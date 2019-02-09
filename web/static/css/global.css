@@ -1,0 +1,120 @@
+@import url('https://fonts.googleapis.com/css?family=Lobster|Alfa+Slab+One|Shadows+Into+Light|Roboto:400,700');
+:root {
+	--home-team: 'Rams';
+	--home-primary: #002244;
+	--home-secondary: #fff;
+	--home-tertiary: #866D4B;
+
+	--away-team: 'Patriots';
+	--away-primary: #002244;
+	--away-secondary: #C60C30;
+	--away-tertiary: #B0B7BC;
+
+	--spacing: 20px;
+	
+	--primary: #4CAF50;
+}
+
+* {
+	padding: 0;
+	margin: 0;
+	outline: none;
+	box-sizing: border-box;
+}
+
+html, body {
+	background-color: var(--primary);
+	font-family: 'Roboto', sans-serif;
+}
+
+header {
+	background-color: #171717;
+	color: #fff;
+	padding: var(--spacing) 0;
+}
+
+main {
+	background-color: #fff;
+	padding: var(--spacing) 0 calc(3 * var(--spacing));
+}
+
+main a {
+	color: var(--primary);
+}
+
+footer {
+	color: rgba(0, 0, 0, 0.3);
+	min-height: 100px;
+	padding-top: var(--spacing);
+	text-align: center;
+}
+footer p {
+	margin: 0;
+}
+footer p.version {
+	font-size: 0.8em;
+}
+footer p a {
+	color: rgba(0, 0, 0, 0.3);
+	text-decoration: underline;
+}
+
+header > div {
+	position: relative;
+}
+header nav {
+	position: absolute;
+	top: 0;
+	right: var(--spacing);
+}
+header nav ul {
+	list-style: none;
+}
+header nav ul li {
+	display: inline-block;
+	margin-left: var(--spacing);
+}
+header nav ul li:first-child {
+	margin-left: 0;
+}
+header nav a {
+	color: #fff;
+	font-weight: bold;
+}
+header p a {
+	background-color: var(--primary);
+	color: #fff;
+	border-radius: 2px;
+	padding: 5px 10px;
+	display: inline-block;
+}
+h1 {
+	font-family: 'Alfa Slab One', sans-serif;
+	font-size: 1.6em;
+	text-shadow: 3px 3px #171717, 5px 5px #4CAF50;
+	display: inline-block;
+}
+p, h3, h4, h5, h6 {
+	margin-bottom: var(--spacing);
+}
+h3 {
+	font-size: 1.6em;
+	font-weight: normal;
+}
+header h2 {
+	font-size: 2.0em;
+	font-weight: normal;
+	text-align: center;
+}
+header p {
+	margin-top: var(--spacing);
+	text-align: center;
+}
+header a {
+	color: #4CAF50;
+	text-decoration: none;
+}
+
+div.content {
+	padding: 0 var(--spacing);
+}

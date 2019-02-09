@@ -1,0 +1,9 @@
+section.index {
+	display: grid;
+	padding-top: var(--spacing);
+	grid-template-columns: repeat(3, 1fr);
+	grid-gap: var(--spacing);
+}
+section.index > div h3 {
+	text-align: center;
+}
