@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"flag"
 	"log"
 	"net/http"
@@ -28,6 +29,8 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/weters/sqmgr/internal/server"
+
+	_ "github.com/lib/pq"
 )
 
 var addr = flag.String("addr", ":8080", "address for the server to listen on")
@@ -40,7 +43,12 @@ const (
 func main() {
 	flag.Parse()
 
-	s := server.New()
+	db, err := openDB()
+	if err != nil {
+		log.Fatalf("could not open database: %v", err)
+	}
+
+	s := server.New(db)
 
 	srv := &http.Server{
 		Addr:         *addr,
@@ -69,4 +77,22 @@ func main() {
 		log.Fatalf("error shutting down: %v", err)
 	}
 	log.Printf("Shutdown complete.")
+}
+
+func openDB() (*sql.DB, error) {
+	dsn := os.Getenv("DSN")
+	if dsn == "" {
+		dsn = "host=localhost port=5432 user=postgres sslmode=disable"
+	}
+
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := db.Ping(); err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }

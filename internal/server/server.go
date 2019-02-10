@@ -18,11 +18,13 @@ limitations under the License.
 package server
 
 import (
+	"database/sql"
 	"html/template"
 	"os"
 	"path/filepath"
 
 	"github.com/gorilla/mux"
+	"github.com/weters/sqmgr/internal/model"
 )
 
 // Version is the current version of the server application
@@ -31,11 +33,12 @@ var Version = "0.1"
 // Server represents the server application
 type Server struct {
 	*mux.Router
+	model        *model.Model
 	baseTemplate *template.Template
 }
 
 // New instantiates a new Server object.
-func New() *Server {
+func New(db *sql.DB) *Server {
 	funcMap := template.FuncMap{
 		"Version": version,
 	}
@@ -46,6 +49,7 @@ func New() *Server {
 
 	s := &Server{
 		Router:       mux.NewRouter(),
+		model:        model.New(db),
 		baseTemplate: tpl,
 	}
 
