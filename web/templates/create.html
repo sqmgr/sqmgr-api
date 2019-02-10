@@ -14,14 +14,16 @@
 				<div class="fields">
 					<div class="field">
 						<label for="name">Squares Name</label>
-						<input type="text" id="name" name="name" placeholder="Squares Name" autocomplete="off" required>
+						<input type="text" id="name" name="name" placeholder="Squares Name" autocomplete="off" required value="{{.FormData.Name}}">
 					</div>
 
 					<div class="field">
 						<label for="squares-type">Type</label>
-						<select id="squares-type">
-							<option value="standard" selected>Standard, 100 squares
-							<option value="standard-25">Standard, 25 squares
+						<select id="squares-type" name="squares-type">
+							{{ $st := .FormData.SquaresType }}
+							{{ range .SquareTypes }}
+							<option value="{{.Key}}" {{ if eq .Key $st }}selected{{ end }}>{{.Description}}
+							{{ end }}
 						</select>
 					</div>
 

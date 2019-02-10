@@ -15,6 +15,18 @@
 			"revisionTime": "2018-09-03T15:43:05Z"
 		},
 		{
+			"checksumSHA1": "xvqMCXXlR74in/1c09UadpfXz9Y=",
+			"path": "github.com/lib/pq",
+			"revision": "4ded0e9383f75c197b3a2aaa6d590ac52df6fd79",
+			"revisionTime": "2018-08-23T06:29:44Z"
+		},
+		{
+			"checksumSHA1": "ATnwV0POluBNQEMjPdylodz0oK0=",
+			"path": "github.com/lib/pq/oid",
+			"revision": "4ded0e9383f75c197b3a2aaa6d590ac52df6fd79",
+			"revisionTime": "2018-08-23T06:29:44Z"
+		},
+		{
 			"checksumSHA1": "DzPitrDCxljWSQkwAqRIJNbU9Z4=",
 			"path": "github.com/onsi/gomega",
 			"revision": "5533ce8a0da374da682cd53d70ddcc54adf1a710",

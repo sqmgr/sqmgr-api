@@ -21,6 +21,8 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+
+	"github.com/weters/sqmgr/internal/model"
 )
 
 const baseTemplateName = "base.html"
@@ -37,8 +39,32 @@ func (s *Server) simpleGetHandler(page string) http.HandlerFunc {
 
 func (s *Server) createHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("create.html")
+
+	type data struct {
+		SquareTypes []*model.SquareType
+		FormData    struct {
+			Name        string
+			SquaresType string
+		}
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := tpl.ExecuteTemplate(w, baseTemplateName, nil); err != nil {
+		var d data
+
+		sts, err := s.model.GetSquareTypes()
+		if err != nil {
+			s.serveInternalError(w, r, err)
+			return
+		}
+
+		d.SquareTypes = sts
+
+		if r.Method == http.MethodPost {
+			d.FormData.Name = r.PostFormValue("name")
+			d.FormData.SquaresType = r.PostFormValue("squares-type")
+		}
+
+		if err := tpl.ExecuteTemplate(w, baseTemplateName, d); err != nil {
 			log.Printf("error: could not render index.html: %v", err)
 		}
 	}
@@ -46,4 +72,10 @@ func (s *Server) createHandler() http.HandlerFunc {
 
 func (s *Server) loadTemplate(filename string) *template.Template {
 	return template.Must(template.Must(s.baseTemplate.Clone()).ParseFiles(filepath.Join(templatesDir, filename)))
+}
+
+func (s *Server) serveInternalError(w http.ResponseWriter, r *http.Request, err error) {
+	log.Printf("error serving %s %s: %v", r.Method, r.URL.String(), err)
+	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	return
 }

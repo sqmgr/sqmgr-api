@@ -25,3 +25,28 @@ type Model struct {
 func New(db *sql.DB) *Model {
 	return &Model{db}
 }
+
+type SquareType struct {
+	Key         string
+	Description string
+}
+
+func (m *Model) GetSquareTypes() ([]*SquareType, error) {
+	rows, err := m.db.Query("SELECT key, description FROM square_types ORDER BY ord ASC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	sts := make([]*SquareType, 0)
+	for rows.Next() {
+		var st SquareType
+		if err := rows.Scan(&st.Key, &st.Description); err != nil {
+			return nil, err
+		}
+
+		sts = append(sts, &st)
+	}
+
+	return sts, nil
+}
