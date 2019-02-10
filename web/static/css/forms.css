@@ -1,0 +1,87 @@
+div.columns {
+	display: grid;
+	grid-template-columns: 3fr 2fr;
+	grid-gap: var(--spacing);
+}
+
+form {
+	border: 1px solid var(--border-color);
+	background-color: #eee;
+	padding: var(--spacing);
+}
+
+fieldset {
+	border: none;
+}
+
+legend {
+	display: block;
+	font-size: 1.2em;
+	border-bottom: 1px solid var(--border-color);
+	margin-bottom: var(--spacing);
+	width: 100%;
+}
+
+label {
+	display: block;
+	margin-bottom: var(--minimal-spacing);
+}
+
+label.optional::after {
+	content: ' - Optional';
+	color: var(--gray);
+	font-style: italic;
+	font-size: 0.8em;
+}
+
+input[type="radio"] + label {
+	display: inline-block;
+}
+
+input, select {
+	border-radius: 3px;
+	border: 1px solid var(--border-color);
+	font: 1em var(--font);
+	padding: var(--minimal-spacing);
+	width: 100%;
+}
+div.field::after {
+	content: '';
+	display: block;
+	clear: both;
+}
+input[type="password"] {
+	float: left;
+	width: calc(50% - var(--minimal-spacing)/2);
+}
+input[type="password"] + input[type="password"] {
+	margin-left: var(--minimal-spacing);
+}
+input::placeholder {
+	color: var(--border-color);
+}
+
+div.field {
+	margin-bottom: var(--spacing);
+}
+
+fieldset.collapsed div.fields {
+	display: none;
+}
+
+fieldset.collapsed legend a {
+	font-size: 0.8em;
+}
+
+input[type="submit"] {
+	background-color: var(--primary);
+	color: #fff;
+	border: none;
+	padding: var(--minimal-spacing) var(--spacing);
+	width: auto;
+}
+
+input:focus, select:focus {
+	border-color: var(--primary);
+	box-shadow: 2px 2px 2px rgba(0,0,0,0.25);
+}

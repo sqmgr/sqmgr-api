@@ -1,6 +1,89 @@
 {{ define "title" }}Create Squares - {{ end }}
+{{ define "header" }}
+<link href="/static/css/forms.css" rel="stylesheet">
+{{ end }}
 {{ define "content" }}
 <section class="create">
 	<h3>Create Squares</h3>
+
+	<div class="columns">
+		<form method="post" action="">
+			<fieldset>
+				<legend>Basic Information</legend>
+
+				<div class="fields">
+					<div class="field">
+						<label for="name">Squares Name</label>
+						<input type="text" id="name" name="name" placeholder="Squares Name" autocomplete="off" required>
+					</div>
+
+					<div class="field">
+						<label for="squares-type">Type</label>
+						<select id="squares-type">
+							<option value="standard" selected>Standard, 100 squares
+							<option value="standard-25">Standard, 25 squares
+						</select>
+					</div>
+
+					<div class="field">
+						<label for="admin-password">Admin Password</label>
+						<input type="password" id="admin-password" name="admin-password" placeholder="Admin Password" required>
+						<input type="password" id="confirm-admin-password" name="confirm-admin-password" placeholder="Confirm Admin Password" required>
+					</div>
+
+					<div class="field">
+						<label for="join-password" class="optional">Join Password</label>
+						<input type="password" id="join-password" name="join-password" placeholder="Join Password">
+						<input type="password" id="confirm-join-password" name="confirm-join-password" placeholder="Confirm Join Password">
+					</div>
+				</div>
+			</fieldset>
+
+			<fieldset class="collapsed">
+				<legend>Advanced Options <a href="#" class="show">show</a></legend>
+
+				<div class="fields">
+					<div class="field">
+						<label for="squares-unlock">Squares Unlock</label>
+						<input type="datetime-local" id="squares-unlock" name="squares-unlock" data-default="today">
+					</div>
+
+					<div class="field">
+						<label for="squares-lock" class="optional">Squares Lock</label>
+						<input type="datetime-local" id="squares-lock" name="squares-lock">
+					</div>
+				</div>
+			</fieldset>
+			<input type="submit" name="submit" value="Create">
+		</form>
+		<div class="help">
+			<h4>Help</h4>
+
+			<h5>Squares Type</h5>
+
+			<p>Select what type of squares board you want. The default is a standard 100 square board. You can also choose a board that has only 25 squares where each square will be granted four numbers.
+
+			<h5>Admin Password</h5>
+
+			<p>The admin password should <strong>not</strong> be shared with anyone else. It will allow you to administor your squares by changing certain settings, marking squares as paid, clearing squares, etc. Remember this password, because it cannot be recovered or reset.
+
+			<h5>Join Password</h5>
+
+			<p>This is an optional password that you may use to password protect your squares.
+
+			<hr>
+
+			<h5>Squares Unlock</h5>
+
+			<p>No squares can be claimed prior to this date and time.
+
+			<h5>Squares Lock</h5>
+
+			<p>Sets the date and time when squares can no longer be claimed.
+		</div>
+	</div>
 </section>
+{{ end }}
+{{ define "javascripts" }}
+<script src="/static/js/forms.js"></script>
 {{ end }}
