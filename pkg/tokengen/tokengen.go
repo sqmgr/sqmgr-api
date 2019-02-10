@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package tokengen is a package that can generate cryptographically secure random tokens
 package tokengen
 
 import (
@@ -22,6 +23,7 @@ import (
 	"math"
 )
 
+// Generate will return a token of length "n".
 func Generate(n int) (string, error) {
 	byteSize := int(math.Ceil(float64(n) * 0.75))
 	b := make([]byte, byteSize)

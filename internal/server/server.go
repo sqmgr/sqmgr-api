@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package server represents the SqMGR server application
 package server
 
 import (
@@ -24,14 +25,16 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// Version is the current version of the server application
 var Version = "0.1"
 
+// Server represents the server application
 type Server struct {
 	*mux.Router
-	Version      string
 	baseTemplate *template.Template
 }
 
+// New instantiates a new Server object.
 func New() *Server {
 	funcMap := template.FuncMap{
 		"Version": version,
@@ -43,7 +46,6 @@ func New() *Server {
 
 	s := &Server{
 		Router:       mux.NewRouter(),
-		Version:      Version,
 		baseTemplate: tpl,
 	}
 
@@ -52,6 +54,8 @@ func New() *Server {
 	return s
 }
 
+// Shutdown will be called when the HTTP server is being shutdown. Any open connections
+// should be gracefully closed.
 func (s *Server) Shutdown() error {
 	return nil
 }
