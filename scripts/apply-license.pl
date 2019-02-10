@@ -42,7 +42,7 @@ limitations under the License.
 
 EOF
 
-chomp( my @files = `find . \! -path '*/vendor/*' \! -path '*/.git/*' -type f -name '*.go'` );
+chomp( my @files = `find . \! -path '*/vendor/*' \! -path '*/.git/*' -type f \\( -name '*.go' -o -name '*.js' \\)` );
 
 for my $file (@files) {
     open my $fh, '+<', $file
