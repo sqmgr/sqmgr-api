@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package validator validates user data
 package validator
 
 import (
@@ -28,18 +29,22 @@ import (
 
 var nonPrintableRx = regexp.MustCompile(`\p{C}`)
 
+// Errors is a mapping of fields to a list of errors
 type Errors map[string][]string
 
+// Validator is the main object for validating user input
 type Validator struct {
 	Errors Errors
 }
 
+// New returns a new validator object
 func New() *Validator {
 	return &Validator{
 		Errors: make(Errors),
 	}
 }
 
+// Printable will ensure that all characters in the string can be printed to string (i.e. no control characters)
 func (v *Validator) Printable(key, val string) string {
 	if len(val) == 0 || nonPrintableRx.MatchString(val) {
 		v.addError(key, "must be a valid string")
@@ -49,6 +54,7 @@ func (v *Validator) Printable(key, val string) string {
 	return val
 }
 
+// Password will ensure that the confirmation matches the password and that they are a certain length
 func (v *Validator) Password(key, pw, cpw string, minLen int) string {
 	hasError := false
 	if pw != cpw {
@@ -95,6 +101,7 @@ func (v *Validator) Datetime(key, datetime, timezoneOffset string) time.Time {
 	return dt.UTC()
 }
 
+// SquaresType will ensure that the string is a valid square type
 func (v *Validator) SquaresType(key, val string) model.SquaresType {
 	if !model.IsValidSquaresType(val) {
 		v.addError(key, "must be a valid squares type")
@@ -102,6 +109,11 @@ func (v *Validator) SquaresType(key, val string) model.SquaresType {
 	}
 
 	return model.SquaresType(val)
+}
+
+// OK will return true if no errors were found
+func (v *Validator) OK() bool {
+	return len(v.Errors) == 0
 }
 
 func (v *Validator) addError(key string, format string, args ...interface{}) {
@@ -112,8 +124,4 @@ func (v *Validator) addError(key string, format string, args ...interface{}) {
 
 	slice = append(slice, fmt.Sprintf(format, args...))
 	v.Errors[key] = slice
-}
-
-func (v *Validator) Valid() bool {
-	return len(v.Errors) == 0
 }

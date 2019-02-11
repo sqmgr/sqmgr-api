@@ -27,6 +27,7 @@ import (
 
 const tokenLen = 6
 
+// Squares represents an individual squares game
 type Squares struct {
 	db            *sql.DB
 	Token         string
@@ -38,10 +39,14 @@ type Squares struct {
 	JoinPassword  string
 }
 
+// NewSquares will create a new squares game. This does not persist
+// anything to the database. You'll need to set the fields first, and then call Save().
 func (m *Model) NewSquares() *Squares {
 	return &Squares{db: m.db}
 }
 
+// Save will persist the squares to the database. This currently only supports creation. A unique token
+// will be generated and updated in the object.
 func (s *Squares) Save() error {
 	token, err := s.generateUniqueToken()
 	if err != nil {

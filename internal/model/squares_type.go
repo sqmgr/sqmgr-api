@@ -16,8 +16,10 @@ limitations under the License.
 
 package model
 
+// SquaresType represents a board type
 type SquaresType string
 
+// Allowed square types
 const (
 	SquaresTypeStd100 SquaresType = "std100"
 	SquaresTypeStd25  SquaresType = "std25"
@@ -28,6 +30,7 @@ var validSquaresTypes = map[SquaresType]bool{
 	SquaresTypeStd25:  true,
 }
 
+// Description returns a human friendly description of the square type
 func (s SquaresType) Description() string {
 	switch s {
 	case SquaresTypeStd100:
@@ -39,11 +42,13 @@ func (s SquaresType) Description() string {
 	return string(s)
 }
 
+// IsValidSquaresType will check to see if the string is a valid square type
 func IsValidSquaresType(val string) bool {
 	_, ok := validSquaresTypes[SquaresType(val)]
 	return ok
 }
 
+// SquaresTypes returns a list of allowed square types
 func SquaresTypes() []SquaresType {
 	return []SquaresType{SquaresTypeStd100, SquaresTypeStd25}
 }

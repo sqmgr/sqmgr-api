@@ -87,7 +87,7 @@ func (s *Server) createHandler() http.HandlerFunc {
 
 			squaresType := v.SquaresType("Type", d.FormData.SquaresType)
 
-			if v.Valid() {
+			if v.OK() {
 				sq := s.model.NewSquares()
 				sq.Name = d.FormData.Name
 				sq.SquaresType = squaresType
