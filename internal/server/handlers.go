@@ -43,9 +43,9 @@ func (s *Server) createHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("create.html")
 
 	type data struct {
-		SquareTypes []*model.SquareType
-		FormErrors  validator.Errors
-		FormData    struct {
+		SquaresTypes []model.SquaresType
+		FormErrors   validator.Errors
+		FormData     struct {
 			Name          string
 			SquaresType   string
 			SquaresUnlock string
@@ -56,13 +56,7 @@ func (s *Server) createHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var d data
 
-		sts, err := s.model.GetSquareTypes()
-		if err != nil {
-			s.serveInternalError(w, r, err)
-			return
-		}
-
-		d.SquareTypes = sts
+		d.SquaresTypes = model.SquaresTypes()
 
 		if r.Method == http.MethodPost {
 			v := validator.New()
@@ -91,10 +85,12 @@ func (s *Server) createHandler() http.HandlerFunc {
 				squaresLock = v.Datetime("Squares Lock", d.FormData.SquaresLock, timezoneOffset)
 			}
 
+			squaresType := v.SquaresType("Type", d.FormData.SquaresType)
+
 			if v.Valid() {
 				sq := s.model.NewSquares()
 				sq.Name = d.FormData.Name
-				sq.SquaresType = d.FormData.SquaresType
+				sq.SquaresType = squaresType
 				sq.SquaresUnlock = squaresUnlock
 				sq.SquaresLock = squaresLock
 				sq.AdminPassword = adminPassword

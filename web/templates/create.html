@@ -39,8 +39,8 @@
 						<label for="squares-type">Type</label>
 						<select id="squares-type" name="squares-type">
 							{{ $st := .FormData.SquaresType }}
-							{{ range .SquareTypes }}
-							<option value="{{.Key}}" {{ if eq .Key $st }}selected{{ end }}>{{.Description}}
+							{{ range .SquaresTypes }}
+								<option value="{{.}}" {{ if eq . $st }}selected{{ end }}>{{.Description}}
 							{{ end }}
 						</select>
 					</div>

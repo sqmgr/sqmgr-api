@@ -31,7 +31,7 @@ type Squares struct {
 	db            *sql.DB
 	Token         string
 	Name          string
-	SquaresType   string
+	SquaresType   SquaresType
 	SquaresUnlock time.Time
 	SquaresLock   time.Time
 	AdminPassword string

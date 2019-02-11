@@ -14,39 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package model handles various models
 package model
 
 import "database/sql"
 
+// Model is an object that can be used to interact with a database
 type Model struct {
 	db *sql.DB
 }
 
+// New returns a new model. The db can be any database, but it's most likely a postgres handle.
 func New(db *sql.DB) *Model {
 	return &Model{db}
-}
-
-type SquareType struct {
-	Key         string
-	Description string
-}
-
-func (m *Model) GetSquareTypes() ([]*SquareType, error) {
-	rows, err := m.db.Query("SELECT key, description FROM square_types ORDER BY ord ASC")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	sts := make([]*SquareType, 0)
-	for rows.Next() {
-		var st SquareType
-		if err := rows.Scan(&st.Key, &st.Description); err != nil {
-			return nil, err
-		}
-
-		sts = append(sts, &st)
-	}
-
-	return sts, nil
 }

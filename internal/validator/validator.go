@@ -22,6 +22,8 @@ import (
 	"regexp"
 	"strconv"
 	"time"
+
+	"github.com/weters/sqmgr/internal/model"
 )
 
 var nonPrintableRx = regexp.MustCompile(`\p{C}`)
@@ -91,6 +93,15 @@ func (v *Validator) Datetime(key, datetime, timezoneOffset string) time.Time {
 	}
 
 	return dt.UTC()
+}
+
+func (v *Validator) SquaresType(key, val string) model.SquaresType {
+	if !model.IsValidSquaresType(val) {
+		v.addError(key, "must be a valid squares type")
+		return model.SquaresType("")
+	}
+
+	return model.SquaresType(val)
 }
 
 func (v *Validator) addError(key string, format string, args ...interface{}) {
