@@ -15,8 +15,12 @@ INSERT INTO square_types (key, description, ord) VALUES
 	('standard-25', 'Standard, 25 Squares', 1)
 ;
 
+CREATE TABLE tokens (
+	token text NOT NULL PRIMARY KEY
+);
+
 CREATE TABLE squares (
-	token text NOT NULL PRIMARY KEY,
+	token text NOT NULL PRIMARY KEY REFERENCES tokens(token),
 	name text NOT NULL,
 	square_type text NOT NULL references square_types (key),
 	admin_password_hash text NOT NULL,
@@ -29,3 +33,26 @@ CREATE TABLE squares (
 
 --rollback DROP TABLE squares;
 --rollback DROP TABLE square_types;
+--rollback DROP TABLE tokens;
+
+-- // --
+
+--changeset tpeters:2 splitStatements:false
+
+CREATE FUNCTION new_token(_token text) RETURNS boolean
+	LANGUAGE plpgsql
+	AS $$
+BEGIN
+	LOCK TABLE tokens IN SHARE UPDATE EXCLUSIVE MODE;
+
+	PERFORM 1 FROM tokens WHERE token = _token;
+	IF FOUND THEN
+		RETURN false;
+	END IF;
+
+	INSERT INTO tokens (token) VALUES (_token);
+	RETURN true;
+END;
+$$;
+
+--rollback DROP FUNCTION new_token(text);

@@ -84,7 +84,7 @@ func (s *Squares) Save() error {
 }
 
 func (s *Squares) generateUniqueToken() (string, error) {
-	stmt, err := s.db.Prepare("SELECT true FROM squares WHERE token = $1")
+	stmt, err := s.db.Prepare("SELECT * FROM new_token($1)")
 	if err != nil {
 		return "", err
 	}
@@ -97,11 +97,12 @@ func (s *Squares) generateUniqueToken() (string, error) {
 
 		row := stmt.QueryRow(token)
 		var ok bool
-		err = row.Scan(&ok)
-		if err != nil && err == sql.ErrNoRows {
-			return token, nil
-		} else if err != nil {
+		if err := row.Scan(&ok); err != nil {
 			return "", err
+		}
+
+		if ok {
+			return token, nil
 		}
 	}
 
