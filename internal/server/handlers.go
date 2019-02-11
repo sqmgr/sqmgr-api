@@ -21,8 +21,10 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/weters/sqmgr/internal/model"
+	"github.com/weters/sqmgr/internal/validator"
 )
 
 const baseTemplateName = "base.html"
@@ -42,9 +44,12 @@ func (s *Server) createHandler() http.HandlerFunc {
 
 	type data struct {
 		SquareTypes []*model.SquareType
+		FormErrors  validator.Errors
 		FormData    struct {
-			Name        string
-			SquaresType string
+			Name          string
+			SquaresType   string
+			SquaresUnlock string
+			SquaresLock   string
 		}
 	}
 
@@ -60,8 +65,52 @@ func (s *Server) createHandler() http.HandlerFunc {
 		d.SquareTypes = sts
 
 		if r.Method == http.MethodPost {
+			v := validator.New()
+
 			d.FormData.Name = r.PostFormValue("name")
 			d.FormData.SquaresType = r.PostFormValue("squares-type")
+			d.FormData.SquaresUnlock = r.PostFormValue("squares-unlock")
+			d.FormData.SquaresLock = r.PostFormValue("squares-lock")
+
+			adminPassword := r.PostFormValue("admin-password")
+			confirmAdminPassword := r.PostFormValue("confirm-admin-password")
+
+			joinPassword := r.PostFormValue("join-password")
+			confirmJoinPassword := r.PostFormValue("confirm-join-password")
+
+			v.Printable("Squares Name", d.FormData.Name)
+			v.Password("Admin Password", adminPassword, confirmAdminPassword, 8)
+			if len(joinPassword) > 0 {
+				v.Password("Join Password", joinPassword, confirmJoinPassword, 4)
+			}
+
+			timezoneOffset := r.PostFormValue("timezone-offset")
+			squaresUnlock := v.Datetime("Squares Unlock", d.FormData.SquaresUnlock, timezoneOffset)
+			squaresLock := time.Time{}
+			if d.FormData.SquaresLock != "" {
+				squaresLock = v.Datetime("Squares Lock", d.FormData.SquaresLock, timezoneOffset)
+			}
+
+			if v.Valid() {
+				sq := s.model.NewSquares()
+				sq.Name = d.FormData.Name
+				sq.SquaresType = d.FormData.SquaresType
+				sq.SquaresUnlock = squaresUnlock
+				sq.SquaresLock = squaresLock
+				sq.AdminPassword = adminPassword
+				sq.JoinPassword = joinPassword
+
+				if err := sq.Save(); err != nil {
+					s.serveInternalError(w, r, err)
+					return
+				}
+
+				// handle
+				http.Redirect(w, r, "/squares/"+sq.Token, http.StatusSeeOther)
+				return
+			}
+
+			d.FormErrors = v.Errors
 		}
 
 		if err := tpl.ExecuteTemplate(w, baseTemplateName, d); err != nil {

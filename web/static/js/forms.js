@@ -23,14 +23,31 @@ Date.prototype.toLocalDateTimeString = function() {
 		'-' + pad(this.getMonth()) +
 		'-' + pad(this.getDate()) +
 		'T' + pad(this.getHours()) +
-		':' + pad(this.getMinutes()) +
-		':' + pad(this.getSeconds())
+		':' + pad(this.getMinutes())
 }
 
 window.addEventListener('load', function() {
 	var now = new Date()
 	var today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 	var todayValue = today.toLocalDateTimeString()
+
+	document.querySelector('input[name="timezone-offset"]').value = -new Date().getTimezoneOffset()/60
+
+	document.querySelectorAll('input').forEach(function(input) {
+		var check = function() {
+			if (this.value === "") {
+				this.classList.add('empty')
+				this.classList.remove('not-empty')
+			} else {
+				this.classList.add('not-empty')
+				this.classList.remove('empty')
+			}
+		}
+
+		input.addEventListener('blur', check)
+		input.addEventListener('keyup', check)
+		check.call(input)
+	})
 
 	document.querySelectorAll('input[type="datetime-local"]').forEach(function(input) {
 		var dataDefault = input.getAttribute('data-default') || ''
@@ -70,11 +87,17 @@ window.addEventListener('load', function() {
 			return
 		}
 
-		input.onblur = function() {
+		input.onblur = input.onkeyup = function() {
 			if (passwordPrimary.value !== passwordConfirm.value) {
+				passwordPrimary.setCustomValidity("passwords do not match")
+				passwordPrimary.classList.add('passwords-no-match')
 				passwordConfirm.setCustomValidity("passwords do not match")
+				passwordConfirm.classList.add('passwords-no-match')
 			} else {
+				passwordPrimary.setCustomValidity("")
+				passwordPrimary.classList.remove('passwords-no-match')
 				passwordConfirm.setCustomValidity("")
+				passwordConfirm.classList.remove('passwords-no-match')
 			}
 		}
 	})

@@ -17,6 +17,7 @@ INSERT INTO square_types (key, description, ord) VALUES
 
 CREATE TABLE squares (
 	token text NOT NULL PRIMARY KEY,
+	name text NOT NULL,
 	square_type text NOT NULL references square_types (key),
 	admin_password_hash text NOT NULL,
 	join_password_hash text,

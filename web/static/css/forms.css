@@ -82,6 +82,33 @@ input[type="submit"] {
 }
 
 input:focus, select:focus {
-	border-color: var(--primary);
 	box-shadow: 2px 2px 2px rgba(0,0,0,0.25);
+}
+
+
+input.not-empty:invalid,
+input.passwords-no-match:invalid {
+	border-color: #f44336;
+}
+
+p.requirement {
+	font-style: italic;
+	font-size: 0.6em;
+	color: var(--gray);
+	margin-bottom: var(--minimal-spacing);
+}
+
+form div.errors {
+	background-color: #f44336;
+	padding: var(--spacing);
+	margin-bottom: var(--spacing);
+}
+form div.errors ul {
+	font-weight: bold;
+	list-style: none;
+}
+form div.errors ul ul {
+	font-weight: normal;
+	margin-left: calc(2*var(--spacing));
+	list-style-type: disc;
 }

@@ -8,6 +8,24 @@
 
 	<div class="columns">
 		<form method="post" action="">
+			{{ if .FormErrors }}
+				<div class="errors">
+					<h4>Error</h4>
+
+					<p>Please correct the following errors:
+
+					<ul>
+						{{ range $k, $v := .FormErrors }}
+							<li>{{$k}}
+								<ul>
+									{{ range $v }}
+										<li>{{.}}
+									{{ end }}
+								</ul>
+						{{ end }}
+					</ul>
+				</div>
+			{{ end }}
 			<fieldset>
 				<legend>Basic Information</legend>
 
@@ -29,14 +47,20 @@
 
 					<div class="field">
 						<label for="admin-password">Admin Password</label>
-						<input type="password" id="admin-password" name="admin-password" placeholder="Admin Password" required>
-						<input type="password" id="confirm-admin-password" name="confirm-admin-password" placeholder="Confirm Admin Password" required>
+						<p class="requirement">Must be at least eight (8) characters
+						<div class="password">
+							<input type="password" id="admin-password" name="admin-password" placeholder="Admin Password" value="" pattern=".{8,}" required>
+							<input type="password" id="confirm-admin-password" name="confirm-admin-password" placeholder="Confirm Admin Password" value="" required>
+						</div>
 					</div>
 
 					<div class="field">
 						<label for="join-password" class="optional">Join Password</label>
-						<input type="password" id="join-password" name="join-password" placeholder="Join Password">
-						<input type="password" id="confirm-join-password" name="confirm-join-password" placeholder="Confirm Join Password">
+						<p class="requirement">Must be at least four (4) characters
+						<div class="password">
+							<input type="password" id="join-password" name="join-password" value="" pattern=".{4,}" placeholder="Join Password">
+							<input type="password" id="confirm-join-password" name="confirm-join-password" value="" placeholder="Confirm Join Password">
+						</div>
 					</div>
 				</div>
 			</fieldset>
@@ -56,6 +80,7 @@
 					</div>
 				</div>
 			</fieldset>
+			<input type="hidden" name="timezone-offset" value="0">
 			<input type="submit" name="submit" value="Create">
 		</form>
 		<div class="help">
