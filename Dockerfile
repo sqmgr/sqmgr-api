@@ -2,6 +2,7 @@ FROM golang:latest AS build
 WORKDIR /go/src/github.com/weters/sqmgr
 COPY cmd/ cmd/
 COPY internal/ internal/
+COPY pkg/ pkg/
 COPY vendor vendor/
 RUN CGO_ENABLED=0 GOOS=linux go build -a -o sqmgrserver github.com/weters/sqmgr/cmd/sqmgrserver
 
