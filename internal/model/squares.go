@@ -21,6 +21,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/weters/sqmgr/pkg/tokengen"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -43,6 +44,27 @@ type Squares struct {
 // anything to the database. You'll need to set the fields first, and then call Save().
 func (m *Model) NewSquares() *Squares {
 	return &Squares{db: m.db}
+}
+
+// GetSquaresByToken will return the squares based on the token. Will return an error if anything goes wrong.
+func (m *Model) GetSquaresByToken(token string) (*Squares, error) {
+	row := m.db.QueryRow("SELECT name, square_type, admin_password_hash, join_password_hash, squares_unlock, squares_lock  FROM squares WHERE token = $1", token)
+	var r Squares
+	var joinPassword sql.NullString
+	var squaresLock pq.NullTime
+	if err := row.Scan(&r.Name, &r.SquaresType, &r.AdminPassword, &joinPassword, &r.SquaresUnlock, &squaresLock); err != nil {
+		return nil, err
+	}
+
+	if joinPassword.Valid {
+		r.JoinPassword = joinPassword.String
+	}
+
+	if squaresLock.Valid {
+		r.SquaresLock = squaresLock.Time
+	}
+
+	return &r, nil
 }
 
 // Save will persist the squares to the database. This currently only supports creation. A unique token

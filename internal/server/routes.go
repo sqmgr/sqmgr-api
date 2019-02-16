@@ -21,6 +21,7 @@ import "net/http"
 func (s *Server) setupRoutes() {
 	s.Router.Methods(http.MethodGet).PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web/static/"))))
 	s.Router.Methods(http.MethodGet).Path("/").Handler(s.simpleGetHandler("index.html"))
+	s.Router.Methods(http.MethodGet).Path("/squares/{token:[A-Za-z0-9_-]+}").Handler(s.squaresGetHandler())
 	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/create").Handler(s.createHandler())
 	s.Router.Methods(http.MethodGet).Path("/donate").Handler(s.simpleGetHandler("donate.html"))
 }

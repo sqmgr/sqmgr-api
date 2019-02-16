@@ -17,12 +17,15 @@ limitations under the License.
 package server
 
 import (
+	"database/sql"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"path/filepath"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/weters/sqmgr/internal/model"
 	"github.com/weters/sqmgr/internal/validator"
 )
@@ -115,6 +118,30 @@ func (s *Server) createHandler() http.HandlerFunc {
 
 		if err := tpl.ExecuteTemplate(w, baseTemplateName, d); err != nil {
 			log.Printf("error: could not render index.html: %v", err)
+		}
+	}
+}
+
+func (s *Server) squaresGetHandler() http.HandlerFunc {
+	tpl := s.loadTemplate("squares.html")
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		token := vars["token"]
+
+		squares, err := s.model.GetSquaresByToken(token)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				http.NotFound(w, r)
+				return
+			}
+
+			fmt.Printf("error: could not get squares: %v", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		if err := tpl.ExecuteTemplate(w, baseTemplateName, squares); err != nil {
+			log.Printf("error: could not render squares.html: %v", err)
 		}
 	}
 }
