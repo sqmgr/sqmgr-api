@@ -14,22 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-Date.prototype.toLocalDateTimeString = function() {
+Date.prototype.toLocalTimeString = function() {
+	var pad = function(x) {
+		return x < 10 ? '0' + x : x
+	}
+
+	return pad(this.getHours()) +
+		':' + pad(this.getMinutes())
+}
+
+Date.prototype.toLocalYMDString = function() {
 	var pad = function(x) {
 		return x < 10 ? '0' + x : x
 	}
 
 	return this.getFullYear() +
 		'-' + pad(this.getMonth()) +
-		'-' + pad(this.getDate()) +
-		'T' + pad(this.getHours()) +
-		':' + pad(this.getMinutes())
+		'-' + pad(this.getDate())
 }
 
 window.addEventListener('load', function() {
 	var now = new Date()
 	var today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-	var todayValue = today.toLocalDateTimeString()
 
 	document.querySelector('input[name="timezone-offset"]').value = -new Date().getTimezoneOffset()/60
 
@@ -49,11 +55,19 @@ window.addEventListener('load', function() {
 		check.call(input)
 	})
 
-	document.querySelectorAll('input[type="datetime-local"]').forEach(function(input) {
+	document.querySelectorAll('input[type="date"]').forEach(function(input) {
 		var dataDefault = input.getAttribute('data-default') || ''
 
 		if (dataDefault === 'today') {
-			input.value = todayValue
+			input.value = today.toLocalYMDString()
+		}
+	})
+
+	document.querySelectorAll('input[type="time"]').forEach(function(input) {
+		var dataDefault = input.getAttribute('data-default') || ''
+
+		if (dataDefault === 'today') {
+			input.value = today.toLocalTimeString()
 		}
 	})
 

@@ -46,10 +46,12 @@ func (s *Server) createHandler() http.HandlerFunc {
 		SquaresTypes []model.SquaresType
 		FormErrors   validator.Errors
 		FormData     struct {
-			Name          string
-			SquaresType   string
-			SquaresUnlock string
-			SquaresLock   string
+			Name              string
+			SquaresType       string
+			SquaresUnlockDate string
+			SquaresUnlockTime string
+			SquaresLockDate   string
+			SquaresLockTime   string
 		}
 	}
 
@@ -63,8 +65,10 @@ func (s *Server) createHandler() http.HandlerFunc {
 
 			d.FormData.Name = r.PostFormValue("name")
 			d.FormData.SquaresType = r.PostFormValue("squares-type")
-			d.FormData.SquaresUnlock = r.PostFormValue("squares-unlock")
-			d.FormData.SquaresLock = r.PostFormValue("squares-lock")
+			d.FormData.SquaresUnlockDate = r.PostFormValue("squares-unlock-date")
+			d.FormData.SquaresUnlockTime = r.PostFormValue("squares-unlock-time")
+			d.FormData.SquaresLockDate = r.PostFormValue("squares-lock-date")
+			d.FormData.SquaresLockTime = r.PostFormValue("squares-lock-time")
 
 			adminPassword := r.PostFormValue("admin-password")
 			confirmAdminPassword := r.PostFormValue("confirm-admin-password")
@@ -79,10 +83,10 @@ func (s *Server) createHandler() http.HandlerFunc {
 			}
 
 			timezoneOffset := r.PostFormValue("timezone-offset")
-			squaresUnlock := v.Datetime("Squares Unlock", d.FormData.SquaresUnlock, timezoneOffset)
+			squaresUnlock := v.Datetime("Squares Unlock", d.FormData.SquaresUnlockDate+"T"+d.FormData.SquaresLockTime, timezoneOffset)
 			squaresLock := time.Time{}
-			if d.FormData.SquaresLock != "" {
-				squaresLock = v.Datetime("Squares Lock", d.FormData.SquaresLock, timezoneOffset)
+			if d.FormData.SquaresLockDate != "" && d.FormData.SquaresLockTime != "" {
+				squaresLock = v.Datetime("Squares Lock", d.FormData.SquaresLockDate+"T"+d.FormData.SquaresUnlockTime, timezoneOffset)
 			}
 
 			squaresType := v.SquaresType("Type", d.FormData.SquaresType)

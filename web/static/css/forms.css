@@ -60,6 +60,10 @@ input[type="password"] + input[type="password"] {
 input::placeholder {
 	color: var(--border-color);
 }
+input[type="date"],
+input[type="time"] {
+	width: auto;
+}
 
 div.field {
 	margin-bottom: var(--spacing);
