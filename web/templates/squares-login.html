@@ -1,0 +1,32 @@
+{{ define "title" }}Login - {{.Squares.Name}} - {{ end }}
+{{ define "header" }}
+<link href="/static/css/forms.css" rel="stylesheet">
+{{ end }}
+{{ define "content" }}
+<section class="squares-login">
+	<h3>{{.Squares.Name}}</h3>
+
+	<p>Please enter the password to continue. If you don't have a password, please contact the board owner.
+
+	<form method="post">
+		<fieldset>
+			<legend>Login</legend>
+
+			{{ if .Error }}
+			<div class="errors">
+				<ul>
+					<li>{{.Error}}
+				</ul>
+			</div>
+			{{ end }}
+
+			<div class="field">
+				<label for="password">Password</label>
+				<input type="password" id="password" name="password" placeholder="password">
+			</div>
+
+			<input type="submit" name="submit" value="Login">
+		</fieldset>
+	</form>
+</section>
+{{ end }}

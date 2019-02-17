@@ -20,15 +20,47 @@ package server
 import (
 	"database/sql"
 	"html/template"
+	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/sessions"
 	"github.com/weters/sqmgr/internal/model"
+	"github.com/weters/sqmgr/pkg/tokengen"
 )
 
 // Version is the current version of the server application
 var Version = "0.1"
+
+var store *sessions.CookieStore
+
+func init() {
+	sessionAuthKey := os.Getenv("SESSION_AUTH_KEY")
+	sessionEncKey := os.Getenv("SESSION_ENC_KEY")
+
+	if sessionAuthKey == "" {
+		var err error
+		sessionAuthKey, err = tokengen.Generate(64)
+		if err != nil {
+			panic(err)
+		}
+
+		log.Printf("WARNING: no SESSION_AUTH_KEY specified, using random value: %s", sessionAuthKey)
+	}
+
+	if sessionEncKey == "" {
+		var err error
+		sessionEncKey, err = tokengen.Generate(32)
+		if err != nil {
+			panic(err)
+		}
+
+		log.Printf("WARNING: no SESSION_ENC_KEY specified, using random value: %s", sessionEncKey)
+	}
+
+	store = sessions.NewCookieStore([]byte(sessionAuthKey), []byte(sessionEncKey))
+}
 
 // Server represents the server application
 type Server struct {

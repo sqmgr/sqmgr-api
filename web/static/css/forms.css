@@ -1,3 +1,4 @@
+/* Generic Forms */
 div.columns {
 	display: grid;
 	grid-template-columns: 3fr 2fr;
@@ -115,4 +116,9 @@ form div.errors ul ul {
 	font-weight: normal;
 	margin-left: calc(2*var(--spacing));
 	list-style-type: disc;
+}
+
+/* Squares Login */
+section.squares-login input[type="password"] {
+	width: auto;
 }

@@ -3,6 +3,7 @@ module github.com/weters/sqmgr
 require (
 	github.com/gorilla/handlers v1.4.0
 	github.com/gorilla/mux v1.7.0
+	github.com/gorilla/sessions v1.1.3
 	github.com/keegancsmith/rpc v1.1.0 // indirect
 	github.com/lib/pq v1.0.0
 	github.com/onsi/gomega v1.4.3

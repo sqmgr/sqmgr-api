@@ -38,6 +38,10 @@ type Squares struct {
 	SquaresLock   time.Time
 	AdminPassword string
 	JoinPassword  string
+
+	// these values will only be set when retrieving from the database
+	AdminPasswordHash string
+	JoinPasswordHash  string
 }
 
 // NewSquares will create a new squares game. This does not persist
@@ -50,14 +54,15 @@ func (m *Model) NewSquares() *Squares {
 func (m *Model) GetSquaresByToken(token string) (*Squares, error) {
 	row := m.db.QueryRow("SELECT name, square_type, admin_password_hash, join_password_hash, squares_unlock, squares_lock  FROM squares WHERE token = $1", token)
 	var r Squares
-	var joinPassword sql.NullString
+	var joinPasswordHash sql.NullString
 	var squaresLock pq.NullTime
-	if err := row.Scan(&r.Name, &r.SquaresType, &r.AdminPassword, &joinPassword, &r.SquaresUnlock, &squaresLock); err != nil {
+	r.Token = token
+	if err := row.Scan(&r.Name, &r.SquaresType, &r.AdminPasswordHash, &joinPasswordHash, &r.SquaresUnlock, &squaresLock); err != nil {
 		return nil, err
 	}
 
-	if joinPassword.Valid {
-		r.JoinPassword = joinPassword.String
+	if joinPasswordHash.Valid {
+		r.JoinPasswordHash = joinPasswordHash.String
 	}
 
 	if squaresLock.Valid {
@@ -65,6 +70,11 @@ func (m *Model) GetSquaresByToken(token string) (*Squares, error) {
 	}
 
 	return &r, nil
+}
+
+// JoinPasswordMatches will return true if the provided joinPassword is valid.
+func (s *Squares) JoinPasswordMatches(joinPassword string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(s.JoinPasswordHash), []byte(joinPassword)) == nil
 }
 
 // Save will persist the squares to the database. This currently only supports creation. A unique token
