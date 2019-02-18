@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/weters/pwned"
 	"github.com/weters/sqmgr/internal/model"
 )
 
@@ -52,6 +53,27 @@ func (v *Validator) Printable(key, val string) string {
 	}
 
 	return val
+}
+
+// NotPwnedPassword will ensure that the password provided has not been pwned.
+func (v *Validator) NotPwnedPassword(key, pw string) string {
+	count, err := pwned.Count(pw)
+	if err != nil {
+		// if we can't detect, just make a note of it, but don't fail
+		log.Printf("error: could not determined if password has been pwned: %v", err)
+	}
+
+	if count > 0 {
+		times := "times"
+		if count == 1 {
+			times = "time"
+		}
+
+		v.addError(key, "the password you provided has been compromised at least %d %s. please use a different password", count, times)
+		return ""
+	}
+
+	return pw
 }
 
 // Password will ensure that the confirmation matches the password and that they are a certain length

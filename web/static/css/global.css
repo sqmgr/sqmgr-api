@@ -16,7 +16,7 @@
 	--gray: #999;
 	--border-color: #ccc;
 	--font: 'Roboto';
-	--primary: #4CAF50;
+	--primary: #4caf50;
 }
 
 * {
@@ -39,6 +39,7 @@ header {
 
 main {
 	background-color: #fff;
+	min-height: 400px;
 	padding: var(--spacing) 0 calc(3 * var(--spacing));
 }
 
@@ -96,7 +97,7 @@ header p a {
 h1 {
 	font-family: 'Alfa Slab One', sans-serif;
 	font-size: 1.6em;
-	text-shadow: 3px 3px #171717, 5px 5px #4CAF50;
+	text-shadow: 3px 3px #171717, 5px 5px var(--primary);
 	display: inline-block;
 }
 h3 {

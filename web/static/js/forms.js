@@ -89,6 +89,9 @@ window.addEventListener('load', function() {
 		var name = input.getAttribute("id")
 		var passwordPrimary
 		var passwordConfirm
+		var shouldCheckPwned = ( input.getAttribute("data-sqmgr") === "no-pwned" )
+		var pwnedReq
+
 		if (name.indexOf("confirm-") === 0) {
 			passwordPrimary = document.getElementById(name.substr(8))
 			passwordConfirm = input
@@ -101,7 +104,8 @@ window.addEventListener('load', function() {
 			return
 		}
 
-		input.onblur = input.onkeyup = function() {
+		var checkConfirmation = function() {
+			var pwnedCount = 0
 			if (passwordPrimary.value !== passwordConfirm.value) {
 				passwordPrimary.setCustomValidity("passwords do not match")
 				passwordPrimary.classList.add('passwords-no-match')
@@ -110,9 +114,56 @@ window.addEventListener('load', function() {
 			} else {
 				passwordPrimary.setCustomValidity("")
 				passwordPrimary.classList.remove('passwords-no-match')
+				passwordPrimary.classList.remove('password-pwned')
 				passwordConfirm.setCustomValidity("")
 				passwordConfirm.classList.remove('passwords-no-match')
+
+				if (pwnedCount = passwordPrimary.getAttribute('data-pwned')) {
+					passwordPrimary.setCustomValidity("password has been compromised " + pwnedCount + " time(s). Please choose another password")
+					passwordPrimary.classList.add('password-pwned')
+				}
 			}
+		}
+
+		var checkPwned = function() {
+			input.removeAttribute("data-pwned")
+
+			if (pwnedReq) {
+				pwnedReq.abort()
+			}
+
+			password = input.value
+			if (password.length < 2) {
+				return
+			}
+
+			pwnedReq = new XMLHttpRequest()
+			pwnedReq.open('POST', '/pwned', true)
+			pwnedReq.onreadystatechange = function() {
+				var count
+				if (pwnedReq.readyState === 4) {
+					count = parseInt(pwnedReq.responseText, 10)
+					if (count > 0) {
+						checkConfirmation()
+						return
+					}
+				}
+			}
+
+			pwnedReq.send(password)
+		}
+
+		input.addEventListener('blur', checkConfirmation)
+		input.addEventListener('keyup', checkConfirmation)
+
+		if (shouldCheckPwned) {
+			input.addEventListener('blur', checkPwned)
+		}
+	})
+
+	document.querySelectorAll('input[type="password"][data-sqmgr="no-pwned"]').forEach(function(input) {
+
+		input.onblur = function() {
 		}
 	})
 })

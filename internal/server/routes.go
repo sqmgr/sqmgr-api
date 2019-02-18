@@ -25,4 +25,6 @@ func (s *Server) setupRoutes() {
 	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/squares/{token:[A-Za-z0-9_-]+}/login").Handler(s.squaresLoginHandler())
 	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/create").Handler(s.createHandler())
 	s.Router.Methods(http.MethodGet).Path("/donate").Handler(s.simpleGetHandler("donate.html"))
+
+	s.Router.Methods(http.MethodPost).Path("/pwned").Handler(s.pwnedHandler())
 }

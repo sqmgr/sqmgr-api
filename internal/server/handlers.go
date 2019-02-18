@@ -20,13 +20,16 @@ import (
 	"database/sql"
 	"fmt"
 	"html/template"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
+	"github.com/weters/pwned"
 	"github.com/weters/sqmgr/internal/model"
 	"github.com/weters/sqmgr/internal/validator"
 )
@@ -83,6 +86,7 @@ func (s *Server) createHandler() http.HandlerFunc {
 
 			v.Printable("Squares Name", d.FormData.Name)
 			v.Password("Admin Password", adminPassword, confirmAdminPassword, 8)
+			v.NotPwnedPassword("Admin Password", adminPassword)
 			if len(joinPassword) > 0 {
 				v.Password("Join Password", joinPassword, confirmJoinPassword, 4)
 			}
@@ -138,7 +142,6 @@ func (s *Server) squaresGetHandler() http.HandlerFunc {
 			return
 		}
 
-		fmt.Printf("%#v", squares)
 		if !s.canViewSquares(session, squares) {
 			http.Redirect(w, r, fmt.Sprintf("/squares/%s/login", squares.Token), http.StatusSeeOther)
 			return
@@ -219,6 +222,24 @@ func (s *Server) getSquares(w http.ResponseWriter, r *http.Request) (*model.Squa
 	}
 
 	return squares, true
+}
+
+func (s *Server) pwnedHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		b, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		count, err := pwned.Count(string(b))
+		if err != nil {
+			log.Printf("error: could not get pwned information: %v", err)
+		}
+
+		w.Header().Set("Content-Type", "text/plain")
+		w.Write([]byte(strconv.Itoa(count)))
+	}
 }
 
 func (s *Server) canViewSquares(session *sessions.Session, squares *model.Squares) bool {
