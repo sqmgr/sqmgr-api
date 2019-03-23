@@ -107,13 +107,10 @@ window.addEventListener('load', function() {
 		var checkConfirmation = function() {
 			var pwnedCount = 0
 			if (passwordPrimary.value !== passwordConfirm.value) {
-				passwordPrimary.setCustomValidity("passwords do not match")
-				passwordPrimary.classList.add('passwords-no-match')
 				passwordConfirm.setCustomValidity("passwords do not match")
 				passwordConfirm.classList.add('passwords-no-match')
 			} else {
 				passwordPrimary.setCustomValidity("")
-				passwordPrimary.classList.remove('passwords-no-match')
 				passwordPrimary.classList.remove('password-pwned')
 				passwordConfirm.setCustomValidity("")
 				passwordConfirm.classList.remove('passwords-no-match')
