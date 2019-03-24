@@ -1,7 +1,41 @@
 {{ define "title" }}Login - {{ end }}
 
+{{ define "header" }}
+<link href="/static/css/forms.css" rel="stylesheet">
+<link href="/static/css/login.css" rel="stylesheet">
+{{ end }}
+
 {{ define "content" }}
 <section class="login">
-	<h3>Login</h3>
+	<form class="small" method="post">
+		<fieldset>
+			<legend>Log in to SqMGR</legend>
+
+			{{ if .FormData.Email }}
+				<div class="errors">
+					<ul>
+						<li>Incorrect email address or password
+					</ul>
+				</div>
+			{{ end }}
+
+			<div class="field">
+				<label for="email">Email Address</label>
+				<input type="email" id="email" name="email" placeholder="Email Address" value="{{.FormData.Email}}" required>
+			</div>
+
+			<div class="field">
+				<label for="password">Password</label>
+				<input type="password" id="password" name="password" placeholder="Password" required>
+			</div>
+
+			<div class="buttons">
+				<input type="submit" name="submit" value="Login">
+				<label class="remember-me"><input type="checkbox" id="remember-me" name="remember-me" value="yes" checked> Remember me</label>
+			</div>
+
+			<p>Don't have an account? <a href="/signup">Signup now!</a>
+		</fieldset>
+	</form>
 </section>
 {{ end }}

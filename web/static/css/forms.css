@@ -11,8 +11,17 @@ form {
 	padding: var(--spacing);
 }
 
+form.small {
+	max-width: 600px;
+	margin: 0 auto;
+}
+
 fieldset {
 	border: none;
+}
+
+div.buttons + p {
+	margin: var(--spacing) 0 0;
 }
 
 legend {

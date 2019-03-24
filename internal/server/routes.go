@@ -33,5 +33,6 @@ func (s *Server) setupRoutes() {
 	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/create").Handler(s.createHandler())
 	s.Router.Methods(http.MethodGet).Path("/donate").Handler(s.simpleGetHandler("donate.html"))
 
-	s.Router.Methods(http.MethodPost).Path("/pwned").Handler(s.pwnedHandler())
+	// temporary
+	s.Router.Methods(http.MethodGet).Path("/info").Handler(s.infoHandler())
 }

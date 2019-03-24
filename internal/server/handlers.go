@@ -20,16 +20,13 @@ import (
 	"database/sql"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
-	"github.com/weters/pwned"
 	"github.com/weters/sqmgr/internal/model"
 	"github.com/weters/sqmgr/internal/validator"
 )
@@ -123,16 +120,6 @@ func (s *Server) createHandler() http.HandlerFunc {
 
 		if err := tpl.Execute(w, d); err != nil {
 			log.Printf("error: could not render index.html: %v", err)
-		}
-	}
-}
-
-func (s *Server) loginHandler() http.HandlerFunc {
-	tpl := s.loadTemplate("login.html")
-	return func(w http.ResponseWriter, r *http.Request) {
-		if err := tpl.Execute(w, nil); err != nil {
-			log.Printf("error: could not render template login.html: %v", err)
-			return
 		}
 	}
 }
@@ -231,24 +218,6 @@ func (s *Server) getSquares(w http.ResponseWriter, r *http.Request) (*model.Squa
 	}
 
 	return squares, true
-}
-
-func (s *Server) pwnedHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		b, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-
-		count, err := pwned.Count(string(b))
-		if err != nil {
-			log.Printf("error: could not get pwned information: %v", err)
-		}
-
-		w.Header().Set("Content-Type", "text/plain")
-		w.Write([]byte(strconv.Itoa(count)))
-	}
 }
 
 func (s *Server) canViewSquares(session *sessions.Session, squares *model.Squares) bool {

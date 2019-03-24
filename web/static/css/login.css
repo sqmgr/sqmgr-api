@@ -1,0 +1,9 @@
+label.remember-me {
+	display: inline-block;
+	line-height: 30px;
+}
+input[type="checkbox"] {
+	margin-left: var(--spacing);
+	display: inline-block;
+	width: auto;
+}

@@ -16,6 +16,7 @@ import (
 )
 
 var ErrUserExists = errors.New("model: user already exists")
+var ErrUserNotFound = errors.New("model: user not found")
 
 type State string
 
@@ -106,9 +107,47 @@ func (m *Model) UserByVerifyToken(token string) (*User, error) {
 	return m.userByRow(row)
 }
 
-func (m *Model) UserByEmail(email string) (*User, error) {
-	row := m.db.QueryRow("SELECT * FROM users WHERE email = $1", email)
+// UserByEmail will return a user by the email address. optionalAllStates is a varargs that can accept a single bool value.
+// If false or not supplied, then only Active users will be returned.
+func (m *Model) UserByEmail(email string, optAllowAllStates ...bool) (*User, error) {
+	var row *sql.Row
+
+	if len(optAllowAllStates) > 0 && optAllowAllStates[0] {
+		// all states
+		row = m.db.QueryRow("SELECT * FROM users WHERE email = $1", email)
+	} else {
+		// only active
+		row = m.db.QueryRow("SELECT * FROM users WHERE email = $1 AND state = $2", email, Active)
+	}
+
 	return m.userByRow(row)
+}
+
+// UserByEmailAndPassword will return a user if the email and password matches. If it doesn't match, ErrUserNotFound is returned.
+func (m *Model) UserByEmailAndPassword(email, password string) (*User, error) {
+	user, err := m.UserByEmail(email)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrUserNotFound
+		}
+
+		return nil, err
+	}
+
+	if err := argon2id.Compare(user.PasswordHash, password); err != nil {
+		if err != argon2id.ErrMismatchedHashAndPassword {
+			log.Printf("error: unexpected error from argon2id: %v", err)
+		}
+
+		return nil, ErrUserNotFound
+	}
+
+	return user, nil
+}
+
+// CheckPassword will check to see if the user can login
+func (u *User) CheckPassword(password string) error {
+	return argon2id.Compare(u.PasswordHash, password)
 }
 
 func (u *User) SendVerificationEmail(tpl *template.Template) error {

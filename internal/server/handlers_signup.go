@@ -48,7 +48,7 @@ func (s *Server) signupHandler() http.HandlerFunc {
 						return
 					}
 
-					user, err := s.model.UserByEmail(email)
+					user, err := s.model.UserByEmail(email, true)
 					if err != nil {
 						log.Printf("error: could not call s.model.UserByEmail(%s): %v", email, err)
 						http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -118,7 +118,7 @@ func (s *Server) signupCompleteHandler() http.HandlerFunc {
 			log.Printf("error: could not save session: %v", err)
 		}
 
-		user, err := s.model.UserByEmail(email)
+		user, err := s.model.UserByEmail(email, true)
 		if err != nil {
 			if err != sql.ErrNoRows {
 				log.Printf("error: could not call s.model.NewUser(%s, xxx): %v", email, err)

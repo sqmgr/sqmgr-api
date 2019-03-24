@@ -1,4 +1,4 @@
-{{ define "title" }}Signup - {{ end }}
+{{ define "title" }}Sign-up - {{ end }}
 
 {{ define "header" }}
 <link href="/static/css/forms.css" rel="stylesheet">
@@ -10,12 +10,10 @@
 
 {{ define "content" }}
 <section class="signup">
-	<h3>Create Your Free Account</h3>
-
-	<form method="post">
+	<form class="small" method="post">
 		{{ template "form-errors" . }}
 		<fieldset>
-			<legend>Registration</legend>
+			<legend>Sign up for SqMGR</legend>
 
 			<div class="field">
 				<label for="email">Email Address</label>
@@ -34,6 +32,8 @@
 			<div class="buttons">
 				<input type="submit" name="Register" value="register">
 			</div>
+
+			<p>Have an account? <a href="/login">Login</a>
 		</fieldset>
 	</form>
 </section>
