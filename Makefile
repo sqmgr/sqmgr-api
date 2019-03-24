@@ -20,6 +20,9 @@ docker-push: docker-build
 test:
 	go test ./...
 
+dev-db:
+	docker run --name sqmgr-postgres --detach --publish 5432:5432 postgres:11
+
 migrations:
 	liquibase \
 		--changeLogFile ./sql/migrations.sql \
