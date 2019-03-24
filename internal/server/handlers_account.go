@@ -16,31 +16,22 @@ limitations under the License.
 
 package server
 
-import (
-	"fmt"
-	"net/http"
-)
+import "net/http"
 
-func (s *Server) infoHandler() http.HandlerFunc {
+func (s *Server) accountHandler() http.HandlerFunc {
+	tpl := s.loadTemplate("account.html")
 	return func(w http.ResponseWriter, r *http.Request) {
-		session := s.Session(r)
-		user, err := session.LoggedInUser()
-		session.Save()
-
-		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, "Session Values:")
-		for key, value := range session.Values {
-			fmt.Fprintf(w, "%s=%s\n", key, value)
-		}
-
-		fmt.Fprintln(w, "\nLogged in user:")
-
+		user, err := s.Session(r).LoggedInUser()
 		if err != nil {
-			fmt.Fprintf(w, "error getting logged in user: %v\n", err)
-		} else {
-			fmt.Fprintf(w, "email=%s\n", user.Email)
+			if err != ErrNotLoggedIn {
+				s.Error(w, r, http.StatusInternalServerError, err)
+				return
+			}
+
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
 		}
 
-		return
+		s.ExecuteTemplate(w, r, tpl, user)
 	}
 }

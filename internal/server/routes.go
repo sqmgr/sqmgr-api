@@ -32,6 +32,8 @@ func (s *Server) setupRoutes() {
 	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/signup/complete").Handler(s.signupCompleteHandler())
 	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/signup/verify/{token:[A-Za-z0-9_-]{64}}").Handler(s.signupVerifyHandler())
 
+	s.Router.Methods(http.MethodGet).Path("/account").Handler(s.accountHandler())
+
 	// to update
 	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/create").Handler(s.createHandler())
 	s.Router.Methods(http.MethodGet).Path("/donate").Handler(s.simpleGetHandler("donate.html"))
