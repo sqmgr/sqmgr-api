@@ -140,3 +140,8 @@ hr {
 	border-top: 1px solid var(--border-color);
 	margin-bottom: var(--spacing);
 }
+
+section.error {
+	font-size: 1.4em;
+	text-align: center;
+}
