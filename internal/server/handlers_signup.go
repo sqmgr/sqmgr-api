@@ -81,7 +81,7 @@ func (s *Server) signupHandler() http.HandlerFunc {
 			tplData.FormErrors = v.Errors
 		}
 
-		if err := tpl.ExecuteTemplate(w, baseTemplateName, tplData); err != nil {
+		if err := tpl.Execute(w, tplData); err != nil {
 			log.Printf("error: could not render signup.html: %v", err)
 			return
 		}
@@ -143,7 +143,7 @@ func (s *Server) signupCompleteHandler() http.HandlerFunc {
 			log.Printf("error: could not send verification email to %s: %v", email, err)
 		}
 
-		if err := tpl.ExecuteTemplate(w, baseTemplateName, data{email}); err != nil {
+		if err := tpl.Execute(w, data{email}); err != nil {
 			log.Printf("error: could not render template signup-complete.html: %v", err)
 			return
 		}
@@ -180,7 +180,7 @@ func (s *Server) signupVerifyHandler() http.HandlerFunc {
 			return
 		}
 
-		if err := tpl.ExecuteTemplate(w, baseTemplateName, user); err != nil {
+		if err := tpl.Execute(w, user); err != nil {
 			log.Printf("error: could not render template signup-verified.html: %v", err)
 			return
 		}

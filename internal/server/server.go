@@ -76,8 +76,8 @@ func New(db *sql.DB) *Server {
 	}
 
 	tpl := template.Must(
-		template.New("").Funcs(funcMap).ParseFiles(filepath.Join(templatesDir, baseTemplateName)),
-	)
+		template.New("").Funcs(funcMap).ParseFiles(filepath.Join(templatesDir, "base.html")),
+	).Lookup("base.html")
 
 	s := &Server{
 		Router:       mux.NewRouter(),

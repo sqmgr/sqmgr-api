@@ -34,14 +34,13 @@ import (
 	"github.com/weters/sqmgr/internal/validator"
 )
 
-const baseTemplateName = "base.html"
 const sessionName = "squares"
 const templatesDir = "web/templates"
 
 func (s *Server) simpleGetHandler(page string) http.HandlerFunc {
 	tpl := s.loadTemplate(page)
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := tpl.ExecuteTemplate(w, baseTemplateName, nil); err != nil {
+		if err := tpl.Execute(w, nil); err != nil {
 			log.Printf("error: could not render %s: %v", page, err)
 		}
 	}
@@ -122,14 +121,19 @@ func (s *Server) createHandler() http.HandlerFunc {
 			d.FormErrors = v.Errors
 		}
 
-		if err := tpl.ExecuteTemplate(w, baseTemplateName, d); err != nil {
+		if err := tpl.Execute(w, d); err != nil {
 			log.Printf("error: could not render index.html: %v", err)
 		}
 	}
 }
 
 func (s *Server) loginHandler() http.HandlerFunc {
+	tpl := s.loadTemplate("login.html")
 	return func(w http.ResponseWriter, r *http.Request) {
+		if err := tpl.Execute(w, nil); err != nil {
+			log.Printf("error: could not render template login.html: %v", err)
+			return
+		}
 	}
 }
 
@@ -154,7 +158,7 @@ func (s *Server) squaresGetHandler() http.HandlerFunc {
 
 		session.Values["test"] = true
 		session.Save(r, w)
-		if err := tpl.ExecuteTemplate(w, baseTemplateName, squares); err != nil {
+		if err := tpl.Execute(w, squares); err != nil {
 			log.Printf("error: could not render squares.html: %v", err)
 		}
 	}
@@ -201,7 +205,7 @@ func (s *Server) squaresLoginHandler() http.HandlerFunc {
 			td.Error = "password does not match"
 		}
 
-		if err := tpl.ExecuteTemplate(w, baseTemplateName, td); err != nil {
+		if err := tpl.Execute(w, td); err != nil {
 			log.Printf("error: could not render squares-template.html: %v", err)
 		}
 	}
