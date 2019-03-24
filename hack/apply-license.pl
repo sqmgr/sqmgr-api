@@ -20,11 +20,10 @@ limitations under the License.
 
 use 5.016;
 use warnings;
-use Fcntl qw(:flock);
+use File::Temp();
 
 my $year    = (localtime)[5] + 1900;
 my $license = <<"EOF";
-/*
 Copyright $year Tom Peters
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,27 +37,35 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-*/
-
 EOF
 
-chomp( my @files = `find . \! -path '*/vendor/*' \! -path '*/.git/*' -type f \\( -name '*.go' -o -name '*.js' \\)` );
+chomp( my @files = `find . \! -path '*/vendor/*' \! -path '*/.git/*' -type f \\( -name '*.go' -o -name '*.js' -o -name '*.html' \\)` );
 
 for my $file (@files) {
-    open my $fh, '+<', $file
-      or die "could not open $file: $!\n";
-    flock( $fh, LOCK_EX | LOCK_NB )
-      or die "could not lock $file: $!\n";
-    my $content = do { undef $/; <$fh> };
-    if ( $content !~ /\QApache License/x ) {
-        say "Prepending license to $file";
-        seek $fh, 0, 0;
-        truncate $fh, 0;
-        print $fh $license
-          or die "could not write to $file: $!\n";
-        print $fh $content
-          or die "could not write to $file: $!\n";
-    }
-    close $fh
-      or die "could not close $file: $!\n";
+	open my $fh, '<', $file
+		or die "could not read file $file: $!\n";
+	my $content = do { local $/ = undef; <$fh> };
+	close $fh;
+
+	if ( $content =~ /\QApache License/x ) {
+		next;
+	}
+
+	my $opening_comment = '/*';
+	my $closing_comment = '*/';
+
+	if ( $file =~ /\.html\z/ ) {
+		$opening_comment = '{{/*';
+		$closing_comment = '*/}}';
+	}
+
+	my $tmp = File::Temp->new;
+	print $tmp "$opening_comment\n$license$closing_comment\n\n$content"
+		or die "could not write to tempfile: $!\n";
+	close $tmp
+		or die "could not close tempfile: $!\n";
+
+	say "adding license to $file...";
+	rename $tmp->filename, $file
+		or die "could not move ${ \$tmp->filename } to $file: $!\n";
 }
