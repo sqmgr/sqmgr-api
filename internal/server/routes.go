@@ -38,4 +38,6 @@ func (s *Server) setupRoutes() {
 
 	// temporary
 	s.Router.Methods(http.MethodGet).Path("/info").Handler(s.infoHandler())
+
+	s.Router.NotFoundHandler = s.middleware(s.notFoundHandler())
 }

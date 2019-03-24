@@ -1,0 +1,13 @@
+{{ define "title" }}{{.Local.Status}} - {{ end }}
+
+{{ define "content" }}
+<section class="error">
+	<h3>Something went wrong!</h3>
+
+	{{ if eq .Local.StatusCode 404 }}
+	<p>That page does not exist.
+	{{ else }}
+	<p>{{.Local.Status}}
+	{{ end }}
+</section>
+{{ end }}

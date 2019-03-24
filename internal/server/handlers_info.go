@@ -2,13 +2,11 @@ package server
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 )
 
 func (s *Server) infoHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("IN\n")
 		session := s.Session(r)
 		user, err := session.LoggedInUser()
 		session.Save()

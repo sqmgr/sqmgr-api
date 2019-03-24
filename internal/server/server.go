@@ -36,6 +36,19 @@ import (
 // Version is the current version of the server application
 var Version = "0.1"
 
+type ctxKey int
+
+// TemplateData represents data that will be sent to an HTML template
+type TemplateData struct {
+	LoggedInUser *model.User
+	Local        interface{}
+}
+
+const (
+	ctxKeySession ctxKey = iota
+	ctxKeySession2
+)
+
 var store *sessions.CookieStore
 
 func init() {
@@ -68,8 +81,9 @@ func init() {
 // Server represents the server application
 type Server struct {
 	*mux.Router
-	model        *model.Model
-	baseTemplate *template.Template
+	model         *model.Model
+	baseTemplate  *template.Template
+	errorTemplate *template.Template
 }
 
 // New instantiates a new Server object.
@@ -88,6 +102,8 @@ func New(db *sql.DB) *Server {
 		baseTemplate: tpl,
 	}
 
+	s.errorTemplate = s.loadTemplate("error.html")
+
 	s.setupRoutes()
 
 	return s
@@ -99,11 +115,8 @@ func (s *Server) Shutdown() error {
 	return nil
 }
 
-type TemplateData struct {
-	LoggedInUser *model.User
-	Local        interface{}
-}
-
+// ExecuteTemplate will execute the template. Template values can be passed in as localData and will be accessible in
+// the template at {{.Local.*}}
 func (s *Server) ExecuteTemplate(w http.ResponseWriter, r *http.Request, t *template.Template, localData interface{}) {
 	session := s.Session(r)
 	user, err := session.LoggedInUser()
@@ -122,20 +135,32 @@ func (s *Server) ExecuteTemplate(w http.ResponseWriter, r *http.Request, t *temp
 	}
 }
 
-type ctxKey int
-
-const (
-	ctxKeySession ctxKey = iota
-	ctxKeySession2
-)
-
-func version() string {
-	ver := Version
-	if build := os.Getenv("BUILD_NUMBER"); build != "" {
-		ver += "-" + build
+// Error will serve a custom error page. err is a varargs and if supplied, will log the error.
+func (s *Server) Error(w http.ResponseWriter, r *http.Request, statusCode int, errInfo ...interface{}) {
+	if len(errInfo) > 0 {
+		strVal, ok := errInfo[0].(string)
+		if ok && len(errInfo) > 1 {
+			log.Printf("error: "+strVal, errInfo[1:]...)
+		} else {
+			log.Println(append([]interface{}{"error"}, errInfo...))
+		}
 	}
 
-	return ver
+	w.WriteHeader(statusCode)
+	s.ExecuteTemplate(w, r, s.errorTemplate, map[string]interface{}{
+		"StatusCode": statusCode,
+		"Status":     http.StatusText(statusCode),
+	})
+}
+
+// Session will return the current cookie session for the user. It will grab it from the context. It should've
+// been set in the middleware.
+func (s *Server) Session(r *http.Request) *Session {
+	session, ok := r.Context().Value(ctxKeySession).(*Session)
+	if !ok {
+		panic("session not stored in context")
+	}
+	return session
 }
 
 func (s *Server) middleware(h http.Handler) http.Handler {
@@ -145,16 +170,17 @@ func (s *Server) middleware(h http.Handler) http.Handler {
 			return
 		}
 
-		session := s.getSession(w, r)
+		session := newSession(w, r, s)
 		ctx := context.WithValue(r.Context(), ctxKeySession, session)
 		h.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-func (s *Server) Session(r *http.Request) *Session {
-	session, ok := r.Context().Value(ctxKeySession).(*Session)
-	if !ok {
-		panic("session not stored in context")
+func version() string {
+	ver := Version
+	if build := os.Getenv("BUILD_NUMBER"); build != "" {
+		ver += "-" + build
 	}
-	return session
+
+	return ver
 }

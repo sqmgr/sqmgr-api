@@ -15,17 +15,27 @@ import (
 	"github.com/weters/sqmgr/pkg/tokengen"
 )
 
+// ErrUserExists is an error when the user already exists (when trying to create a new account)
 var ErrUserExists = errors.New("model: user already exists")
+
+// ErrUserNotFound is when the user is not found in the database
 var ErrUserNotFound = errors.New("model: user not found")
 
+// State represents the state of the user
 type State string
 
 const (
-	Active   State = "active"
-	Pending  State = "pending"
+	// Active means the user is active
+	Active State = "active"
+
+	// Pending is when the account is waiting the user to verify the email
+	Pending State = "pending"
+
+	// Disabled is when the user disabled their account
 	Disabled State = "disabled"
 )
 
+// User represents an account
 type User struct {
 	*Model
 	ID           int64
@@ -36,46 +46,7 @@ type User struct {
 	Modified     time.Time
 }
 
-func (m *Model) userByRow(row *sql.Row) (*User, error) {
-	u := &User{Model: m}
-
-	var email, passwordHash, state *string
-	var created *time.Time
-	var modified *time.Time
-
-	if err := row.Scan(&u.ID, &email, &passwordHash, &state, &created, &modified); err != nil {
-		return nil, err
-	}
-
-	if email != nil {
-		u.Email = *email
-	}
-
-	if passwordHash != nil {
-		u.PasswordHash = *passwordHash
-	}
-
-	if state != nil {
-		u.State = State(*state)
-	}
-
-	if created != nil {
-		u.Created = *created
-	}
-
-	if modified != nil {
-		u.Modified = *modified
-	}
-
-	return u, nil
-}
-
-func (u *User) Save() error {
-	row := u.db.QueryRow("UPDATE users SET email = $1, password_hash = $2, state = $3, modified = (NOW() AT TIME ZONE 'UTC') WHERE id = $4 RETURNING modified", u.Email, u.PasswordHash, u.State, u.ID)
-
-	return row.Scan(&u.Modified)
-}
-
+// NewUser will try to save a new user in the database
 func (m *Model) NewUser(email, password string) (*User, error) {
 	hashedPassword, err := argon2id.DefaultHashPassword(password)
 	if err != nil {
@@ -96,6 +67,14 @@ func (m *Model) NewUser(email, password string) (*User, error) {
 	return user, nil
 }
 
+// Save will persist any changes to the database
+func (u *User) Save() error {
+	row := u.db.QueryRow("UPDATE users SET email = $1, password_hash = $2, state = $3, modified = (NOW() AT TIME ZONE 'UTC') WHERE id = $4 RETURNING modified", u.Email, u.PasswordHash, u.State, u.ID)
+
+	return row.Scan(&u.Modified)
+}
+
+// UserByVerifyToken will lookup a user by its verification token
 func (m *Model) UserByVerifyToken(token string) (*User, error) {
 	row := m.db.QueryRow(`
 		SELECT users.*
@@ -150,6 +129,7 @@ func (u *User) CheckPassword(password string) error {
 	return argon2id.Compare(u.PasswordHash, password)
 }
 
+// SendVerificationEmail will create a new verification token and send it to the user
 func (u *User) SendVerificationEmail(tpl *template.Template) error {
 	token, err := tokengen.Generate(64)
 	if err != nil {
@@ -179,4 +159,38 @@ Content-Type: text/html; charset=utf-8
 	}
 
 	return nil
+}
+
+func (m *Model) userByRow(row *sql.Row) (*User, error) {
+	u := &User{Model: m}
+
+	var email, passwordHash, state *string
+	var created *time.Time
+	var modified *time.Time
+
+	if err := row.Scan(&u.ID, &email, &passwordHash, &state, &created, &modified); err != nil {
+		return nil, err
+	}
+
+	if email != nil {
+		u.Email = *email
+	}
+
+	if passwordHash != nil {
+		u.PasswordHash = *passwordHash
+	}
+
+	if state != nil {
+		u.State = State(*state)
+	}
+
+	if created != nil {
+		u.Created = *created
+	}
+
+	if modified != nil {
+		u.Modified = *modified
+	}
+
+	return u, nil
 }

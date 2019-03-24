@@ -40,15 +40,13 @@ func (s *Server) signupHandler() http.HandlerFunc {
 			if v.OK() {
 				if user, err := s.model.NewUser(email, password); err != nil {
 					if err != model.ErrUserExists {
-						log.Printf("error: could not call s.model.NewUser(%s, xxx): %v", email, err)
-						http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+						s.Error(w, r, http.StatusInternalServerError, "could not call s.model.NewUser(%s, xxx): %v", email, err)
 						return
 					}
 
 					user, err := s.model.UserByEmail(email, true)
 					if err != nil {
-						log.Printf("error: could not call s.model.UserByEmail(%s): %v", email, err)
-						http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+						s.Error(w, r, http.StatusInternalServerError, "could not call s.model.UserByEmail(%s): %v", email, err)
 						return
 					}
 
@@ -104,8 +102,7 @@ func (s *Server) signupCompleteHandler() http.HandlerFunc {
 		user, err := s.model.UserByEmail(email, true)
 		if err != nil {
 			if err != sql.ErrNoRows {
-				log.Printf("error: could not call s.model.NewUser(%s, xxx): %v", email, err)
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				s.Error(w, r, http.StatusInternalServerError, "could not call s.model.NewUser(%s, xxx): %v", email, err)
 				return
 			}
 
@@ -138,8 +135,7 @@ func (s *Server) signupVerifyHandler() http.HandlerFunc {
 		user, err := s.model.UserByVerifyToken(token)
 		if err != nil {
 			if err != sql.ErrNoRows {
-				log.Printf("error: could not call s.model.UserByVerifyToken(%s): %v", string(token[0:16]), err)
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				s.Error(w, r, http.StatusInternalServerError, "could not call s.model.UserByVerifyToken(%s): %v", string(token[0:16]), err)
 				return
 			}
 
@@ -155,8 +151,7 @@ func (s *Server) signupVerifyHandler() http.HandlerFunc {
 
 		user.State = model.Active
 		if err := user.Save(); err != nil {
-			log.Printf("error: could not call user.Save(%d): %v", user.ID, err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			s.Error(w, r, http.StatusInternalServerError, "could not call user.Save(%d): %v", user.ID, err)
 			return
 		}
 

@@ -18,7 +18,6 @@ package server
 
 import (
 	"html/template"
-	"log"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -100,7 +99,7 @@ func (s *Server) createHandler() http.HandlerFunc {
 				sq.JoinPassword = joinPassword
 
 				if err := sq.Save(); err != nil {
-					s.serveInternalError(w, r, err)
+					s.Error(w, r, http.StatusInternalServerError, err)
 					return
 				}
 
@@ -125,8 +124,9 @@ func (s *Server) loadTemplate(filenames ...string) *template.Template {
 	return template.Must(template.Must(s.baseTemplate.Clone()).ParseFiles(fullFilenames...))
 }
 
-func (s *Server) serveInternalError(w http.ResponseWriter, r *http.Request, err error) {
-	log.Printf("error serving %s %s: %v", r.Method, r.URL.String(), err)
-	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-	return
+func (s *Server) notFoundHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		s.Error(w, r, http.StatusNotFound)
+		return
+	}
 }

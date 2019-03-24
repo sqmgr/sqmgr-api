@@ -1,7 +1,6 @@
 package server
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/weters/sqmgr/internal/model"
@@ -30,8 +29,7 @@ func (s *Server) loginHandler() http.HandlerFunc {
 					tplData.FormData.Email = email
 				} else {
 					session.Save()
-					log.Printf("error: could not call s.model.UserByEmailAndPassword(%s, xxx): %v", email, err)
-					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+					s.Error(w, r, http.StatusInternalServerError, "could not call s.model.UserByEmailAndPassword(%s, xxx): %v", email, err)
 					return
 				}
 			} else {
