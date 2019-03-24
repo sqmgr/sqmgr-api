@@ -31,5 +31,5 @@ func Generate(n int) (string, error) {
 		return "", err
 	}
 
-	return string(base64.URLEncoding.EncodeToString(b[:])[0:n]), nil
+	return string(base64.RawURLEncoding.EncodeToString(b[:])[0:n]), nil
 }

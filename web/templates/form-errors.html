@@ -1,0 +1,20 @@
+{{ define "form-errors" }}
+	{{ if .FormErrors }}
+		<div class="errors">
+			<h4>Error</h4>
+
+			<p>Please correct the following errors:
+
+			<ul>
+				{{ range $k, $v := .FormErrors }}
+					<li>{{$k}}
+						<ul>
+							{{ range $v }}
+								<li>{{.}}
+							{{ end }}
+						</ul>
+				{{ end }}
+			</ul>
+		</div>
+	{{ end }}
+{{ end }}

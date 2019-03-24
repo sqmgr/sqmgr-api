@@ -128,6 +128,11 @@ func (s *Server) createHandler() http.HandlerFunc {
 	}
 }
 
+func (s *Server) loginHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+	}
+}
+
 func (s *Server) squaresGetHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("squares.html")
 
@@ -251,8 +256,13 @@ func (s *Server) canViewSquares(session *sessions.Session, squares *model.Square
 	return val
 }
 
-func (s *Server) loadTemplate(filename string) *template.Template {
-	return template.Must(template.Must(s.baseTemplate.Clone()).ParseFiles(filepath.Join(templatesDir, filename)))
+func (s *Server) loadTemplate(filenames ...string) *template.Template {
+	fullFilenames := make([]string, len(filenames))
+	for i, filename := range filenames {
+		fullFilenames[i] = filepath.Join(templatesDir, filename)
+	}
+
+	return template.Must(template.Must(s.baseTemplate.Clone()).ParseFiles(fullFilenames...))
 }
 
 func (s *Server) serveInternalError(w http.ResponseWriter, r *http.Request, err error) {

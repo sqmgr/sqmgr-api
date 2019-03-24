@@ -20,6 +20,7 @@ package validator
 import (
 	"fmt"
 	"log"
+	"net/mail"
 	"regexp"
 	"strconv"
 	"time"
@@ -48,11 +49,21 @@ func New() *Validator {
 // Printable will ensure that all characters in the string can be printed to string (i.e. no control characters)
 func (v *Validator) Printable(key, val string) string {
 	if len(val) == 0 || nonPrintableRx.MatchString(val) {
-		v.addError(key, "must be a valid string")
+		v.AddError(key, "must be a valid string")
 		return ""
 	}
 
 	return val
+}
+
+// Email will ensure the email address is valid
+func (v *Validator) Email(key, email string) string {
+	if _, err := mail.ParseAddress(email); err != nil {
+		v.AddError(key, "must be a valid email address")
+		return ""
+	}
+
+	return email
 }
 
 // NotPwnedPassword will ensure that the password provided has not been pwned.
@@ -69,7 +80,7 @@ func (v *Validator) NotPwnedPassword(key, pw string) string {
 			times = "time"
 		}
 
-		v.addError(key, "the password you provided has been compromised at least %d %s. please use a different password", count, times)
+		v.AddError(key, "the password you provided has been compromised at least %d %s. please use a different password", count, times)
 		return ""
 	}
 
@@ -80,12 +91,12 @@ func (v *Validator) NotPwnedPassword(key, pw string) string {
 func (v *Validator) Password(key, pw, cpw string, minLen int) string {
 	hasError := false
 	if pw != cpw {
-		v.addError(key, "passwords do not match")
+		v.AddError(key, "passwords do not match")
 		hasError = true
 	}
 
 	if len(pw) < minLen {
-		v.addError(key, "password must be at least %d characters", minLen)
+		v.AddError(key, "password must be at least %d characters", minLen)
 		hasError = true
 	}
 
@@ -116,7 +127,7 @@ func (v *Validator) Datetime(key, datetime, timezoneOffset string) time.Time {
 	dt, err := time.Parse("2006-01-02T15:04-0700", datetime+tzStr)
 	if err != nil {
 		log.Printf("Got %s, err = %v", datetime+tzStr, err)
-		v.addError(key, "must be a valid date and time")
+		v.AddError(key, "must be a valid date and time")
 		return time.Time{}
 	}
 
@@ -126,7 +137,7 @@ func (v *Validator) Datetime(key, datetime, timezoneOffset string) time.Time {
 // SquaresType will ensure that the string is a valid square type
 func (v *Validator) SquaresType(key, val string) model.SquaresType {
 	if !model.IsValidSquaresType(val) {
-		v.addError(key, "must be a valid squares type")
+		v.AddError(key, "must be a valid squares type")
 		return model.SquaresType("")
 	}
 
@@ -138,7 +149,8 @@ func (v *Validator) OK() bool {
 	return len(v.Errors) == 0
 }
 
-func (v *Validator) addError(key string, format string, args ...interface{}) {
+// AddError will add an error for the specified key
+func (v *Validator) AddError(key string, format string, args ...interface{}) {
 	slice, ok := v.Errors[key]
 	if !ok {
 		slice = make([]string, 0)

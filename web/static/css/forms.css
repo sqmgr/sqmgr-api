@@ -46,24 +46,16 @@ input, select {
 	padding: var(--minimal-spacing);
 	width: 100%;
 }
+input[type="password"] + input[type="password"] {
+	margin-top: var(--minimal-spacing);
+}
 div.field::after {
 	content: '';
 	display: block;
 	clear: both;
 }
-input[type="password"] {
-	float: left;
-	width: calc(50% - var(--minimal-spacing)/2);
-}
-input[type="password"] + input[type="password"] {
-	margin-left: var(--minimal-spacing);
-}
 input::placeholder {
 	color: var(--border-color);
-}
-input[type="date"],
-input[type="time"] {
-	width: auto;
 }
 
 div.field {
@@ -85,16 +77,6 @@ input[type="submit"] {
 	border: none;
 	padding: var(--minimal-spacing) var(--spacing);
 	width: auto;
-}
-
-input:focus, select:focus {
-	box-shadow: 2px 2px 2px rgba(0,0,0,0.25);
-}
-
-
-input.not-empty:invalid,
-input.passwords-no-match:invalid {
-	border-color: #f44336;
 }
 
 p.requirement {
@@ -119,7 +101,30 @@ form div.errors ul ul {
 	list-style-type: disc;
 }
 
-/* Squares Login */
-section.squares-login input[type="password"] {
-	width: auto;
+div.input-error {
+	background-color: #444;
+	padding: calc(2*var(--minimal-spacing));
+	position: absolute;
+	border-radius: 2px;
+	color: #fff;
+	font-size: 0.8em;
+	box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25);
+	transform: translateX(calc(-1 * var(--minimal-spacing)));
+}
+div.input-error::before {
+	--size: 7px;
+	background-color: transparent;
+	display: block;
+	content: '';
+	width: 0;
+	height: 0;
+	border-left: var(--size) solid transparent;
+	border-right: var(--size) solid transparent;
+	border-bottom: var(--size) solid #444;
+	position: absolute;
+	top: calc(-1 * var(--size));
+	left: calc(var(--minimal-spacing) + 2px);
+}
+input[type="password"]:invalid {
+	box-shadow: none;
 }

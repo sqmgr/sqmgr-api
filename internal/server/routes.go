@@ -21,6 +21,13 @@ import "net/http"
 func (s *Server) setupRoutes() {
 	s.Router.Methods(http.MethodGet).PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web/static/"))))
 	s.Router.Methods(http.MethodGet).Path("/").Handler(s.simpleGetHandler("index.html"))
+
+	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/login").Handler(s.loginHandler())
+	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/signup").Handler(s.signupHandler())
+	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/signup/complete").Handler(s.signupCompleteHandler())
+	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/signup/verify/{token:[A-Za-z0-9_-]{64}}").Handler(s.signupVerifyHandler())
+
+	// to update
 	s.Router.Methods(http.MethodGet).Path("/squares/{token:[A-Za-z0-9_-]+}").Handler(s.squaresGetHandler())
 	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/squares/{token:[A-Za-z0-9_-]+}/login").Handler(s.squaresLoginHandler())
 	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/create").Handler(s.createHandler())

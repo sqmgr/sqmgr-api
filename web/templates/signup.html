@@ -1,0 +1,40 @@
+{{ define "title" }}Signup - {{ end }}
+
+{{ define "header" }}
+<link href="/static/css/forms.css" rel="stylesheet">
+{{ end }}
+
+{{ define "javascripts" }}
+<script src="/static/js/forms2.js"></script>
+{{ end }}
+
+{{ define "content" }}
+<section class="signup">
+	<h3>Create Your Free Account</h3>
+
+	<form method="post">
+		{{ template "form-errors" . }}
+		<fieldset>
+			<legend>Registration</legend>
+
+			<div class="field">
+				<label for="email">Email Address</label>
+				<input type="email" id="email" name="email" placeholder="Email Address" required value="{{.FormData.Email}}">
+			</div>
+
+			<div class="field">
+				<label for="password">Password</label>
+				<p class="requirement">Must be at least eight (8) characters
+				<div class="password">
+					<input type="password" id="password" name="password" placeholder="Password" value="" pattern=".{8,}" required>
+					<input type="password" id="confirm-password" name="confirm-password" placeholder="Confirm Password" value="" required>
+				</div>
+			</div>
+
+			<div class="buttons">
+				<input type="submit" name="Register" value="register">
+			</div>
+		</fieldset>
+	</form>
+</section>
+{{ end }}
