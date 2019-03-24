@@ -16,7 +16,12 @@ type Session struct {
 	req    *http.Request
 }
 
-func (s *Server) GetSession(w http.ResponseWriter, r *http.Request) *Session {
+const (
+	loginEmail        = "le"
+	loginPasswordHash = "lph"
+)
+
+func (s *Server) getSession(w http.ResponseWriter, r *http.Request) *Session {
 	session, err := store.Get(r, sessionName)
 	if err != nil {
 		log.Printf("error: could not get session: %v", err)
@@ -37,20 +42,20 @@ func (s *Session) Save() {
 }
 
 func (s *Session) Logout() {
-	delete(s.Values, "email")
-	delete(s.Values, "password_hash")
+	delete(s.Values, loginEmail)
+	delete(s.Values, loginPasswordHash)
 }
 
 func (s *Session) Login(u *model.User) {
-	s.Values["email"] = u.Email
-	s.Values["password_hash"] = u.PasswordHash
+	s.Values[loginEmail] = u.Email
+	s.Values[loginPasswordHash] = u.PasswordHash
 }
 
 var ErrNotLoggedIn = errors.New("not logged in")
 
 func (s *Session) LoggedInUser() (*model.User, error) {
-	email, _ := s.Values["email"].(string)
-	passwordHash, _ := s.Values["password_hash"].(string)
+	email, _ := s.Values[loginEmail].(string)
+	passwordHash, _ := s.Values[loginPasswordHash].(string)
 	if len(email) == 0 || len(passwordHash) == 0 {
 		return nil, ErrNotLoggedIn
 	}

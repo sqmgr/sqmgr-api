@@ -1,12 +1,12 @@
 {{ define "form-errors" }}
-	{{ if .FormErrors }}
+	{{ if .Local.FormErrors }}
 		<div class="errors">
 			<h4>Error</h4>
 
 			<p>Please correct the following errors:
 
 			<ul>
-				{{ range $k, $v := .FormErrors }}
+				{{ range $k, $v := .Local.FormErrors }}
 					<li>{{$k}}
 						<ul>
 							{{ range $v }}

@@ -19,8 +19,12 @@
 			<nav>
 				<ul>
 					<li><a href="/">Home</a>
-					<li><a href="/login">Log in</a>
-					<li><a href="/signup">Sign up</a>
+					{{ if .LoggedInUser }}
+						<li><a href="/account">Your Account</a>
+					{{ else }}
+						<li><a href="/login">Log in</a>
+						<li><a href="/signup">Sign up</a>
+					{{ end }}
 					<li><a href="/donate">Donate</a>
 				</ul>
 			</nav>

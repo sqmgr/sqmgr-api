@@ -18,7 +18,7 @@ func (s *Server) loginHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tplData := data{}
 
-		session := s.GetSession(w, r)
+		session := s.Session(r)
 		session.Logout()
 
 		if r.Method == http.MethodPost {
@@ -43,9 +43,6 @@ func (s *Server) loginHandler() http.HandlerFunc {
 		}
 
 		session.Save()
-		if err := tpl.Execute(w, tplData); err != nil {
-			log.Printf("error: could not render template login.html: %v", err)
-			return
-		}
+		s.ExecuteTemplate(w, r, tpl, tplData)
 	}
 }

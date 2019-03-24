@@ -8,14 +8,14 @@
 
 	<div class="columns">
 		<form method="post" action="">
-			{{ if .FormErrors }}
+			{{ if .Local.FormErrors }}
 				<div class="errors">
 					<h4>Error</h4>
 
 					<p>Please correct the following errors:
 
 					<ul>
-						{{ range $k, $v := .FormErrors }}
+						{{ range $k, $v := .Local.FormErrors }}
 							<li>{{$k}}
 								<ul>
 									{{ range $v }}
@@ -32,14 +32,14 @@
 				<div class="fields">
 					<div class="field">
 						<label for="name">Squares Name</label>
-						<input type="text" id="name" name="name" placeholder="Squares Name" autocomplete="off" required value="{{.FormData.Name}}">
+						<input type="text" id="name" name="name" placeholder="Squares Name" autocomplete="off" required value="{{.Local.FormData.Name}}">
 					</div>
 
 					<div class="field">
 						<label for="squares-type">Type</label>
 						<select id="squares-type" name="squares-type">
-							{{ $st := .FormData.SquaresType }}
-							{{ range .SquaresTypes }}
+							{{ $st := .Local.FormData.SquaresType }}
+							{{ range .Local.SquaresTypes }}
 								<option value="{{.}}" {{ if eq . $st }}selected{{ end }}>{{.Description}}
 							{{ end }}
 						</select>

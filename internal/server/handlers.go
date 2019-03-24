@@ -17,16 +17,12 @@ limitations under the License.
 package server
 
 import (
-	"database/sql"
-	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"path/filepath"
 	"time"
 
-	"github.com/gorilla/mux"
-	"github.com/gorilla/sessions"
 	"github.com/weters/sqmgr/internal/model"
 	"github.com/weters/sqmgr/internal/validator"
 )
@@ -37,9 +33,7 @@ const templatesDir = "web/templates"
 func (s *Server) simpleGetHandler(page string) http.HandlerFunc {
 	tpl := s.loadTemplate(page)
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := tpl.Execute(w, nil); err != nil {
-			log.Printf("error: could not render %s: %v", page, err)
-		}
+		s.ExecuteTemplate(w, r, tpl, nil)
 	}
 }
 
@@ -118,115 +112,8 @@ func (s *Server) createHandler() http.HandlerFunc {
 			d.FormErrors = v.Errors
 		}
 
-		if err := tpl.Execute(w, d); err != nil {
-			log.Printf("error: could not render index.html: %v", err)
-		}
+		s.ExecuteTemplate(w, r, tpl, d)
 	}
-}
-
-func (s *Server) squaresGetHandler() http.HandlerFunc {
-	tpl := s.loadTemplate("squares.html")
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		session, err := store.Get(r, sessionName)
-		if err != nil {
-			log.Printf("error: could not decode session: %v", err)
-		}
-
-		squares, ok := s.getSquares(w, r)
-		if !ok {
-			return
-		}
-
-		if !s.canViewSquares(session, squares) {
-			http.Redirect(w, r, fmt.Sprintf("/squares/%s/login", squares.Token), http.StatusSeeOther)
-			return
-		}
-
-		session.Values["test"] = true
-		session.Save(r, w)
-		if err := tpl.Execute(w, squares); err != nil {
-			log.Printf("error: could not render squares.html: %v", err)
-		}
-	}
-}
-
-func (s *Server) squaresLoginHandler() http.HandlerFunc {
-	tpl := s.loadTemplate("squares-login.html")
-	type templateData struct {
-		Error   string
-		Squares *model.Squares
-	}
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		var td templateData
-
-		session, err := store.Get(r, sessionName)
-		if err != nil {
-			log.Printf("error: could not decode session: %v", err)
-		}
-
-		squares, ok := s.getSquares(w, r)
-		if !ok {
-			return
-		}
-		td.Squares = squares
-
-		if s.canViewSquares(session, squares) {
-			http.Redirect(w, r, fmt.Sprintf("/squares/%s", squares.Token), http.StatusSeeOther)
-			return
-		}
-
-		if r.Method == http.MethodPost {
-			password := r.PostFormValue("password")
-			if squares.JoinPasswordMatches(password) {
-				session.Values[squares.Token] = true
-				if err := session.Save(r, w); err != nil {
-					log.Printf("error: could not save session: %v", err)
-				}
-
-				http.Redirect(w, r, fmt.Sprintf("/squares/%s", squares.Token), http.StatusSeeOther)
-				return
-			}
-
-			td.Error = "password does not match"
-		}
-
-		if err := tpl.Execute(w, td); err != nil {
-			log.Printf("error: could not render squares-template.html: %v", err)
-		}
-	}
-}
-
-// getSquares will attempt to load squares based on the token value. If the squares can not be loaded
-// for any reason, the correct headers will be set and the calling method can just check for the "ok" state.
-// If it's false, no additional processing should be done.
-func (s *Server) getSquares(w http.ResponseWriter, r *http.Request) (*model.Squares, bool) {
-	vars := mux.Vars(r)
-	token := vars["token"]
-
-	squares, err := s.model.GetSquaresByToken(token)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			http.NotFound(w, r)
-			return nil, false
-		}
-
-		fmt.Printf("error: could not get squares: %v", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return nil, false
-	}
-
-	return squares, true
-}
-
-func (s *Server) canViewSquares(session *sessions.Session, squares *model.Squares) bool {
-	if squares.JoinPasswordHash == "" {
-		return true
-	}
-
-	val, _ := session.Values[squares.Token].(bool)
-	return val
 }
 
 func (s *Server) loadTemplate(filenames ...string) *template.Template {

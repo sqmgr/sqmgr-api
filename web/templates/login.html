@@ -11,7 +11,7 @@
 		<fieldset>
 			<legend>Log in to SqMGR</legend>
 
-			{{ if .FormData.Email }}
+			{{ if .Local.FormData.Email }}
 				<div class="errors">
 					<ul>
 						<li>Incorrect email address or password
@@ -21,7 +21,7 @@
 
 			<div class="field">
 				<label for="email">Email Address</label>
-				<input type="email" id="email" name="email" placeholder="Email Address" value="{{.FormData.Email}}" required>
+				<input type="email" id="email" name="email" placeholder="Email Address" value="{{.Local.FormData.Email}}" required>
 			</div>
 
 			<div class="field">

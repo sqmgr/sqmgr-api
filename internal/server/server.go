@@ -18,11 +18,14 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"database/sql"
 	"html/template"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
@@ -96,6 +99,36 @@ func (s *Server) Shutdown() error {
 	return nil
 }
 
+type TemplateData struct {
+	LoggedInUser *model.User
+	Local        interface{}
+}
+
+func (s *Server) ExecuteTemplate(w http.ResponseWriter, r *http.Request, t *template.Template, localData interface{}) {
+	session := s.Session(r)
+	user, err := session.LoggedInUser()
+	if err != nil && err != ErrNotLoggedIn {
+		log.Printf("error: could not get user: %v", err)
+	}
+
+	tplData := TemplateData{
+		LoggedInUser: user,
+		Local:        localData,
+	}
+
+	if err := t.Execute(w, tplData); err != nil {
+		log.Printf("error executing template: %v", err)
+		return
+	}
+}
+
+type ctxKey int
+
+const (
+	ctxKeySession ctxKey = iota
+	ctxKeySession2
+)
+
 func version() string {
 	ver := Version
 	if build := os.Getenv("BUILD_NUMBER"); build != "" {
@@ -103,4 +136,25 @@ func version() string {
 	}
 
 	return ver
+}
+
+func (s *Server) middleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Index(r.URL.Path, "/static/") == 0 {
+			h.ServeHTTP(w, r)
+			return
+		}
+
+		session := s.getSession(w, r)
+		ctx := context.WithValue(r.Context(), ctxKeySession, session)
+		h.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (s *Server) Session(r *http.Request) *Session {
+	session, ok := r.Context().Value(ctxKeySession).(*Session)
+	if !ok {
+		panic("session not stored in context")
+	}
+	return session
 }

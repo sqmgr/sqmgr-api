@@ -26,10 +26,7 @@ func (s *Server) signupHandler() http.HandlerFunc {
 		tplData := data{}
 
 		if r.Method == http.MethodPost {
-			session, err := store.Get(r, sessionName)
-			if err != nil {
-				log.Printf("error could not decode session %s: %v", sessionName, err)
-			}
+			session := s.Session(r)
 
 			email := r.PostFormValue("email")
 			password := r.PostFormValue("password")
@@ -59,19 +56,13 @@ func (s *Server) signupHandler() http.HandlerFunc {
 						v.AddError("email", "That email address is already registered")
 					} else {
 						session.AddFlash(user.Email, "email")
-						if err := session.Save(r, w); err != nil {
-							log.Printf("error: could not save session: %v", err)
-						}
-
+						session.Save()
 						http.Redirect(w, r, "/signup/complete", http.StatusSeeOther)
 						return
 					}
 				} else {
 					session.AddFlash(user.Email, "email")
-					if err := session.Save(r, w); err != nil {
-						log.Printf("error: could not save session: %v", err)
-					}
-
+					session.Save()
 					http.Redirect(w, r, "/signup/complete", http.StatusSeeOther)
 					return
 				}
@@ -81,10 +72,7 @@ func (s *Server) signupHandler() http.HandlerFunc {
 			tplData.FormErrors = v.Errors
 		}
 
-		if err := tpl.Execute(w, tplData); err != nil {
-			log.Printf("error: could not render signup.html: %v", err)
-			return
-		}
+		s.ExecuteTemplate(w, r, tpl, tplData)
 	}
 }
 
@@ -97,10 +85,7 @@ func (s *Server) signupCompleteHandler() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		session, err := store.Get(r, sessionName)
-		if err != nil {
-			log.Printf("error: could not decode session: %s: %v", sessionName, err)
-		}
+		session := s.Session(r)
 
 		flashes := session.Flashes("email")
 		if len(flashes) == 0 {
@@ -114,9 +99,7 @@ func (s *Server) signupCompleteHandler() http.HandlerFunc {
 			return
 		}
 
-		if err := session.Save(r, w); err != nil {
-			log.Printf("error: could not save session: %v", err)
-		}
+		session.Save()
 
 		user, err := s.model.UserByEmail(email, true)
 		if err != nil {
@@ -143,10 +126,7 @@ func (s *Server) signupCompleteHandler() http.HandlerFunc {
 			log.Printf("error: could not send verification email to %s: %v", email, err)
 		}
 
-		if err := tpl.Execute(w, data{email}); err != nil {
-			log.Printf("error: could not render template signup-complete.html: %v", err)
-			return
-		}
+		s.ExecuteTemplate(w, r, tpl, data{email})
 	}
 }
 
@@ -180,9 +160,6 @@ func (s *Server) signupVerifyHandler() http.HandlerFunc {
 			return
 		}
 
-		if err := tpl.Execute(w, user); err != nil {
-			log.Printf("error: could not render template signup-verified.html: %v", err)
-			return
-		}
+		s.ExecuteTemplate(w, r, tpl, user)
 	}
 }
