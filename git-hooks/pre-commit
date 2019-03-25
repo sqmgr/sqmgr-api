@@ -18,7 +18,7 @@ files=$(
 	find . -type f \
 		\! -path './.git/*' \
 		\! -path './vendor/*' \
-		\( -name '*.go' -o -name '*.js' -o -name '*.html' \) \
+		\( -name '*.go' -o -name '*.js' -o -name '*.css' -o -name '*.html' \) \
 		| xargs grep -L 'Apache License'
 	)
 
