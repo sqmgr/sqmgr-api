@@ -188,16 +188,31 @@ func (s *Server) LoggedInUserOrRedirect(w http.ResponseWriter, r *http.Request) 
 	return user, true
 }
 
+func (s *Server) requestWithSession(w http.ResponseWriter, r *http.Request) *http.Request {
+	session := newSession(w, r, s)
+	ctx := context.WithValue(r.Context(), ctxKeySession, session)
+	return r.WithContext(ctx)
+}
+
+func (s *Server) noDirListing(h http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "" || strings.HasSuffix(r.URL.Path, "/") {
+			s.Error(w, s.requestWithSession(w, r), http.StatusNotFound)
+			return
+		}
+
+		h.ServeHTTP(w, r)
+	}
+}
+
 func (s *Server) middleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Index(r.URL.Path, "/static/") == 0 {
+		if strings.HasPrefix(r.URL.Path, "/static/") || strings.HasSuffix(r.URL.Path, ".txt") {
 			h.ServeHTTP(w, r)
 			return
 		}
 
-		session := newSession(w, r, s)
-		ctx := context.WithValue(r.Context(), ctxKeySession, session)
-		h.ServeHTTP(w, r.WithContext(ctx))
+		h.ServeHTTP(w, s.requestWithSession(w, r))
 	})
 }
 

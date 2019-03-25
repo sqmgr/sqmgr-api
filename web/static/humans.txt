@@ -1,0 +1,13 @@
+/* TEAM */
+
+	Lead: Thomas Peters
+	Web: https://taproom.us/
+	Twitter: @weters
+	Location: Getzville, NY, USA
+
+/* SITE */
+
+	Language: English
+	Programming Languages: Go, JavaScript, PLpgSQL, Perl, Bash
+	Software: Git, Vim
+	Technologies: Docker, Kubernetes, Liquibase, PostgreSQL

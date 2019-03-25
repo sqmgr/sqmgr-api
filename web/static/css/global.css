@@ -70,20 +70,35 @@ main a {
 }
 
 footer {
-	color: rgba(0, 0, 0, 0.3);
+	color: rgba(255, 255, 255, 0.4);
 	min-height: 100px;
+	font-size: 0.9em;
 	padding-top: var(--spacing);
-	text-align: center;
+	text-align: right;
 }
 footer p {
 	margin: 0;
 }
-footer p.version {
-	font-size: 0.8em;
-}
 footer p a {
 	color: rgba(0, 0, 0, 0.3);
 	text-decoration: underline;
+}
+footer nav {
+	float: left;
+}
+footer nav ul {
+	list-style: none;
+}
+footer nav li {
+	display: inline-block;
+	margin-left: var(--spacing);
+}
+footer nav li:first-child {
+	margin-left: 0;
+}
+footer nav a {
+	color: #fff;
+	text-decoration: none;
 }
 
 header > div {

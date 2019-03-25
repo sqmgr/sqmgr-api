@@ -18,14 +18,21 @@ package server
 
 import (
 	"net/http"
+	"path/filepath"
 )
 
 func (s *Server) setupRoutes() {
 	s.Router.Use(s.middleware)
 
-	s.Router.Methods(http.MethodGet).PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web/static/"))))
+	s.Router.Methods(http.MethodGet).PathPrefix("/static/").Handler(http.StripPrefix("/static/", s.noDirListing(http.FileServer(http.Dir(filepath.Join("web", "static"))))))
+
+	s.Router.Methods(http.MethodGet).Path("/humans.txt").Handler(s.staticFileHandler(filepath.Join("web", "static", "humans.txt")))
+	s.Router.Methods(http.MethodGet).Path("/robots.txt").Handler(s.staticFileHandler(filepath.Join("web", "static", "robots.txt")))
 
 	s.Router.Methods(http.MethodGet).Path("/").Handler(s.simpleGetHandler("index.html"))
+	s.Router.Methods(http.MethodGet).Path("/about").Handler(s.simpleGetHandler("about.html"))
+	s.Router.Methods(http.MethodGet).Path("/privacy").Handler(s.simpleGetHandler("privacy.html"))
+	s.Router.Methods(http.MethodGet).Path("/terms").Handler(s.simpleGetHandler("terms.html"))
 
 	// account management
 	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/login").Handler(s.loginHandler())

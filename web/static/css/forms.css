@@ -36,8 +36,12 @@ fieldset {
 	border: none;
 }
 
-div.buttons + p {
+fieldset > p {
 	margin: var(--spacing) 0 0;
+}
+
+p.note {
+	font-size: 0.8em;
 }
 
 legend {
