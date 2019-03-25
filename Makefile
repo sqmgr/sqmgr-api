@@ -1,4 +1,3 @@
-.PHONY: docker-build docker-push migrations migrations-down run test
 IMG ?= "reg.taproom.us/weters/sqmgrserver:latest"
 BUILD_NUMBER ?= `date "+%y%m%d%H%M%S"`
 PG_HOST ?= "localhost"
@@ -42,3 +41,8 @@ migrations-down:
 		--username ${PG_USERNAME} \
 		--password ${PG_PASSWORD} \
 		rollbackCount ${ROLLBACK_COUNT}
+
+git-hooks:
+	ln -s ../../git-hooks/pre-commit .git/hooks/pre-commit
+
+.PHONY: docker-build docker-push migrations migrations-down run test git-hooks dev-db

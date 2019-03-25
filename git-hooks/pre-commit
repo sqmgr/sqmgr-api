@@ -1,0 +1,16 @@
+#!/bin/bash
+
+files=$(
+	find . -type f \
+		\! -path './.git/*' \
+		\! -path './vendor/*' \
+		\( -name '*.go' -o -name '*.js' -o -name '*.html' \) \
+		| xargs grep -L 'Apache License'
+	)
+
+if [[ -n $files ]]; then
+	echo "The following files are missing a license:" >&2
+	echo "$files" >&2
+	echo "Please run hack/apply-license.pl" >&2
+	exit 1
+fi
