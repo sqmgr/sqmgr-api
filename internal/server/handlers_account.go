@@ -64,6 +64,10 @@ func (s *Server) accountChangePasswordHandler() http.HandlerFunc {
 			v.Password("New Password", newPassword, confirmNewPassword, 8)
 			v.NotPwnedPassword("New Password", newPassword)
 
+			if user.PasswordIsValid(newPassword) {
+				v.AddError("New Password", "Your new password cannot be the same as your current password")
+			}
+
 			if v.OK() {
 				if err := user.SetPassword(newPassword); err != nil {
 					s.Error(w, r, http.StatusInternalServerError, err)
