@@ -160,4 +160,5 @@ input[type="password"]:invalid {
 
 p.message {
 	font-weight: bold;
+	margin: 0 0 var(--spacing);
 }
