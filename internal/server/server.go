@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -142,7 +143,13 @@ func (s *Server) Error(w http.ResponseWriter, r *http.Request, statusCode int, e
 		if ok && len(errInfo) > 1 {
 			log.Printf("error: "+strVal, errInfo[1:]...)
 		} else {
-			log.Println(append([]interface{}{"error"}, errInfo...))
+			err, ok := errInfo[0].(error)
+			if ok {
+				stack := debug.Stack()
+				log.Printf("error: %v\n%s\n", err, stack)
+			} else {
+				log.Println(errInfo[0])
+			}
 		}
 	}
 
@@ -161,6 +168,24 @@ func (s *Server) Session(r *http.Request) *Session {
 		panic("session not stored in context")
 	}
 	return session
+}
+
+// LoggedInUserOrRedirect will return the logged in user, or redirect the user to the login page. If false
+// is returned for the second value, the calling function MUST immediately return in order for the redirect to properly take place
+func (s *Server) LoggedInUserOrRedirect(w http.ResponseWriter, r *http.Request) (*model.User, bool) {
+	session := s.Session(r)
+	user, err := session.LoggedInUser()
+	if err != nil {
+		if err != ErrNotLoggedIn {
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return nil, false
+		}
+
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return nil, false
+	}
+
+	return user, true
 }
 
 func (s *Server) middleware(h http.Handler) http.Handler {

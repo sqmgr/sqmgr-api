@@ -141,8 +141,27 @@ func (m *Model) UserByEmailAndPassword(email, password string) (*User, error) {
 }
 
 // CheckPassword will check to see if the user can login
-func (u *User) CheckPassword(password string) error {
-	return argon2id.Compare(u.PasswordHash, password)
+func (u *User) PasswordIsValid(password string) bool {
+	if err := argon2id.Compare(u.PasswordHash, password); err != nil {
+		if err != argon2id.ErrMismatchedHashAndPassword {
+			log.Printf("error: could not validate password: %v", err)
+		}
+
+		return false
+	}
+
+	return true
+}
+
+// SetPassword will set the new password. This will NOT persist the change to the database
+func (u *User) SetPassword(password string) error {
+	hash, err := argon2id.DefaultHashPassword(password)
+	if err != nil {
+		return err
+	}
+
+	u.PasswordHash = hash
+	return nil
 }
 
 // SendVerificationEmail will create a new verification token and send it to the user

@@ -13,6 +13,7 @@
 	--minimal-spacing: 4px;
 	--spacing: 20px;
 	
+	--light-gray: #eee;
 	--gray: #999;
 	--red: #f44336;
 	--border-color: #ccc;
@@ -42,6 +43,10 @@ main {
 	background-color: #fff;
 	min-height: 400px;
 	padding: var(--spacing) 0 calc(3 * var(--spacing));
+}
+
+main ul {
+	margin-left: calc( 2 * var(--spacing) );
 }
 
 main a {
@@ -144,4 +149,13 @@ hr {
 section.error {
 	font-size: 1.4em;
 	text-align: center;
+}
+
+div.columns {
+	display: grid;
+	grid-gap: var(--spacing);
+	grid-template-columns: repeat(4, 1fr);
+}
+div.col-3 {
+	grid-column: span 3;
 }

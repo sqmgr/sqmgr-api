@@ -16,12 +16,25 @@ limitations under the License.
 
 {{ define "title" }}Account - {{ end }}
 
+{{ define "header" }}
+<link href="/static/css/account.css" rel="stylesheet">
+{{ end }}
+
 {{ define "content" }}
 <section class="account">
-	<h3>Your Account</h3>
+	<div class="columns">
+		<div class="actions col-3">
+			<p>Welcome {{.Local.Email}}
+		</div>
+		<div class="account-management">
+			<h3>Account Management</h3>
 
-	<p>Welcome {{.Local.Email}}
-
-	<p><a href="/login">Logout</a>
+			<ul>
+				<li><a href="/logout">Logout</a>
+				<li><a href="/account/change-password">Change Password</a>
+				<li><a href="/account/delete">Delete Account</a>
+			</ul>
+		</div>
+	</div>
 </section>
 {{ end }}

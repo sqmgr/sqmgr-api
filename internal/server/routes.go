@@ -27,12 +27,14 @@ func (s *Server) setupRoutes() {
 
 	s.Router.Methods(http.MethodGet).Path("/").Handler(s.simpleGetHandler("index.html"))
 
+	// account management
 	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/login").Handler(s.loginHandler())
+	s.Router.Methods(http.MethodGet).Path("/logout").Handler(s.loginHandler())
 	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/signup").Handler(s.signupHandler())
-	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/signup/complete").Handler(s.signupCompleteHandler())
-	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/signup/verify/{token:[A-Za-z0-9_-]{64}}").Handler(s.signupVerifyHandler())
-
+	s.Router.Methods(http.MethodGet).Path("/signup/complete").Handler(s.signupCompleteHandler())
+	s.Router.Methods(http.MethodGet).Path("/signup/verify/{token:[A-Za-z0-9_-]{64}}").Handler(s.signupVerifyHandler())
 	s.Router.Methods(http.MethodGet).Path("/account").Handler(s.accountHandler())
+	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/account/change-password").Handler(s.accountChangePasswordHandler())
 
 	// to update
 	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/create").Handler(s.createHandler())

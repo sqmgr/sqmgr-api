@@ -7,7 +7,7 @@ div.columns {
 
 form {
 	border: 1px solid var(--border-color);
-	background-color: #eee;
+	background-color: var(--light-gray);
 	padding: var(--spacing);
 }
 
@@ -136,4 +136,8 @@ div.input-error::before {
 }
 input[type="password"]:invalid {
 	box-shadow: none;
+}
+
+p.message {
+	font-weight: bold;
 }
