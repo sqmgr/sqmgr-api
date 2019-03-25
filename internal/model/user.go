@@ -140,7 +140,7 @@ func (m *Model) UserByEmailAndPassword(email, password string) (*User, error) {
 	return user, nil
 }
 
-// CheckPassword will check to see if the user can login
+// PasswordIsValid will check to see if the user can login
 func (u *User) PasswordIsValid(password string) bool {
 	if err := argon2id.Compare(u.PasswordHash, password); err != nil {
 		if err != argon2id.ErrMismatchedHashAndPassword {
