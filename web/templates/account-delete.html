@@ -1,0 +1,60 @@
+{{/*
+Copyright 2019 Tom Peters
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+
+{{ define "title" }}Delete Account - {{ end }}
+
+{{ define "header" }}
+<link href="/static/css/forms.css" rel="stylesheet">
+<link href="/static/css/account-delete.css" rel="stylesheet">
+{{ end }}
+
+{{ define "javascripts" }}
+<script src="/static/js/forms.js"></script>
+<script src="/static/js/account-delete.js"></script>
+{{ end }}
+
+{{ define "content" }}
+<section class="login">
+	<div class="small">
+		<h3>Delete your account</h3>
+
+		<p>Warning! Deleting your account is an irreversible process. While any boards you've created will remain, your email and password will be wiped from the system. Please be certain before you proceed.
+
+		<div class="buttons">
+			<button class="destructive">Delete My Account</button>
+		</div>
+	</div>
+
+	<div class="modal">
+		<form method="post">
+			<h3>Are you sure?</h3>
+			
+			<a class="close" href="#"><span>Close</span></a>
+
+			<p>This action <strong>cannot</strong> be undone. Please type your email address to confirm.
+
+			<div class="field">
+				<input type="email" name="email" autocomplete="off">
+				<input type="hidden" name="expected-email" value="{{.Local.Email}}">
+			</div>
+
+			<div class="buttons">
+				<input type="submit" name="submit" class="destructive" value="I understand the consequences, delete my account" disabled>
+			</div>
+		</form>
+	</div>
+</section>
+{{ end }}

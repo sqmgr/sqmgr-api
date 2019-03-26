@@ -18,7 +18,9 @@ package model
 
 import (
 	"bytes"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"html/template"
@@ -192,6 +194,29 @@ Content-Type: text/html; charset=utf-8
 		log.Printf("error: could not send email to %s: %v", u.Email, err)
 		return err
 	}
+
+	return nil
+}
+
+// Delete will mark the account as "deleted" by setting random values to the email and password. This will
+// keep the account ID in tact in order to not destroy any boards previously created.
+func (u *User) Delete() error {
+	// first 20 bytes is email, last 20 is password
+	randomData := make([]byte, 40)
+	if _, err := rand.Read(randomData); err != nil {
+		return err
+	}
+
+	email := hex.EncodeToString(randomData[0:len(randomData)/2]) + "@deleted.sqmgr.com"
+
+	passwordHash, err := argon2id.DefaultHashPassword(string(randomData[len(randomData)/2:]))
+	if err != nil {
+		return err
+	}
+
+	u.Email = email
+	u.PasswordHash = passwordHash
+	u.State = Disabled
 
 	return nil
 }

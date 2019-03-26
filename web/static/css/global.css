@@ -190,3 +190,8 @@ div.columns {
 div.col-3 {
 	grid-column: span 3;
 }
+
+.small {
+	max-width: 600px;
+	margin: 0 auto;
+}
