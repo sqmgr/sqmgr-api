@@ -28,7 +28,7 @@ input[type="submit"].destructive,
 button.destructive:disabled:hover,
 input[type="submit"].destructive:disabled:hover {
 	background-color: #eee;
-	border: 1px solid var(--border-color);
+	border-color: rgba(0, 0, 0, 0.2);
 	color: var(--red);
 	font-weight: bold;
 }
