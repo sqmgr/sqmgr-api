@@ -27,11 +27,6 @@ form {
 	padding: var(--spacing);
 }
 
-form.small {
-	max-width: 600px;
-	margin: 0 auto;
-}
-
 fieldset {
 	border: none;
 }
@@ -68,7 +63,9 @@ input[type="radio"] + label {
 	display: inline-block;
 }
 
-input, select {
+input,
+select,
+button {
 	border-radius: 3px;
 	border: 1px solid var(--border-color);
 	font: 1em var(--font);
@@ -100,7 +97,8 @@ fieldset.collapsed legend a {
 	font-size: 0.8em;
 }
 
-input[type="submit"] {
+input[type="submit"],
+button {
 	background-color: var(--primary);
 	color: #fff;
 	border: none;

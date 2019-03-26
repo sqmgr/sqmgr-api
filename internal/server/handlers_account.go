@@ -97,3 +97,55 @@ func (s *Server) accountChangePasswordHandler() http.HandlerFunc {
 		s.ExecuteTemplate(w, r, tpl, tplData)
 	}
 }
+
+func (s *Server) accountDeletedHandler() http.HandlerFunc {
+	tpl := s.loadTemplate("account-deleted.html")
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		session := s.Session(r)
+		didDelete := len(session.Flashes("account-deleted")) > 0
+		session.Save()
+
+		if !didDelete {
+			s.Error(w, r, http.StatusNotFound)
+			return
+		}
+
+		s.ExecuteTemplate(w, r, tpl, nil)
+	}
+}
+
+func (s *Server) accountDeleteHandler() http.HandlerFunc {
+	tpl := s.loadTemplate("account-delete.html")
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := s.LoggedInUserOrRedirect(w, r)
+		if !ok {
+			return
+		}
+
+		if r.Method == http.MethodPost {
+			email := r.PostFormValue("email")
+			if email == user.Email {
+				if err := user.Delete(); err != nil {
+					s.Error(w, r, http.StatusInternalServerError, err)
+					return
+				}
+
+				if err := user.Save(); err != nil {
+					s.Error(w, r, http.StatusInternalServerError, err)
+					return
+				}
+
+				session := s.Session(r)
+				session.AddFlash(true, "account-deleted")
+				session.Save()
+
+				http.Redirect(w, r, "/account/deleted", http.StatusSeeOther)
+				return
+			}
+		}
+
+		s.ExecuteTemplate(w, r, tpl, user)
+	}
+}
