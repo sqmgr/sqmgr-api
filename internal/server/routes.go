@@ -24,34 +24,37 @@ import (
 func (s *Server) setupRoutes() {
 	s.Router.Use(s.middleware)
 
-	s.Router.Methods(http.MethodGet).PathPrefix("/static/").Handler(http.StripPrefix("/static/", s.noDirListing(http.FileServer(http.Dir(filepath.Join("web", "static"))))))
+	// static directory
+	s.Router.PathPrefix("/static/").Methods(http.MethodGet).Handler(http.StripPrefix("/static/", s.noDirListing(http.FileServer(http.Dir(filepath.Join("web", "static"))))))
 
-	s.Router.Methods(http.MethodGet).Path("/humans.txt").Handler(s.staticFileHandler(filepath.Join("web", "static", "humans.txt")))
-	s.Router.Methods(http.MethodGet).Path("/robots.txt").Handler(s.staticFileHandler(filepath.Join("web", "static", "robots.txt")))
+	// static files
+	s.Router.Path("/humans.txt").Methods(http.MethodGet).Handler(s.staticFileHandler(filepath.Join("web", "static", "humans.txt")))
+	s.Router.Path("/robots.txt").Methods(http.MethodGet).Handler(s.staticFileHandler(filepath.Join("web", "static", "robots.txt")))
 
-	s.Router.Methods(http.MethodGet).Path("/").Handler(s.simpleGetHandler("index.html"))
-	s.Router.Methods(http.MethodGet).Path("/about").Handler(s.simpleGetHandler("about.html"))
-	s.Router.Methods(http.MethodGet).Path("/privacy").Handler(s.simpleGetHandler("privacy.html"))
-	s.Router.Methods(http.MethodGet).Path("/terms").Handler(s.simpleGetHandler("terms.html"))
+	// basic pags
+	s.Router.Path("/").Methods(http.MethodGet).Handler(s.simpleGetHandler("index.html"))
+	s.Router.Path("/about").Methods(http.MethodGet).Handler(s.simpleGetHandler("about.html"))
+	s.Router.Path("/donate").Methods(http.MethodGet).Handler(s.simpleGetHandler("donate.html"))
+	s.Router.Path("/privacy").Methods(http.MethodGet).Handler(s.simpleGetHandler("privacy.html"))
+	s.Router.Path("/terms").Methods(http.MethodGet).Handler(s.simpleGetHandler("terms.html"))
 
 	// account management
-	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/login").Handler(s.loginHandler())
-	s.Router.Methods(http.MethodGet).Path("/logout").Handler(s.loginHandler())
-	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/signup").Handler(s.signupHandler())
-	s.Router.Methods(http.MethodGet).Path("/signup/complete").Handler(s.signupCompleteHandler())
-	s.Router.Methods(http.MethodGet).Path("/signup/verify/{token:[A-Za-z0-9_-]{64}}").Handler(s.signupVerifyHandler())
-	s.Router.Methods(http.MethodGet).Path("/account").Handler(s.accountHandler())
-	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/account/verify").Handler(s.accountVerifyHandler())
-	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/account/delete").Handler(s.accountDeleteHandler())
-	s.Router.Methods(http.MethodGet).Path("/account/deleted").Handler(s.accountDeletedHandler())
-	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/account/change-password").Handler(s.accountChangePasswordHandler())
+	s.Router.Path("/account").Methods(http.MethodGet).Handler(s.accountHandler())
+	s.Router.Path("/account/change-password").Methods(http.MethodGet, http.MethodPost).Handler(s.accountChangePasswordHandler())
+	s.Router.Path("/account/delete").Methods(http.MethodGet, http.MethodPost).Handler(s.accountDeleteHandler())
+	s.Router.Path("/account/deleted").Methods(http.MethodGet).Handler(s.accountDeletedHandler())
+	s.Router.Path("/account/verify").Methods(http.MethodGet, http.MethodPost).Handler(s.accountVerifyHandler())
+	s.Router.Path("/login").Methods(http.MethodGet, http.MethodPost).Handler(s.loginHandler())
+	s.Router.Path("/logout").Methods(http.MethodGet).Handler(s.loginHandler())
+	s.Router.Path("/signup").Methods(http.MethodGet, http.MethodPost).Handler(s.signupHandler())
+	s.Router.Path("/signup/complete").Methods(http.MethodGet).Handler(s.signupCompleteHandler())
+	s.Router.Path("/signup/verify/{token:[A-Za-z0-9_-]{64}}").Methods(http.MethodGet).Handler(s.signupVerifyHandler())
 
 	// to update
-	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/create").Handler(s.createHandler())
-	s.Router.Methods(http.MethodGet).Path("/donate").Handler(s.simpleGetHandler("donate.html"))
+	s.Router.Path("/create").Methods(http.MethodGet, http.MethodPost).Handler(s.createHandler())
 
 	// temporary
-	s.Router.Methods(http.MethodGet).Path("/info").Handler(s.infoHandler())
+	s.Router.Path("/info").Methods(http.MethodGet).Handler(s.infoHandler())
 
 	s.Router.NotFoundHandler = s.middleware(s.notFoundHandler())
 }
