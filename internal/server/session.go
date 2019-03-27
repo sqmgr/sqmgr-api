@@ -56,8 +56,7 @@ const (
 )
 
 const (
-	loginEmail        = "le"
-	loginPasswordHash = "lph"
+	rememberMeKey = "rememberMe"
 )
 
 func init() {
@@ -68,6 +67,10 @@ func newSession(w http.ResponseWriter, r *http.Request, s *Server) *Session {
 	session, err := store.Get(r, sessionNameLT)
 	if err != nil {
 		log.Printf("error: could not get session: %v", err)
+	}
+
+	if rememberMe, _ := session.Values[rememberMeKey].(bool); !rememberMe {
+		session.Options.MaxAge = 0
 	}
 
 	return &Session{
@@ -91,12 +94,22 @@ func (s *Session) Logout() {
 }
 
 // Login will log the user in
-func (s *Session) Login(u *model.User) {
+func (s *Session) Login(u *model.User, optionalRememberMe ...bool) {
 	s.Values[loginKey] = loginSession{
 		Version:      loginVersion,
 		Email:        u.Email,
 		PasswordHash: u.PasswordHash,
 		Created:      time.Now(),
+	}
+
+	if len(optionalRememberMe) > 0 {
+		if optionalRememberMe[0] {
+			s.Values[rememberMeKey] = true
+			s.Options.MaxAge = store.Options.MaxAge
+		} else {
+			delete(s.Values, rememberMeKey)
+			s.Options.MaxAge = 0
+		}
 	}
 }
 

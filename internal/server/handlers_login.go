@@ -25,31 +25,37 @@ import (
 func (s *Server) loginHandler() http.HandlerFunc {
 	type data struct {
 		FormData struct {
-			Email string
+			Email      string
+			RememberMe string
 		}
 	}
 
 	tpl := s.loadTemplate("login.html")
 	return func(w http.ResponseWriter, r *http.Request) {
-		tplData := data{}
-
 		session := s.Session(r)
 		session.Logout()
+
+		tplData := data{}
+		if rememberMe, _ := session.Values[rememberMeKey].(bool); rememberMe {
+			tplData.FormData.RememberMe = "yes"
+		}
 
 		if r.Method == http.MethodPost {
 			email := r.PostFormValue("email")
 			password := r.PostFormValue("password")
+			rememberMe := r.PostFormValue("remember-me")
 
 			if user, err := s.model.UserByEmailAndPassword(email, password); err != nil {
 				if err == model.ErrUserNotFound {
 					tplData.FormData.Email = email
+					tplData.FormData.RememberMe = rememberMe
 				} else {
 					session.Save()
 					s.Error(w, r, http.StatusInternalServerError, "could not call s.model.UserByEmailAndPassword(%s, xxx): %v", email, err)
 					return
 				}
 			} else {
-				session.Login(user)
+				session.Login(user, len(rememberMe) > 0)
 				session.Save()
 				http.Redirect(w, r, "/account", http.StatusSeeOther)
 				return

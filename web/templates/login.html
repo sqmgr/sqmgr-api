@@ -47,7 +47,7 @@ limitations under the License.
 
 			<div class="buttons">
 				<input type="submit" name="submit" value="Login">
-				<label class="remember-me"><input type="checkbox" id="remember-me" name="remember-me" value="yes" checked> Remember me</label>
+				<label class="remember-me"><input type="checkbox" id="remember-me" name="remember-me" value="yes" {{ if .Local.FormData.RememberMe }}checked{{ end }}> Remember me</label>
 			</div>
 
 			<p>Don't have an account? <a href="/signup">Sign up now!</a>
