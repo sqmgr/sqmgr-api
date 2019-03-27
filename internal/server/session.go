@@ -17,9 +17,11 @@ limitations under the License.
 package server
 
 import (
+	"encoding/gob"
 	"errors"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/sessions"
 	"github.com/weters/sqmgr/internal/model"
@@ -36,13 +38,34 @@ type Session struct {
 	req    *http.Request
 }
 
+type loginSession struct {
+	Version      uint
+	Email        string
+	PasswordHash string
+	Created      time.Time
+}
+
+const (
+	sessionNameLT = "sqmgr-lt" // long term storage
+	sessionNameST = "sqmgr-st" // short term (i.e. browser session) storage
+)
+
+const (
+	loginKey          = "login"
+	loginVersion uint = 1
+)
+
 const (
 	loginEmail        = "le"
 	loginPasswordHash = "lph"
 )
 
+func init() {
+	gob.Register(loginSession{})
+}
+
 func newSession(w http.ResponseWriter, r *http.Request, s *Server) *Session {
-	session, err := store.Get(r, sessionName)
+	session, err := store.Get(r, sessionNameLT)
 	if err != nil {
 		log.Printf("error: could not get session: %v", err)
 	}
@@ -64,33 +87,41 @@ func (s *Session) Save() {
 
 // Logout will log the user out
 func (s *Session) Logout() {
-	delete(s.Values, loginEmail)
-	delete(s.Values, loginPasswordHash)
+	delete(s.Values, loginKey)
 }
 
 // Login will log the user in
 func (s *Session) Login(u *model.User) {
-	s.Values[loginEmail] = u.Email
-	s.Values[loginPasswordHash] = u.PasswordHash
+	s.Values[loginKey] = loginSession{
+		Version:      loginVersion,
+		Email:        u.Email,
+		PasswordHash: u.PasswordHash,
+		Created:      time.Now(),
+	}
 }
 
 // LoggedInUser will grab the currently logged in user
 func (s *Session) LoggedInUser() (*model.User, error) {
-	email, _ := s.Values[loginEmail].(string)
-	passwordHash, _ := s.Values[loginPasswordHash].(string)
-	if len(email) == 0 || len(passwordHash) == 0 {
+	login, ok := s.Values[loginKey].(loginSession)
+	if !ok {
 		return nil, ErrNotLoggedIn
 	}
 
-	user, err := s.server.model.UserByEmail(email)
+	if len(login.Email) == 0 || login.Version != loginVersion {
+		return nil, ErrNotLoggedIn
+	}
+
+	user, err := s.server.model.UserByEmail(login.Email)
 	if err != nil {
 		return nil, err
 	}
 
-	if user.PasswordHash != passwordHash {
+	if user.PasswordHash != login.PasswordHash {
 		s.Logout()
 		return nil, ErrNotLoggedIn
 	}
+
+	user.Metadata.LastCredentialCheck = login.Created
 
 	return user, nil
 }

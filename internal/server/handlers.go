@@ -26,7 +26,6 @@ import (
 	"github.com/weters/sqmgr/internal/validator"
 )
 
-const sessionName = "squares"
 const templatesDir = "web/templates"
 
 func (s *Server) simpleGetHandler(page string) http.HandlerFunc {

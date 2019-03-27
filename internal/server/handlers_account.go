@@ -17,8 +17,11 @@ limitations under the License.
 package server
 
 import (
+	"encoding/base64"
 	"net/http"
+	"strings"
 
+	"github.com/weters/sqmgr/internal/model"
 	"github.com/weters/sqmgr/internal/validator"
 )
 
@@ -124,6 +127,11 @@ func (s *Server) accountDeleteHandler() http.HandlerFunc {
 			return
 		}
 
+		if user.RequiresReauthentication() {
+			http.Redirect(w, r, "/account/verify?b="+base64.RawURLEncoding.EncodeToString([]byte("/account/delete")), http.StatusSeeOther)
+			return
+		}
+
 		if r.Method == http.MethodPost {
 			email := r.PostFormValue("email")
 			if email == user.Email {
@@ -147,5 +155,50 @@ func (s *Server) accountDeleteHandler() http.HandlerFunc {
 		}
 
 		s.ExecuteTemplate(w, r, tpl, user)
+	}
+}
+
+func (s *Server) accountVerifyHandler() http.HandlerFunc {
+	tpl := s.loadTemplate("account-verify.html")
+
+	type data struct {
+		User          *model.User
+		WrongPassword bool
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := s.LoggedInUserOrRedirect(w, r)
+		if !ok {
+			return
+		}
+
+		tplData := data{
+			User: user,
+		}
+
+		if r.Method == http.MethodPost {
+			password := r.PostFormValue("password")
+
+			if user.PasswordIsValid(password) {
+				bounceTo := "/account"
+				if b := r.FormValue("b"); len(b) > 0 {
+					bounceToBytes, _ := base64.RawURLEncoding.DecodeString(b)
+					if len(bounceToBytes) > 0 && bounceToBytes[0] == '/' && !strings.HasPrefix(string(bounceToBytes), "//") {
+						bounceTo = string(bounceToBytes)
+					}
+				}
+
+				session := s.Session(r)
+				session.Login(user)
+				session.Save()
+
+				http.Redirect(w, r, bounceTo, http.StatusSeeOther)
+				return
+			}
+
+			tplData.WrongPassword = true
+		}
+
+		s.ExecuteTemplate(w, r, tpl, tplData)
 	}
 }

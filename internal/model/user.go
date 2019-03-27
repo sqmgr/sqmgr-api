@@ -53,6 +53,10 @@ const (
 	Disabled State = "disabled"
 )
 
+// durationBeforeReauth is a maximum duration allowed before a user is required to resupply their credentials
+// before doing some potentially destructive operation
+const durationBeforeReauth = time.Minute * 3
+
 // User represents an account
 type User struct {
 	*Model
@@ -62,6 +66,13 @@ type User struct {
 	State        State
 	Created      time.Time
 	Modified     time.Time
+	Metadata     UserMetadata // data not persisted to database
+}
+
+// UserMetadata represents data that won't be persisted to the database for a user. May contain information regarding
+// logged in states, etc.
+type UserMetadata struct {
+	LastCredentialCheck time.Time
 }
 
 // NewUser will try to save a new user in the database
@@ -83,6 +94,11 @@ func (m *Model) NewUser(email, password string) (*User, error) {
 	}
 
 	return user, nil
+}
+
+// RequiresReauthentication will return true if the user needs to re-enter their credentials
+func (u *User) RequiresReauthentication() bool {
+	return time.Now().Sub(u.Metadata.LastCredentialCheck) > durationBeforeReauth
 }
 
 // Save will persist any changes to the database

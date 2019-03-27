@@ -41,6 +41,7 @@ func (s *Server) setupRoutes() {
 	s.Router.Methods(http.MethodGet).Path("/signup/complete").Handler(s.signupCompleteHandler())
 	s.Router.Methods(http.MethodGet).Path("/signup/verify/{token:[A-Za-z0-9_-]{64}}").Handler(s.signupVerifyHandler())
 	s.Router.Methods(http.MethodGet).Path("/account").Handler(s.accountHandler())
+	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/account/verify").Handler(s.accountVerifyHandler())
 	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/account/delete").Handler(s.accountDeleteHandler())
 	s.Router.Methods(http.MethodGet).Path("/account/deleted").Handler(s.accountDeletedHandler())
 	s.Router.Methods(http.MethodGet, http.MethodPost).Path("/account/change-password").Handler(s.accountChangePasswordHandler())

@@ -39,6 +39,8 @@ func (s *Server) infoHandler() http.HandlerFunc {
 			fmt.Fprintf(w, "error getting logged in user: %v\n", err)
 		} else {
 			fmt.Fprintf(w, "email=%s\n", user.Email)
+			fmt.Fprintf(w, "last cred check=%s\n", user.Metadata.LastCredentialCheck)
+			fmt.Fprintf(w, "require reauth?=%t\n", user.RequiresReauthentication())
 		}
 
 		return
