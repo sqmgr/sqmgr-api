@@ -61,8 +61,13 @@ main {
 	padding: var(--spacing) 0 calc(3 * var(--spacing));
 }
 
-main ul {
+main ul,
+main ol {
 	margin-left: calc( 2 * var(--spacing) );
+	margin-bottom: var(--spacing);
+}
+main ol ol {
+	margin-bottom: 0;
 }
 
 main a {
@@ -74,17 +79,18 @@ footer {
 	min-height: 100px;
 	font-size: 0.9em;
 	padding-top: var(--spacing);
-	text-align: right;
+	position: relative;
+	text-align: center;
 }
-footer p {
+footer p.version {
 	margin: 0;
+	position: absolute;
+	right: var(--spacing);
+	top: var(--spacing);
 }
-footer p a {
+footer p.version a {
 	color: rgba(0, 0, 0, 0.3);
 	text-decoration: underline;
-}
-footer nav {
-	float: left;
 }
 footer nav ul {
 	list-style: none;
@@ -194,4 +200,9 @@ div.col-3 {
 .small {
 	max-width: 600px;
 	margin: 0 auto;
+}
+
+p.generated-by {
+	font-size: 0.8em;
+	color: var(--gray);
 }
