@@ -67,7 +67,7 @@ func init() {
 			panic(err)
 		}
 
-		logrus.Warningf("WARNING: no SESSION_AUTH_KEY specified, using random value: %s", sessionAuthKey)
+		logrus.WithField("SESSION_AUTH_KEY", sessionAuthKey).Warnln("no SESSION_AUTH_KEY specified, using random value")
 	}
 
 	if sessionEncKey == "" {
@@ -77,7 +77,7 @@ func init() {
 			panic(err)
 		}
 
-		logrus.Warningf("WARNING: no SESSION_ENC_KEY specified, using random value: %s", sessionEncKey)
+		logrus.WithField("SESSION_ENC_KEY", sessionEncKey).Warnln("no SESSION_ENC_KEY specified, using random value")
 	}
 
 	store = sessions.NewCookieStore([]byte(sessionAuthKey), []byte(sessionEncKey))

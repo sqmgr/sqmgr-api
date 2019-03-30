@@ -126,7 +126,7 @@ func (v *Validator) Datetime(key, datetime, timezoneOffset string) time.Time {
 
 	dt, err := time.Parse("2006-01-02T15:04-0700", datetime+tzStr)
 	if err != nil {
-		logrus.Warnf("Got %s, err = %v", datetime+tzStr, err)
+		logrus.WithError(err).Warnf("could not parse date string: %s", datetime+tzStr)
 		v.AddError(key, "must be a valid date and time")
 		return time.Time{}
 	}

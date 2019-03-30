@@ -68,7 +68,7 @@ func main() {
 	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
 
 	go func() {
-		logrus.WithField("addr", srv.Addr).Infof("Listening")
+		logrus.WithField("addr", srv.Addr).Infof("listening")
 		err := srv.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			logrus.Fatal(err)
@@ -76,14 +76,14 @@ func main() {
 	}()
 
 	<-sig
-	logrus.Infof("Shutting down")
+	logrus.Infof("shutting down")
 	if err := s.Shutdown(); err != nil {
-		logrus.Errorf("error shutting down server resources: %v", err)
+		logrus.WithError(err).Errorln("could not shutdown server resources")
 	}
 	if err := srv.Shutdown(context.Background()); err != nil {
-		logrus.Fatalf("error shutting down: %v", err)
+		logrus.WithError(err).Fatalln("could not shut down server")
 	}
-	logrus.Printf("Shutdown complete.")
+	logrus.Infoln("shutdown complete")
 }
 
 func openDB() (*sql.DB, error) {
