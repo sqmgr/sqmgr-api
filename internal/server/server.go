@@ -21,7 +21,6 @@ import (
 	"context"
 	"database/sql"
 	"html/template"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -30,6 +29,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
+	"github.com/sirupsen/logrus"
 	"github.com/weters/sqmgr/internal/model"
 	"github.com/weters/sqmgr/pkg/tokengen"
 )
@@ -47,10 +47,14 @@ type TemplateData struct {
 
 const (
 	ctxKeySession ctxKey = iota
-	ctxKeySession2
+	ctxKeyUser
 )
 
 var store *sessions.CookieStore
+
+var funcMap = template.FuncMap{
+	"Version": version,
+}
 
 func init() {
 	sessionAuthKey := os.Getenv("SESSION_AUTH_KEY")
@@ -63,7 +67,7 @@ func init() {
 			panic(err)
 		}
 
-		log.Printf("WARNING: no SESSION_AUTH_KEY specified, using random value: %s", sessionAuthKey)
+		logrus.Warningf("WARNING: no SESSION_AUTH_KEY specified, using random value: %s", sessionAuthKey)
 	}
 
 	if sessionEncKey == "" {
@@ -73,7 +77,7 @@ func init() {
 			panic(err)
 		}
 
-		log.Printf("WARNING: no SESSION_ENC_KEY specified, using random value: %s", sessionEncKey)
+		logrus.Warningf("WARNING: no SESSION_ENC_KEY specified, using random value: %s", sessionEncKey)
 	}
 
 	store = sessions.NewCookieStore([]byte(sessionAuthKey), []byte(sessionEncKey))
@@ -82,6 +86,7 @@ func init() {
 // Server represents the server application
 type Server struct {
 	*mux.Router
+	Reload        bool
 	model         *model.Model
 	baseTemplate  *template.Template
 	errorTemplate *template.Template
@@ -89,9 +94,6 @@ type Server struct {
 
 // New instantiates a new Server object.
 func New(db *sql.DB) *Server {
-	funcMap := template.FuncMap{
-		"Version": version,
-	}
 
 	tpl := template.Must(
 		template.New("").Funcs(funcMap).ParseFiles(filepath.Join(templatesDir, "base.html")),
@@ -122,7 +124,7 @@ func (s *Server) ExecuteTemplate(w http.ResponseWriter, r *http.Request, t *temp
 	session := s.Session(r)
 	user, err := session.LoggedInUser()
 	if err != nil && err != ErrNotLoggedIn {
-		log.Printf("error: could not get user: %v", err)
+		logrus.WithError(err).Errorln("could not get user")
 	}
 
 	tplData := TemplateData{
@@ -130,8 +132,23 @@ func (s *Server) ExecuteTemplate(w http.ResponseWriter, r *http.Request, t *temp
 		Local:        localData,
 	}
 
+	// if Reload is enabled, will attempt to read the templates from disk again.
+	if s.Reload {
+		newTemplate := template.New("").Funcs(funcMap)
+		for _, tpl := range t.Templates() {
+			if strings.HasSuffix(tpl.Name(), ".html") {
+				logrus.Debugf("reloading template %s", tpl.Name())
+				newTemplate, err = newTemplate.ParseFiles(filepath.Join(templatesDir, tpl.Name()))
+				if err != nil {
+					panic(err)
+				}
+			}
+		}
+		t = newTemplate.Lookup("base.html")
+	}
+
 	if err := t.Execute(w, tplData); err != nil {
-		log.Printf("error executing template: %v", err)
+		logrus.WithError(err).Errorln("could not execute template")
 		return
 	}
 }
@@ -141,14 +158,17 @@ func (s *Server) Error(w http.ResponseWriter, r *http.Request, statusCode int, e
 	if len(errInfo) > 0 {
 		strVal, ok := errInfo[0].(string)
 		if ok && len(errInfo) > 1 {
-			log.Printf("error: "+strVal, errInfo[1:]...)
+			// similar to fmt.Sprintf(...)
+			logrus.Errorf(strVal, errInfo[1:]...)
 		} else {
 			err, ok := errInfo[0].(error)
 			if ok {
+				// we have an error object
 				stack := debug.Stack()
-				log.Printf("error: %v\n%s\n", err, stack)
+				logrus.WithError(err).Errorf(string(stack))
 			} else {
-				log.Println(errInfo[0])
+				// not an error... probably a string
+				logrus.Errorln(errInfo[0])
 			}
 		}
 	}
@@ -170,22 +190,34 @@ func (s *Server) Session(r *http.Request) *Session {
 	return session
 }
 
-// LoggedInUserOrRedirect will return the logged in user, or redirect the user to the login page. If false
-// is returned for the second value, the calling function MUST immediately return in order for the redirect to properly take place
-func (s *Server) LoggedInUserOrRedirect(w http.ResponseWriter, r *http.Request) (*model.User, bool) {
-	session := s.Session(r)
-	user, err := session.LoggedInUser()
-	if err != nil {
-		if err != ErrNotLoggedIn {
-			s.Error(w, r, http.StatusInternalServerError, err)
-			return nil, false
+func (s *Server) authHandler(nextHandler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session := s.Session(r)
+		user, err := session.LoggedInUser()
+		if err != nil {
+			if err != ErrNotLoggedIn {
+				s.Error(w, r, http.StatusInternalServerError, err)
+				return
+			}
+
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
 		}
 
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return nil, false
+		newR := r.WithContext(context.WithValue(r.Context(), ctxKeyUser, user))
+		nextHandler.ServeHTTP(w, newR)
+	})
+}
+
+// AuthUser will return the currently authenticated user. This MUST only be called the calling handler has been
+// wrapped by authHandler
+func (s *Server) AuthUser(r *http.Request) *model.User {
+	user, ok := r.Context().Value(ctxKeyUser).(*model.User)
+	if !ok {
+		panic("user not stored in context")
 	}
 
-	return user, true
+	return user
 }
 
 func (s *Server) requestWithSession(w http.ResponseWriter, r *http.Request) *http.Request {

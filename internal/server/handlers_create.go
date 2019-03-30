@@ -16,33 +16,11 @@ limitations under the License.
 
 package server
 
-import (
-	"html/template"
-	"net/http"
-	"path/filepath"
-)
+import "net/http"
 
-const templatesDir = "web/templates"
-
-func (s *Server) simpleGetHandler(page string) http.HandlerFunc {
-	tpl := s.loadTemplate(page)
+func (s *Server) createHandler() http.HandlerFunc {
+	tpl := s.loadTemplate("create.html")
 	return func(w http.ResponseWriter, r *http.Request) {
 		s.ExecuteTemplate(w, r, tpl, nil)
-	}
-}
-
-func (s *Server) loadTemplate(filenames ...string) *template.Template {
-	fullFilenames := make([]string, len(filenames))
-	for i, filename := range filenames {
-		fullFilenames[i] = filepath.Join(templatesDir, filename)
-	}
-
-	return template.Must(template.Must(s.baseTemplate.Clone()).ParseFiles(fullFilenames...))
-}
-
-func (s *Server) notFoundHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		s.Error(w, r, http.StatusNotFound)
-		return
 	}
 }

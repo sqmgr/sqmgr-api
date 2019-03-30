@@ -19,12 +19,12 @@ package validator
 
 import (
 	"fmt"
-	"log"
 	"net/mail"
 	"regexp"
 	"strconv"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/weters/pwned"
 	"github.com/weters/sqmgr/internal/model"
 )
@@ -71,7 +71,7 @@ func (v *Validator) NotPwnedPassword(key, pw string) string {
 	count, err := pwned.Count(pw)
 	if err != nil {
 		// if we can't detect, just make a note of it, but don't fail
-		log.Printf("error: could not determined if password has been pwned: %v", err)
+		logrus.WithError(err).Errorln("could not determined if password has been pwned")
 	}
 
 	if count > 0 {
@@ -113,7 +113,7 @@ func (v *Validator) Password(key, pw, cpw string, minLen int) string {
 func (v *Validator) Datetime(key, datetime, timezoneOffset string) time.Time {
 	tzInt, err := strconv.Atoi(timezoneOffset)
 	if err != nil {
-		log.Printf("invalid timezone found: %s", timezoneOffset)
+		logrus.Errorf("invalid timezone found: %s", timezoneOffset)
 	}
 
 	tzInt *= 100
@@ -126,7 +126,7 @@ func (v *Validator) Datetime(key, datetime, timezoneOffset string) time.Time {
 
 	dt, err := time.Parse("2006-01-02T15:04-0700", datetime+tzStr)
 	if err != nil {
-		log.Printf("Got %s, err = %v", datetime+tzStr, err)
+		logrus.Warnf("Got %s, err = %v", datetime+tzStr, err)
 		v.AddError(key, "must be a valid date and time")
 		return time.Time{}
 	}

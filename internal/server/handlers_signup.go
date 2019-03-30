@@ -19,11 +19,11 @@ package server
 import (
 	"database/sql"
 	"html/template"
-	"log"
 	"net/http"
 	"path/filepath"
 
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 	"github.com/weters/sqmgr/internal/model"
 	"github.com/weters/sqmgr/internal/validator"
 )
@@ -122,7 +122,7 @@ func (s *Server) signupCompleteHandler() http.HandlerFunc {
 				return
 			}
 
-			log.Printf("warning: email %s found in flash, but could not find account", email)
+			logrus.Warningf("email %s found in flash, but could not find account", email)
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
@@ -136,7 +136,7 @@ func (s *Server) signupCompleteHandler() http.HandlerFunc {
 		}
 
 		if err := user.SendVerificationEmail(emailTpl); err != nil {
-			log.Printf("error: could not send verification email to %s: %v", email, err)
+			logrus.WithError(err).Errorf("could not send verification email to %s", err)
 		}
 
 		s.ExecuteTemplate(w, r, tpl, data{email})

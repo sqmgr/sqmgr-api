@@ -19,11 +19,11 @@ package server
 import (
 	"encoding/gob"
 	"errors"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/sessions"
+	"github.com/sirupsen/logrus"
 	"github.com/weters/sqmgr/internal/model"
 )
 
@@ -66,7 +66,7 @@ func init() {
 func newSession(w http.ResponseWriter, r *http.Request, s *Server) *Session {
 	session, err := store.Get(r, sessionNameLT)
 	if err != nil {
-		log.Printf("error: could not get session: %v", err)
+		logrus.WithError(err).Errorln("could not get session")
 	}
 
 	if rememberMe, _ := session.Values[rememberMeKey].(bool); !rememberMe {
@@ -84,7 +84,7 @@ func newSession(w http.ResponseWriter, r *http.Request, s *Server) *Session {
 // Save will save the session.
 func (s *Session) Save() {
 	if err := s.Session.Save(s.req, s.writer); err != nil {
-		log.Printf("error: could not save session: %v", err)
+		logrus.WithError(err).Errorln("could not save session")
 	}
 }
 

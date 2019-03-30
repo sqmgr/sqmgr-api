@@ -38,17 +38,24 @@ func (s *Server) setupRoutes() {
 	s.Router.Path("/privacy").Methods(http.MethodGet).Handler(s.simpleGetHandler("privacy.html"))
 	s.Router.Path("/terms").Methods(http.MethodGet).Handler(s.simpleGetHandler("terms.html"))
 
-	// account management
-	s.Router.Path("/account").Methods(http.MethodGet).Handler(s.accountHandler())
-	s.Router.Path("/account/change-password").Methods(http.MethodGet, http.MethodPost).Handler(s.accountChangePasswordHandler())
-	s.Router.Path("/account/delete").Methods(http.MethodGet, http.MethodPost).Handler(s.accountDeleteHandler())
-	s.Router.Path("/account/deleted").Methods(http.MethodGet).Handler(s.accountDeletedHandler())
-	s.Router.Path("/account/verify").Methods(http.MethodGet, http.MethodPost).Handler(s.accountVerifyHandler())
+	// login/logout functionality
 	s.Router.Path("/login").Methods(http.MethodGet, http.MethodPost).Handler(s.loginHandler())
 	s.Router.Path("/logout").Methods(http.MethodGet).Handler(s.loginHandler())
+
+	// account management
+	s.Router.Path("/account").Methods(http.MethodGet).Handler(s.authHandler(s.accountHandler()))
+	s.Router.Path("/account/change-password").Methods(http.MethodGet, http.MethodPost).Handler(s.authHandler(s.accountChangePasswordHandler()))
+	s.Router.Path("/account/delete").Methods(http.MethodGet, http.MethodPost).Handler(s.authHandler(s.accountDeleteHandler()))
+	s.Router.Path("/account/deleted").Methods(http.MethodGet).Handler(s.authHandler(s.accountDeletedHandler()))
+	s.Router.Path("/account/verify").Methods(http.MethodGet, http.MethodPost).Handler(s.authHandler(s.accountVerifyHandler()))
+
+	// signup
 	s.Router.Path("/signup").Methods(http.MethodGet, http.MethodPost).Handler(s.signupHandler())
 	s.Router.Path("/signup/complete").Methods(http.MethodGet).Handler(s.signupCompleteHandler())
 	s.Router.Path("/signup/verify/{token:[A-Za-z0-9_-]{64}}").Methods(http.MethodGet).Handler(s.signupVerifyHandler())
+
+	// square management
+	s.Router.Path("/create").Methods(http.MethodGet).Handler(s.authHandler(s.createHandler()))
 
 	// temporary
 	s.Router.Path("/info").Methods(http.MethodGet).Handler(s.infoHandler())

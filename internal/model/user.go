@@ -24,10 +24,10 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"log"
 	"net/smtp"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/synacor/argon2id"
 	"github.com/weters/sqmgr/internal/config"
 	"github.com/weters/sqmgr/pkg/tokengen"
@@ -149,7 +149,7 @@ func (m *Model) UserByEmailAndPassword(email, password string) (*User, error) {
 
 	if err := argon2id.Compare(user.PasswordHash, password); err != nil {
 		if err != argon2id.ErrMismatchedHashAndPassword {
-			log.Printf("error: unexpected error from argon2id: %v", err)
+			logrus.WithError(err).Errorf("unexpected error from argon2id")
 		}
 
 		return nil, ErrUserNotFound
@@ -162,7 +162,7 @@ func (m *Model) UserByEmailAndPassword(email, password string) (*User, error) {
 func (u *User) PasswordIsValid(password string) bool {
 	if err := argon2id.Compare(u.PasswordHash, password); err != nil {
 		if err != argon2id.ErrMismatchedHashAndPassword {
-			log.Printf("error: could not validate password: %v", err)
+			logrus.WithError(err).Errorf("could not validate password")
 		}
 
 		return false
@@ -207,7 +207,7 @@ Content-Type: text/html; charset=utf-8
 %s`, u.Email, config.GetFromAddress(), "SqMGR - Account Verification", w.String())
 
 	if err := smtp.SendMail(config.GetSMTP(), nil, config.GetFromAddress(), []string{u.Email}, []byte(body)); err != nil {
-		log.Printf("error: could not send email to %s: %v", u.Email, err)
+		logrus.WithError(err).WithField("email", u.Email).Errorln("could not send email")
 		return err
 	}
 

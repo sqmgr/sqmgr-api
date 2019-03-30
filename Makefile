@@ -9,7 +9,7 @@ ROLLBACK_COUNT ?= "1"
 
 run:
 	# these keys MUST never be used outside of a dev environment
-	SESSION_AUTH_KEY=dev-session-auth-key---X2xr5nJgD2eetKHZoYOoh00otckwU8mmB3jEvTBhc SESSION_ENC_KEY=dev-session-enc-key---Bgvp9YxwQT go run cmd/sqmgrserver/*.go
+	SESSION_AUTH_KEY=dev-session-auth-key---X2xr5nJgD2eetKHZoYOoh00otckwU8mmB3jEvTBhc SESSION_ENC_KEY=dev-session-enc-key---Bgvp9YxwQT go run cmd/sqmgrserver/*.go -dev
 
 docker-build:
 	docker build -t ${IMG} --build-arg BUILD_NUMBER=${BUILD_NUMBER} .

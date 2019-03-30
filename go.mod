@@ -7,6 +7,7 @@ require (
 	github.com/keegancsmith/rpc v1.1.0 // indirect
 	github.com/lib/pq v1.0.0
 	github.com/onsi/gomega v1.5.0
+	github.com/sirupsen/logrus v1.4.0
 	github.com/stamblerre/gocode v0.0.0-20190213022308-8cc90faaf476 // indirect
 	github.com/synacor/argon2id v0.0.0-20190318165710-18569dfc600b
 	github.com/weters/pwned v0.0.0-20190217152429-1a03bf606e34

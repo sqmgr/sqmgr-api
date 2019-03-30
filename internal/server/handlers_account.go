@@ -28,12 +28,7 @@ import (
 func (s *Server) accountHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("account.html")
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, ok := s.LoggedInUserOrRedirect(w, r)
-		if !ok {
-			return
-		}
-
-		s.ExecuteTemplate(w, r, tpl, user)
+		s.ExecuteTemplate(w, r, tpl, s.AuthUser(r))
 	}
 }
 
@@ -48,10 +43,7 @@ func (s *Server) accountChangePasswordHandler() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, ok := s.LoggedInUserOrRedirect(w, r)
-		if !ok {
-			return
-		}
+		user := s.AuthUser(r)
 
 		tplData := data{}
 		if r.Method == http.MethodPost {
@@ -122,10 +114,7 @@ func (s *Server) accountDeleteHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("account-delete.html")
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, ok := s.LoggedInUserOrRedirect(w, r)
-		if !ok {
-			return
-		}
+		user := s.AuthUser(r)
 
 		if user.RequiresReauthentication() {
 			http.Redirect(w, r, "/account/verify?b="+base64.RawURLEncoding.EncodeToString([]byte("/account/delete")), http.StatusSeeOther)
@@ -167,10 +156,7 @@ func (s *Server) accountVerifyHandler() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, ok := s.LoggedInUserOrRedirect(w, r)
-		if !ok {
-			return
-		}
+		user := s.AuthUser(r)
 
 		tplData := data{
 			User: user,

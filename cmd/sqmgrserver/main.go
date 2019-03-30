@@ -20,7 +20,6 @@ import (
 	"context"
 	"database/sql"
 	"flag"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -28,12 +27,14 @@ import (
 	"time"
 
 	"github.com/gorilla/handlers"
+	"github.com/sirupsen/logrus"
 	"github.com/weters/sqmgr/internal/server"
 
 	_ "github.com/lib/pq"
 )
 
 var addr = flag.String("addr", ":8080", "address for the server to listen on")
+var dev = flag.Bool("dev", false, "enabling dev mode turns on debug logging and template reloads")
 
 const (
 	readTimeout  = time.Second * 5
@@ -45,10 +46,16 @@ func main() {
 
 	db, err := openDB()
 	if err != nil {
-		log.Fatalf("could not open database: %v", err)
+		logrus.Fatalf("could not open database: %v", err)
 	}
 
 	s := server.New(db)
+	if *dev {
+		logrus.Infof("enabling template reload")
+		s.Reload = true
+
+		logrus.SetLevel(logrus.DebugLevel)
+	}
 
 	srv := &http.Server{
 		Addr:         *addr,
@@ -61,22 +68,22 @@ func main() {
 	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
 
 	go func() {
-		log.Printf("Listening...")
+		logrus.WithField("addr", srv.Addr).Infof("Listening")
 		err := srv.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
+			logrus.Fatal(err)
 		}
 	}()
 
 	<-sig
-	log.Printf("Initiating shutdown...")
+	logrus.Infof("Shutting down")
 	if err := s.Shutdown(); err != nil {
-		log.Printf("error shutting down server resources: %v", err)
+		logrus.Errorf("error shutting down server resources: %v", err)
 	}
 	if err := srv.Shutdown(context.Background()); err != nil {
-		log.Fatalf("error shutting down: %v", err)
+		logrus.Fatalf("error shutting down: %v", err)
 	}
-	log.Printf("Shutdown complete.")
+	logrus.Printf("Shutdown complete.")
 }
 
 func openDB() (*sql.DB, error) {
