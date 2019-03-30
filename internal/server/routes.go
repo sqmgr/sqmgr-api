@@ -50,9 +50,6 @@ func (s *Server) setupRoutes() {
 	s.Router.Path("/signup/complete").Methods(http.MethodGet).Handler(s.signupCompleteHandler())
 	s.Router.Path("/signup/verify/{token:[A-Za-z0-9_-]{64}}").Methods(http.MethodGet).Handler(s.signupVerifyHandler())
 
-	// to update
-	s.Router.Path("/create").Methods(http.MethodGet, http.MethodPost).Handler(s.createHandler())
-
 	// temporary
 	s.Router.Path("/info").Methods(http.MethodGet).Handler(s.infoHandler())
 
