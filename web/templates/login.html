@@ -23,7 +23,7 @@ limitations under the License.
 
 {{ define "content" }}
 <section class="login">
-	<form class="small" method="post" action="/login">
+	<form class="small" method="post" action="/login{{ if .Local.Query }}?{{.Local.Query}}{{ end }}">
 		<fieldset>
 			<legend>Log in to SqMGR</legend>
 

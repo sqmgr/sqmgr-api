@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"html/template"
 	"net/http"
 
 	"github.com/weters/sqmgr/internal/model"
@@ -24,6 +25,7 @@ import (
 
 func (s *Server) loginHandler() http.HandlerFunc {
 	type data struct {
+		Query    template.URL
 		FormData struct {
 			Email      string
 			RememberMe string
@@ -35,7 +37,10 @@ func (s *Server) loginHandler() http.HandlerFunc {
 		session := s.Session(r)
 		session.Logout()
 
-		tplData := data{}
+		tplData := data{
+			Query: template.URL(r.URL.RawQuery),
+		}
+
 		if rememberMe, _ := session.Values[rememberMeKey].(bool); rememberMe {
 			tplData.FormData.RememberMe = "yes"
 		}
@@ -57,7 +62,13 @@ func (s *Server) loginHandler() http.HandlerFunc {
 			} else {
 				session.Login(user, len(rememberMe) > 0)
 				session.Save()
-				http.Redirect(w, r, "/account", http.StatusSeeOther)
+
+				redirectURL := "/account"
+				if bounceTo := r.FormValue("bounce-to"); len(bounceTo) > 0 {
+					redirectURL = bounceTo
+				}
+
+				http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 				return
 			}
 		}
