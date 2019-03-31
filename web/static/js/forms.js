@@ -22,6 +22,10 @@ window.addEventListener('load', function() {
 		var confirmInput, checkPasswordFn, noMatchElem
 
 		if (id.indexOf('confirm-') === 0) {
+			// if a confirm- is present, that means that we are expecting user to input
+			// a brand-new password. Do not let Firefox auto fill this
+			document.getElementById(id.substr('confirm-'.length)).value = ''
+			input.value = ''
 			return
 		}
 
