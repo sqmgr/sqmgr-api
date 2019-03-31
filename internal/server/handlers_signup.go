@@ -28,18 +28,21 @@ import (
 	"github.com/weters/sqmgr/internal/validator"
 )
 
+const minPasswordLen = 8
+
 func (s *Server) signupHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("signup.html", "form-errors.html")
 
 	type data struct {
-		FormData struct {
+		MinPasswordLen int
+		FormData       struct {
 			Email string
 		}
 		FormErrors validator.Errors
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		tplData := data{}
+		tplData := data{MinPasswordLen: minPasswordLen}
 
 		if r.Method == http.MethodPost {
 			session := s.Session(r)
@@ -50,7 +53,7 @@ func (s *Server) signupHandler() http.HandlerFunc {
 
 			v := validator.New()
 			v.Email("email", email)
-			v.Password("password", password, confirmPassword, 8)
+			v.Password("password", password, confirmPassword, minPasswordLen)
 			v.NotPwnedPassword("password", password)
 
 			if v.OK() {

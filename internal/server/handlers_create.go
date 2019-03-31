@@ -22,16 +22,20 @@ import (
 	"github.com/weters/sqmgr/internal/model"
 )
 
+const minJoinPasswordLen = 5
+
 func (s *Server) createHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("create.html")
 
 	type data struct {
-		SquaresTypes []model.SquaresType
+		MinJoinPasswordLen int
+		SquaresTypes       []model.SquaresType
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		s.ExecuteTemplate(w, r, tpl, data{
-			SquaresTypes: model.SquaresTypes(),
+			MinJoinPasswordLen: minJoinPasswordLen,
+			SquaresTypes:       model.SquaresTypes(),
 		})
 	}
 }

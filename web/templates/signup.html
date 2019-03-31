@@ -38,9 +38,9 @@ limitations under the License.
 
 			<div class="field">
 				<label for="password">Password</label>
-				<p class="requirement">Must be at least eight (8) characters
+				<p class="requirement">Must be at least {{.Local.MinPasswordLen}} characters
 				<div class="password">
-					<input type="password" id="password" name="password" placeholder="Password" value="" pattern=".{8,}" required>
+					<input type="password" id="password" name="password" placeholder="Password" value="" pattern=".{{"{"}}{{.Local.MinPasswordLen}},}" required>
 					<input type="password" id="confirm-password" name="confirm-password" placeholder="Confirm Password" value="" required>
 				</div>
 			</div>

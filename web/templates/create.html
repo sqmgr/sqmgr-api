@@ -45,9 +45,9 @@ limitations under the License.
 
 				<div class="field">
 					<label for="password">Password</label>
-					<p class="requirement">Must be at least five (5) characters
+					<p class="requirement">Must be at least {{.Local.MinJoinPasswordLen}} characters
 					<div class="password">
-						<input type="password" id="password" name="password" placeholder="Password" autocomplete="off" pattern=".{5,}" required>
+						<input type="password" id="password" name="password" placeholder="Password" autocomplete="off" pattern=".{{"{"}}{{.Local.MinJoinPasswordLen}},}" required>
 						<input type="password" id="confirm-password" name="confirm-password" placeholder="Password Confirmation" autocomplete="off" required>
 					</div>
 				</div>
