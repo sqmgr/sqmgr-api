@@ -22,6 +22,7 @@ import (
 	"database/sql"
 	"html/template"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -200,7 +201,12 @@ func (s *Server) authHandler(nextHandler http.Handler) http.Handler {
 				return
 			}
 
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			u, _ := url.Parse("/login")
+			query := url.Values{}
+			query.Set("bounce-to", r.URL.String())
+			u.RawQuery = query.Encode()
+
+			http.Redirect(w, r, u.String(), http.StatusSeeOther)
 			return
 		}
 
