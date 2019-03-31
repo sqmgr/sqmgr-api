@@ -122,7 +122,7 @@ func (s *Server) signupCompleteHandler() http.HandlerFunc {
 				return
 			}
 
-			logrus.Warnln("email %s found in flash, but could not find account", email)
+			logrus.Warnf("email %s found in flash, but could not find account", email)
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}

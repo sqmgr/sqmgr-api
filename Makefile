@@ -18,10 +18,29 @@ docker-push: docker-build
 	docker push ${IMG}
 
 test:
-	go test ./...
+	go test -coverprofile=coverage.out ./...
+
+clean-integration:
+	-docker exec -it sqmgr-postgres dropdb -Upostgres integration
+
+test-integration: PG_DATABASE=integration
+test-integration: integration-db migrations
+	INTEGRATION=1 go test -v -coverprofile=coverage.out ./...
+
+cover: test
+	go tool cover -html coverage.out
+
+cover-integration: test-integration
+	go tool cover -html coverage.out
 
 dev-db:
-	docker run --name sqmgr-postgres --detach --publish 5432:5432 postgres:11
+	-docker run --name sqmgr-postgres --detach --publish 5432:5432 postgres:11
+
+integration-db: dev-db clean-integration
+	docker exec -it sqmgr-postgres createdb -Upostgres integration
+
+git-hooks:
+	ln -s ../../git-hooks/pre-commit .git/hooks/pre-commit
 
 migrations:
 	liquibase \
@@ -43,7 +62,4 @@ migrations-down:
 		--password ${PG_PASSWORD} \
 		rollbackCount ${ROLLBACK_COUNT}
 
-git-hooks:
-	ln -s ../../git-hooks/pre-commit .git/hooks/pre-commit
-
-.PHONY: docker-build docker-push migrations migrations-down run test git-hooks dev-db
+.PHONY: run docker-build docker-push test clean-integration test-integration cover cover-integration dev-db integration-db git-hooks migrations migrations-down

@@ -136,7 +136,7 @@ func (v *Validator) Datetime(key, datetime, timezoneOffset string) time.Time {
 
 // SquaresType will ensure that the string is a valid square type
 func (v *Validator) SquaresType(key, val string) model.SquaresType {
-	if !model.IsValidSquaresType(val) {
+	if err := model.IsValidSquaresType(val); err != nil {
 		v.AddError(key, "must be a valid squares type")
 		return model.SquaresType("")
 	}

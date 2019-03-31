@@ -99,3 +99,70 @@ END;
 $$;
 
 --rollback DROP FUNCTION set_user_confirmation(bigint, text);
+
+--changeset weters:4
+
+CREATE TABLE squares (
+	id bigserial not null primary key,
+	token text not null unique references tokens (token),
+	user_id bigint not null references users (id),
+	name text not null,
+	squares_type text not null,
+	password_hash text not null,
+	locks timestamp,
+	created timestamp not null default (now() at time zone 'utc'),
+	modified timestamp not null default (now() at time zone 'utc')
+);
+
+CREATE TABLE squares_settings (
+	squares_id bigint not null primary key references squares (id),
+	home_team_name text,
+	home_team_color_1 text,
+	home_team_color_2 text,
+	home_team_color_3 text,
+	away_team_name text,
+	away_team_color_1 text,
+	away_team_color_2 text,
+	away_team_color_3 text,
+	modified timestamp not null default (now() at time zone 'utc')
+);
+
+--rollback DROP TABLE squares_settings;
+--rollback DROP TABLE squares;
+
+--changeset weters:5 splitStatements:false
+
+CREATE FUNCTION new_token(_token text) RETURNS boolean
+	LANGUAGE plpgsql
+	AS $$
+BEGIN
+	LOCK TABLE tokens IN SHARE UPDATE EXCLUSIVE MODE;
+	PERFORM 1 FROM tokens WHERE token = _token;
+	IF FOUND THEN
+		RETURN FALSE;
+	END IF;
+
+	INSERT INTO tokens (token) VALUES (_token);
+	RETURN TRUE;
+END;
+$$;
+
+CREATE FUNCTION new_squares(_token text, _user_id bigint, _name text, _squares_type text, _password_hash text) RETURNS squares
+	LANGUAGE plpgsql
+	AS $$
+DECLARE
+	_row squares;
+BEGIN
+	INSERT INTO squares (token, user_id, name, squares_type, password_hash)
+	VALUES (_token, _user_id, _name, _squares_type, _password_hash)
+	RETURNING * INTO _row;
+
+	INSERT INTO squares_settings (squares_id)
+	VALUES (_row.id);
+
+	RETURN _row;
+END;
+$$;
+
+--rollback DROP FUNCTION new_token(text);
+--rollback DROP FUNCTION new_squares(text, bigint, text, text, text);
