@@ -74,16 +74,13 @@ func TestSquares(t *testing.T) {
 	user, err := m.NewUser("test@sqmgr.com", "my-unique-password")
 	g.Expect(err).Should(gomega.Succeed())
 
-	token, err := m.NewToken()
-	g.Expect(err).Should(gomega.Succeed())
-
-	squares, err := m.NewSquares(token, user.ID, "My Squares", SquaresTypeStd100, "my-other-unique-password")
+	squares, err := m.NewSquares(user.ID, "My Squares", SquaresTypeStd100, "my-other-unique-password")
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(squares).ShouldNot(gomega.BeNil())
 
 	g.Expect(squares.ID).Should(gomega.BeNumerically(">", 0))
 	g.Expect(squares.UserID).Should(gomega.Equal(user.ID))
-	g.Expect(squares.Token).Should(gomega.Equal(token))
+	g.Expect(squares.Token).Should(gomega.MatchRegexp(`^[A-Za-z0-9]{6}\z`))
 	g.Expect(squares.Name).Should(gomega.Equal("My Squares"))
 	g.Expect(squares.passwordHash).ShouldNot(gomega.Equal("my-other-unique-password"))
 	g.Expect(argon2id.Compare(squares.passwordHash, "my-other-unique-password")).Should(gomega.Succeed())
@@ -129,7 +126,7 @@ func TestNewSquaresInvalidSquaresType(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
 	m := New(nil)
-	s, err := m.NewSquares("token", 1, "my name", SquaresType("invalid"), "my password")
+	s, err := m.NewSquares(1, "my name", SquaresType("invalid"), "my password")
 	g.Expect(s).Should(gomega.BeNil())
 	g.Expect(err).Should(gomega.MatchError(ErrInvalidSquaresType))
 }

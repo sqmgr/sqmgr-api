@@ -71,8 +71,13 @@ func (m *Model) SquaresByID(id int64) (*Squares, error) {
 }
 
 // NewSquares will save new squares into the database
-func (m *Model) NewSquares(token string, userID int64, name string, squaresType SquaresType, password string) (*Squares, error) {
+func (m *Model) NewSquares(userID int64, name string, squaresType SquaresType, password string) (*Squares, error) {
 	if err := IsValidSquaresType(string(squaresType)); err != nil {
+		return nil, err
+	}
+
+	token, err := m.NewToken()
+	if err != nil {
 		return nil, err
 	}
 
