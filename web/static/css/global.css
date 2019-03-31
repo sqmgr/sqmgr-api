@@ -188,13 +188,19 @@ section.error {
 	text-align: center;
 }
 
-div.columns {
+.columns {
 	display: grid;
 	grid-gap: var(--spacing);
 	grid-template-columns: repeat(4, 1fr);
 }
-div.col-3 {
+.col-2 {
+	grid-column: span 2;
+}
+.col-3 {
 	grid-column: span 3;
+}
+.col-4 {
+	grid-column: span 4;
 }
 
 .small {

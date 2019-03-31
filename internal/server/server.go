@@ -136,15 +136,18 @@ func (s *Server) ExecuteTemplate(w http.ResponseWriter, r *http.Request, t *temp
 	// if Reload is enabled, will attempt to read the templates from disk again.
 	if s.Reload {
 		newTemplate := template.New("").Funcs(funcMap)
+		whatReloaded := make([]string, 0)
 		for _, tpl := range t.Templates() {
 			if strings.HasSuffix(tpl.Name(), ".html") {
-				logrus.Debugf("reloading template %s", tpl.Name())
+				whatReloaded = append(whatReloaded, tpl.Name())
 				newTemplate, err = newTemplate.ParseFiles(filepath.Join(templatesDir, tpl.Name()))
 				if err != nil {
 					panic(err)
 				}
 			}
+
 		}
+		logrus.Debugf("reloaded templates %s", strings.Join(whatReloaded, ", "))
 		t = newTemplate.Lookup("base.html")
 	}
 

@@ -22,8 +22,55 @@ limitations under the License.
 
 {{ define "content" }}
 <section class="create">
-	<h3>Create</h3>
+	<h3>Create New Squares</h3>
 
+	<div class="columns">
+		<form method="post" action="/create" class="col-2">
+			<fieldset>
+				<legend>Basic Settings</legend>
+
+				<div class="field">
+					<label for="squares-name">Squares Name</label>
+					<input type="text" id="squares-name" name="squares-name" placeholder="Squares Name" autocomplete="off" required>
+				</div>
+
+				<div class="field">
+					<label for="squares-type">Squares Configuration</label>
+					<select id="squares-type" name="squares-type">
+						{{ range .Local.SquaresTypes }}
+						<option value="{{.}}">{{.Description}}
+						{{ end }}
+					</select>
+				</div>
+
+				<div class="field">
+					<label for="password">Password</label>
+					<p class="requirement">Must be at least five (5) characters
+					<div class="password">
+						<input type="password" id="password" name="password" placeholder="Password" autocomplete="off" pattern=".{5,}" required>
+						<input type="password" id="confirm-password" name="confirm-password" placeholder="Password Confirmation" autocomplete="off" required>
+					</div>
+				</div>
+
+				<div class="buttons">
+					<input type="submit" name="submit" value="Create">
+				</div>
+			</fieldset>
+		</form>
+		<div class="help col-2">
+			<h4>Help</h4>
+
+			<p>This screen will allow you to create a new squares event. You'll have further opportunity to customize the look &amp; feel of your squares once you create them.
+
+			<h5>Squares Configuration</h5>
+
+			<p>You can choose how you want your board to appear. For example, there is your standard 100-square configuration (a 10x10 grid) and then there is a 25-square configuration (a 5x5 grid) where each square will be assigned two home-team numbers and two away-team numbers.
+
+			<h5>Password</h5>
+
+			<p>The password will be required by people you invite before they are allowed to view the board.
+		</div>
+	</div>
 </section>
 {{ end }}
 

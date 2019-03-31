@@ -16,11 +16,22 @@ limitations under the License.
 
 package server
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/weters/sqmgr/internal/model"
+)
 
 func (s *Server) createHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("create.html")
+
+	type data struct {
+		SquaresTypes []model.SquaresType
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
-		s.ExecuteTemplate(w, r, tpl, nil)
+		s.ExecuteTemplate(w, r, tpl, data{
+			SquaresTypes: model.SquaresTypes(),
+		})
 	}
 }

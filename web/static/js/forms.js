@@ -61,4 +61,11 @@ window.addEventListener('load', function() {
 		input.addEventListener('keyup', checkPasswordFn)
 		confirmInput.addEventListener('keyup', checkPasswordFn)
 	})
+
+	document.querySelectorAll('input[type="time"]').forEach(function(input) {
+		console.log(typeof(input.type))
+		if (input.value === '') {
+			input.value = '00:00'
+		}
+	})
 })

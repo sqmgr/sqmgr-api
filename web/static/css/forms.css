@@ -15,11 +15,6 @@ limitations under the License.
 */
 
 /* Generic Forms */
-div.columns {
-	display: grid;
-	grid-template-columns: 3fr 2fr;
-	grid-gap: var(--spacing);
-}
 
 form {
 	border: 1px solid var(--border-color);
@@ -180,4 +175,12 @@ input[type="password"]:invalid {
 p.message {
 	font-weight: bold;
 	margin: 0 0 var(--spacing);
+}
+
+div.datetime {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	grid-gap: var(--minimal-spacing);
+}
+input[type="date"] {
 }
