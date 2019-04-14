@@ -18,12 +18,14 @@ limitations under the License.
 
 {{ define "content" }}
 <section class="error">
-	<h3>Something went wrong!</h3>
-
 	{{ if eq .Local.StatusCode 404 }}
-	<p>That page does not exist.
+		<h3>Page not found!</h3>
+
+		<p>That page does not exist.
 	{{ else }}
-	<p>{{.Local.Status}}
+		<h3>Something went wrong!</h3>
+
+		<p>{{.Local.Status}}
 	{{ end }}
 </section>
 {{ end }}

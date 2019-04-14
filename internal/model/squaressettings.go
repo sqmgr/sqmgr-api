@@ -22,29 +22,17 @@ import (
 
 // SquaresSettings will contain various user-defined settings
 type SquaresSettings struct {
-	SquaresID      int64
-	homeTeamName   *string
-	homeTeamColor1 *string
-	homeTeamColor2 *string
-	homeTeamColor3 *string
-	awayTeamName   *string
-	awayTeamColor1 *string
-	awayTeamColor2 *string
-	awayTeamColor3 *string
-	Modified       *time.Time
+	SquaresID      int64      `json:"-"`
+	HomeTeamName   *string    `json:"homeTeamName"`
+	HomeTeamColor1 *string    `json:"homeTeamColor1"`
+	HomeTeamColor2 *string    `json:"homeTeamColor2"`
+	HomeTeamColor3 *string    `json:"homeTeamColor3"`
+	AwayTeamName   *string    `json:"awayTeamName"`
+	AwayTeamColor1 *string    `json:"awayTeamColor1"`
+	AwayTeamColor2 *string    `json:"awayTeamColor2"`
+	AwayTeamColor3 *string    `json:"awayTeamColor3"`
+	Modified       *time.Time `json:"-"`
 }
-
-// defaults for SquaresSettings
-const (
-	defaultHomeTeamName   = "Home Team"
-	defaultHomeTeamColor1 = "#000"
-	defaultHomeTeamColor2 = "#000"
-	defaultHomeTeamColor3 = "#000"
-	defaultAwayTeamName   = "Away Team"
-	defaultAwayTeamColor1 = "#000"
-	defaultAwayTeamColor2 = "#000"
-	defaultAwayTeamColor3 = "#000"
-)
 
 // Save will save the settings
 func (s *SquaresSettings) Save(q executer) error {
@@ -61,152 +49,88 @@ func (s *SquaresSettings) Save(q executer) error {
 			modified = (NOW() AT TIME ZONE 'utc')
 		WHERE squares_id = $9
 	`,
-		s.homeTeamName,
-		s.homeTeamColor1,
-		s.homeTeamColor2,
-		s.homeTeamColor3,
-		s.awayTeamName,
-		s.awayTeamColor1,
-		s.awayTeamColor2,
-		s.awayTeamColor3,
+		s.HomeTeamName,
+		s.HomeTeamColor1,
+		s.HomeTeamColor2,
+		s.HomeTeamColor3,
+		s.AwayTeamName,
+		s.AwayTeamColor1,
+		s.AwayTeamColor2,
+		s.AwayTeamColor3,
 		s.SquaresID,
 	)
 
 	return err
 }
 
-func (s *SquaresSettings) HomeTeamName() string {
-	if s.homeTeamName != nil {
-		return *s.homeTeamName
-	}
-
-	return defaultHomeTeamName
-}
-
-func (s *SquaresSettings) HomeTeamColor1() string {
-	if s.homeTeamColor1 != nil {
-		return *s.homeTeamColor1
-	}
-
-	return defaultHomeTeamColor1
-}
-
-func (s *SquaresSettings) HomeTeamColor2() string {
-	if s.homeTeamColor2 != nil {
-		return *s.homeTeamColor2
-	}
-
-	return defaultHomeTeamColor2
-}
-
-func (s *SquaresSettings) HomeTeamColor3() string {
-	if s.homeTeamColor3 != nil {
-		return *s.homeTeamColor3
-	}
-
-	return defaultHomeTeamColor3
-}
-
-func (s *SquaresSettings) AwayTeamName() string {
-	if s.awayTeamName != nil {
-		return *s.awayTeamName
-	}
-
-	return defaultAwayTeamName
-}
-
-func (s *SquaresSettings) AwayTeamColor1() string {
-	if s.awayTeamColor1 != nil {
-		return *s.awayTeamColor1
-	}
-
-	return defaultAwayTeamColor1
-}
-
-func (s *SquaresSettings) AwayTeamColor2() string {
-	if s.awayTeamColor2 != nil {
-		return *s.awayTeamColor2
-	}
-
-	return defaultAwayTeamColor2
-}
-
-func (s *SquaresSettings) AwayTeamColor3() string {
-	if s.awayTeamColor3 != nil {
-		return *s.awayTeamColor3
-	}
-
-	return defaultAwayTeamColor3
-}
-
 func (s *SquaresSettings) SetHomeTeamName(str string) {
 	if len(str) == 0 {
-		s.homeTeamName = nil
+		s.HomeTeamName = nil
 		return
 	}
 
-	s.homeTeamName = &str
+	s.HomeTeamName = &str
 }
 
 func (s *SquaresSettings) SetHomeTeamColor1(str string) {
 	if len(str) == 0 {
-		s.homeTeamColor1 = nil
+		s.HomeTeamColor1 = nil
 		return
 	}
 
-	s.homeTeamColor1 = &str
+	s.HomeTeamColor1 = &str
 }
 
 func (s *SquaresSettings) SetHomeTeamColor2(str string) {
 	if len(str) == 0 {
-		s.homeTeamColor2 = nil
+		s.HomeTeamColor2 = nil
 		return
 	}
 
-	s.homeTeamColor2 = &str
+	s.HomeTeamColor2 = &str
 }
 
 func (s *SquaresSettings) SetHomeTeamColor3(str string) {
 	if len(str) == 0 {
-		s.homeTeamColor3 = nil
+		s.HomeTeamColor3 = nil
 		return
 	}
 
-	s.homeTeamColor3 = &str
+	s.HomeTeamColor3 = &str
 }
 
 func (s *SquaresSettings) SetAwayTeamName(str string) {
 	if len(str) == 0 {
-		s.awayTeamName = nil
+		s.AwayTeamName = nil
 		return
 	}
 
-	s.awayTeamName = &str
+	s.AwayTeamName = &str
 }
 
 func (s *SquaresSettings) SetAwayTeamColor1(str string) {
 	if len(str) == 0 {
-		s.awayTeamColor1 = nil
+		s.AwayTeamColor1 = nil
 		return
 	}
 
-	s.awayTeamColor1 = &str
+	s.AwayTeamColor1 = &str
 }
 
 func (s *SquaresSettings) SetAwayTeamColor2(str string) {
 	if len(str) == 0 {
-		s.awayTeamColor2 = nil
+		s.AwayTeamColor2 = nil
 		return
 	}
 
-	s.awayTeamColor2 = &str
+	s.AwayTeamColor2 = &str
 }
 
 func (s *SquaresSettings) SetAwayTeamColor3(str string) {
 	if len(str) == 0 {
-		s.awayTeamColor3 = nil
+		s.AwayTeamColor3 = nil
 		return
 	}
 
-	s.awayTeamColor3 = &str
+	s.AwayTeamColor3 = &str
 }

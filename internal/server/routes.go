@@ -49,13 +49,16 @@ func (s *Server) setupRoutes() {
 	s.Router.Path("/account/deleted").Methods(http.MethodGet).Handler(s.authHandler(s.accountDeletedHandler()))
 	s.Router.Path("/account/verify").Methods(http.MethodGet, http.MethodPost).Handler(s.authHandler(s.accountVerifyHandler()))
 
+	// squares
+	s.Router.Path("/squares/{token:[A-Za-z0-9_-]{6}}").Methods(http.MethodGet).Handler(s.squaresHandler())
+
 	// signup
 	s.Router.Path("/signup").Methods(http.MethodGet, http.MethodPost).Handler(s.signupHandler())
 	s.Router.Path("/signup/complete").Methods(http.MethodGet).Handler(s.signupCompleteHandler())
 	s.Router.Path("/signup/verify/{token:[A-Za-z0-9_-]{64}}").Methods(http.MethodGet).Handler(s.signupVerifyHandler())
 
 	// square management
-	s.Router.Path("/create").Methods(http.MethodGet).Handler(s.authHandler(s.createHandler()))
+	s.Router.Path("/create").Methods(http.MethodGet, http.MethodPost).Handler(s.authHandler(s.createHandler()))
 
 	// temporary
 	s.Router.Path("/info").Methods(http.MethodGet).Handler(s.infoHandler())

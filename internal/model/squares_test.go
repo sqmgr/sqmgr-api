@@ -91,14 +91,14 @@ func TestSquares(t *testing.T) {
 
 	g.Expect(squares.Settings).Should(gomega.Equal(SquaresSettings{
 		SquaresID:      squares.ID,
-		homeTeamName:   nil,
-		homeTeamColor1: nil,
-		homeTeamColor2: nil,
-		homeTeamColor3: nil,
-		awayTeamName:   nil,
-		awayTeamColor1: nil,
-		awayTeamColor2: nil,
-		awayTeamColor3: nil,
+		HomeTeamName:   nil,
+		HomeTeamColor1: nil,
+		HomeTeamColor2: nil,
+		HomeTeamColor3: nil,
+		AwayTeamName:   nil,
+		AwayTeamColor1: nil,
+		AwayTeamColor2: nil,
+		AwayTeamColor3: nil,
 	}))
 
 	future := time.Now().UTC().Add(time.Hour)
@@ -118,8 +118,13 @@ func TestSquares(t *testing.T) {
 	g.Expect(squares2.Name).Should(gomega.Equal("Different Name"))
 	g.Expect(squares2.Locks.Unix()).Should(gomega.Equal(future.Unix()))
 	g.Expect(squares2.SquaresType).Should(gomega.Equal(SquaresTypeStd25))
-	g.Expect(squares2.Settings.HomeTeamName()).Should(gomega.Equal("Home Team"))
-	g.Expect(squares2.Settings.AwayTeamName()).Should(gomega.Equal("Different Away Team"))
+	g.Expect(squares2.Settings.HomeTeamName).Should(gomega.BeNil())
+	g.Expect(*squares2.Settings.AwayTeamName).Should(gomega.Equal("Different Away Team"))
+
+	squares3, err := m.SquaresByToken(squares2.Token)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(squares3).ShouldNot(gomega.BeNil())
+	g.Expect(squares3).Should(gomega.Equal(squares2))
 }
 
 func TestNewSquaresInvalidSquaresType(t *testing.T) {

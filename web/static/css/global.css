@@ -16,16 +16,6 @@ limitations under the License.
 
 @import url('https://fonts.googleapis.com/css?family=Lobster|Alfa+Slab+One|Shadows+Into+Light|Roboto:400,700');
 :root {
-	--home-team: 'Rams';
-	--home-primary: #002244;
-	--home-secondary: #fff;
-	--home-tertiary: #866D4B;
-
-	--away-team: 'Patriots';
-	--away-primary: #002244;
-	--away-secondary: #C60C30;
-	--away-tertiary: #B0B7BC;
-
 	--minimal-spacing: 4px;
 	--spacing: 20px;
 	
@@ -211,4 +201,17 @@ section.error {
 p.generated-by {
 	font-size: 0.8em;
 	color: var(--gray);
+}
+
+@media (max-width: 800px) {
+	header nav {
+		margin-top: var(--spacing);
+		position: static;
+	}
+
+	footer p.version {
+		position: static;
+		margin: 0;
+		text-align: center;
+	}
 }

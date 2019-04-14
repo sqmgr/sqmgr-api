@@ -14,124 +14,134 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed');
+
+:root {
+	--team-primary: #000;
+	--team-secondary: #666;
+	--grid-gray: #ddd;
+}
+
 div.squares {
-	height: calc(100vmin - 40px);
+	background-color: #fff;
 	display: grid;
-	width: calc(100vmin - 40px);
 	grid-gap: 2px;
-	grid-template-columns: repeat(12, 1fr);
-	grid-template-rows: repeat(12, 1fr);
 	margin: 0 auto;
+	height: calc( 100vmin - var(--spacing) * 2 );
+	width: calc( 100vmin - var(--spacing) * 2 );
+	grid-template-columns: repeat(2, 0.5fr) repeat(10, 1fr);
+	grid-template-rows: repeat(2, 0.5fr) repeat(10, 1fr);
 }
 
 div.spacer {
 	background-color: transparent;
-	grid-column: 1 / span 2;
-	grid-row: 1 / span 2;
+	grid-column: 1/ span 2;
+	grid-row: 1/ span 2;
 }
 
-div.team-home {
-	border-radius: 5px 0 0 5px;
-	grid-column-start: 0;
-	grid-row: 3 / span 10;
-	--team-primary: var(--home-primary);
-	--team-secondary: var(--home-secondary);
-	--team-tertiary: var(--home-tertiary);
-	--team-name: var(--home-team);
+div.home-team {
+	grid-column-start: 3;
+	grid-column-end: 13;
 }
-div.team-away {
-	border-radius: 5px 5px 0 0;
-	grid-column: 3 / span 10;
-	grid-row-start: 0;
-	--team-primary: var(--away-primary);
-	--team-secondary: var(--away-secondary);
-	--team-tertiary: var(--away-tertiary);
-	--team-name: var(--away-team);
-}
+
 div.team {
-	background-color: var(--team-primary);
+	background-color: var(--team-secondary);
+	color: #fff;
+	font-weight: bold;
+	font-size: 1.4em;
 	position: relative;
+	text-shadow: 1px 1px var(--team-primary);
 }
-div.team::after {
-	color: var(--team-secondary);
-	font-family: 'Lobster', cursive;
-	content: var(--team-name);
+
+div.away-team {
+	grid-row-start: 3;
+	grid-row-end: 13;
+}
+
+div.team span {
 	display: block;
-	font-size: 2em;
+	transform: translate(-50%, -50%);
 	position: absolute;
+	white-space: nowrap;
 	top: 50%;
 	left: 50%;
-	transform: translate(-50%, -50%);
-	text-shadow: 2px 2px var(--team-primary), 4px 4px var(--team-tertiary);
-}
-div.team-home::after {
-	transform: translate(-50%, -50%) rotate(-90deg);
 }
 
-div.score-home {
-	background-color: var(--home-tertiary);
-}
-div.score-away {
-	background-color: var(--away-tertiary);
+div.away-team span {
+	transform: translate(-50%, -50%) rotate(270deg);
 }
 
 div.score {
-	font-size: 2em;
-	font-family: Roboto, sans-serif;
-	color: #fff;
-	font-weight: bold;
-	text-shadow: 1px 1px #000;
-	position: relative;
+	background-color: var(--grid-gray);
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 div.score span {
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	transform: translate(-50%, -50%);
 }
-
-div.score-away { grid-row-start: 2; }
-div.score-away-0 { grid-column-start: 3 }
-div.score-away-1 { grid-column-start: 4 }
-div.score-away-2 { grid-column-start: 5 }
-div.score-away-3 { grid-column-start: 6 }
-div.score-away-4 { grid-column-start: 7 }
-div.score-away-5 { grid-column-start: 8 }
-div.score-away-6 { grid-column-start: 9 }
-div.score-away-7 { grid-column-start: 10 }
-div.score-away-8 { grid-column-start: 11 }
-div.score-away-9 { grid-column-start: 12 }
-
-div.score-home { grid-column-start: 2; }
-div.score-home-0 { grid-row-start: 3 }
-div.score-home-1 { grid-row-start: 4 }
-div.score-home-2 { grid-row-start: 5 }
-div.score-home-3 { grid-row-start: 6 }
-div.score-home-4 { grid-row-start: 7 }
-div.score-home-5 { grid-row-start: 8 }
-div.score-home-6 { grid-row-start: 9 }
-div.score-home-7 { grid-row-start: 10 }
-div.score-home-8 { grid-row-start: 11 }
-div.score-home-9 { grid-row-start: 12 }
+div.home-score { grid-row-start: 2; }
+div.home-score-0 { grid-column-start: 3; }
+div.home-score-1 { grid-column-start: 4; }
+div.home-score-2 { grid-column-start: 5; }
+div.home-score-3 { grid-column-start: 6; }
+div.home-score-4 { grid-column-start: 7; }
+div.home-score-5 { grid-column-start: 8; }
+div.home-score-6 { grid-column-start: 9; }
+div.home-score-7 { grid-column-start: 10; }
+div.home-score-8 { grid-column-start: 11; }
+div.home-score-9 { grid-column-start: 12; }
+div.away-score { grid-column-start: 2; }
+div.away-score-0 { grid-row-start: 3; }
+div.away-score-1 { grid-row-start: 4; }
+div.away-score-2 { grid-row-start: 5; }
+div.away-score-3 { grid-row-start: 6; }
+div.away-score-4 { grid-row-start: 7; }
+div.away-score-5 { grid-row-start: 8; }
+div.away-score-6 { grid-row-start: 9; }
+div.away-score-7 { grid-row-start: 10; }
+div.away-score-8 { grid-row-start: 11; }
+div.away-score-9 { grid-row-start: 12; }
 
 div.square {
-	background-color: #eee;
-	grid-column-start: span 2;
-	grid-row-start: span 2;
+	border: 1px solid var(--grid-gray);
+	display: flex;
+	font-family: 'Roboto Condensed', sans-serif;
+	font-size: 14px;
+	align-items: center;
+	justify-content: center;
 	position: relative;
 	overflow: hidden;
-	text-align: center;
 }
-div.square span {
-	display: block;
+div.square span.square-id {
 	position: absolute;
-	font-family: 'Shadows Into Light', cursive;
-	top: 50%;
-	left: 50%;
-	transform: translate(-50%, -50%) rotate(-45deg);
-	color: #0003;
+	top: 2px;
+	right: 2px;
+	font-size: 0.8em;
+	color: var(--grid-gray);
+	z-index: 1;
 }
-div.square.paid span {
-	color: #000;
+div.square span.name {
+	position: relative;
+	z-index: 2;
 }
 
+div.std25 div.square {
+	grid-row-start: span 2;
+	grid-column-start: span 2;
+}
+
+@media (max-width: 800px) {
+	div#squares-container {
+		overflow: auto;
+		width: 100%;
+	}
+
+	div.std100.squares {
+		height: calc( 200vmin - var(--spacing) * 2 );
+		width: calc( 200vmin - var(--spacing) * 2 );
+	}
+
+	div.team {
+		font-size: 1.0em;
+	}
+}

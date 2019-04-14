@@ -20,6 +20,7 @@ import (
 	"net/http"
 
 	"github.com/weters/sqmgr/internal/model"
+	"github.com/weters/sqmgr/internal/validator"
 )
 
 const minJoinPasswordLen = 5
@@ -29,13 +30,47 @@ func (s *Server) createHandler() http.HandlerFunc {
 
 	type data struct {
 		MinJoinPasswordLen int
+		FormData           map[string]string
+		FormErrors         validator.Errors
 		SquaresTypes       []model.SquaresType
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		s.ExecuteTemplate(w, r, tpl, data{
+		tplData := data{
 			MinJoinPasswordLen: minJoinPasswordLen,
 			SquaresTypes:       model.SquaresTypes(),
-		})
+		}
+
+		user := s.AuthUser(r)
+
+		if r.Method == http.MethodPost {
+			v := validator.New()
+
+			squaresName := r.PostFormValue("squares-name")
+			squaresType := r.PostFormValue("squares-type")
+			password := r.PostFormValue("password")
+			confirmPassword := r.PostFormValue("confirm-password")
+
+			v.Printable("Squares Name", squaresName)
+			v.Password("Join Password", password, confirmPassword, minJoinPasswordLen)
+			if err := model.IsValidSquaresType(squaresType); err != nil {
+				v.AddError("Squares Configuration", "you must select a valid configuration option")
+			}
+
+			if v.OK() {
+				squares, err := s.model.NewSquares(user.ID, squaresName, model.SquaresType(squaresType), password)
+				if err != nil {
+					s.Error(w, r, http.StatusInternalServerError, err)
+					return
+				}
+
+				http.Redirect(w, r, "/squares/"+squares.Token, http.StatusSeeOther)
+				return
+			}
+
+			tplData.FormErrors = v.Errors
+		}
+
+		s.ExecuteTemplate(w, r, tpl, tplData)
 	}
 }

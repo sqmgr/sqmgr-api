@@ -14,11 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 
-{{ define "title" }}{{.Name}} - {{ end }}
+{{ define "title" }}{{.Local.Squares.Name}} - {{ end }}
+{{ define "header" }}
+<link href="/static/css/squares.css" rel="stylesheet">
+{{ end }}
 {{ define "content" }}
 <section class="squares">
-	<h3>{{.Name}}</h3>
+	<h3>{{.Local.Squares.Name}}</h3>
 
-
+	<div id="squares-container"></div>
 </section>
+{{ end }}
+{{ define "javascripts" }}
+<script>
+function SqMGR() { }
+SqMGR.squares = {{.Local.Squares}}
+</script>
+<script src="/static/js/squares.js"></script>
 {{ end }}

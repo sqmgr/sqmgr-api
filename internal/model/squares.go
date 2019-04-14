@@ -26,24 +26,24 @@ import (
 // Squares is an individual squares board
 type Squares struct {
 	model        *Model
-	ID           int64
-	Token        string
-	UserID       int64
-	Name         string
-	SquaresType  SquaresType
+	ID           int64       `json:"-"`
+	Token        string      `json:"token"`
+	UserID       int64       `json:"-"`
+	Name         string      `json:"name"`
+	SquaresType  SquaresType `json:"squaresType"`
 	passwordHash string
-	Locks        time.Time
-	Created      time.Time
-	Modified     time.Time
+	Locks        time.Time `json:"locks"`
+	Created      time.Time `json:"created"`
+	Modified     time.Time `json:"modified"`
 
-	Settings SquaresSettings
+	Settings SquaresSettings `json:"settings"`
 }
 
 type executer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
-func (m *Model) squaresByRow(row *sql.Row) (*Squares, error) {
+func (m *Model) squaresByRow(row *sql.Row, loadSettings bool) (*Squares, error) {
 	var locks *time.Time
 	s := Squares{model: m}
 	if err := row.Scan(&s.ID, &s.Token, &s.UserID, &s.Name, &s.SquaresType, &s.passwordHash, &locks, &s.Created, &s.Modified); err != nil {
@@ -54,20 +54,23 @@ func (m *Model) squaresByRow(row *sql.Row) (*Squares, error) {
 		s.Locks = *locks
 	}
 
+	if loadSettings {
+		if err := s.LoadSettings(); err != nil {
+			return nil, err
+		}
+	}
+
 	return &s, nil
+}
+
+func (m *Model) SquaresByToken(token string) (*Squares, error) {
+	row := m.db.QueryRow("SELECT * FROM squares WHERE token = $1", token)
+	return m.squaresByRow(row, true)
 }
 
 func (m *Model) SquaresByID(id int64) (*Squares, error) {
 	row := m.db.QueryRow("SELECT * FROM squares WHERE id = $1", id)
-	s, err := m.squaresByRow(row)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.LoadSettings(); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return m.squaresByRow(row, true)
 }
 
 // NewSquares will save new squares into the database
@@ -87,7 +90,7 @@ func (m *Model) NewSquares(userID int64, name string, squaresType SquaresType, p
 	}
 	row := m.db.QueryRow("SELECT * FROM new_squares($1, $2, $3, $4, $5)", token, userID, name, squaresType, passwordHash)
 
-	s, err := m.squaresByRow(row)
+	s, err := m.squaresByRow(row, false)
 	if err != nil {
 		return nil, err
 	}
@@ -118,14 +121,14 @@ func (s *Squares) LoadSettings() error {
 	`, s.ID)
 
 	return row.Scan(
-		&s.Settings.homeTeamName,
-		&s.Settings.homeTeamColor1,
-		&s.Settings.homeTeamColor2,
-		&s.Settings.homeTeamColor3,
-		&s.Settings.awayTeamName,
-		&s.Settings.awayTeamColor1,
-		&s.Settings.awayTeamColor2,
-		&s.Settings.awayTeamColor3,
+		&s.Settings.HomeTeamName,
+		&s.Settings.HomeTeamColor1,
+		&s.Settings.HomeTeamColor2,
+		&s.Settings.HomeTeamColor3,
+		&s.Settings.AwayTeamName,
+		&s.Settings.AwayTeamColor1,
+		&s.Settings.AwayTeamColor2,
+		&s.Settings.AwayTeamColor3,
 		&s.Settings.Modified,
 	)
 }
