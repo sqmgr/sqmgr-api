@@ -191,6 +191,7 @@ func (s *Server) Session(r *http.Request) *Session {
 	if !ok {
 		panic("session not stored in context")
 	}
+
 	return session
 }
 

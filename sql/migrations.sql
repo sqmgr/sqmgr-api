@@ -166,3 +166,15 @@ $$;
 
 --rollback DROP FUNCTION new_token(text);
 --rollback DROP FUNCTION new_squares(text, bigint, text, text, text);
+
+--changeset weters:6
+
+-- determine which squares a user has properly authenticated with
+CREATE TABLE squares_users (
+	squares_id bigint not null references squares (id),
+	user_id bigint not null references users (id),
+	created timestamp not null default (now() at time zone 'utc'),
+	PRIMARY KEY (user_id, squares_id)
+);
+
+--rollback DROP TABLE squares_users;

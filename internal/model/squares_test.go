@@ -71,7 +71,7 @@ func TestSquares(t *testing.T) {
 	g := gomega.NewWithT(t)
 	m := New(getDB())
 
-	user, err := m.NewUser("test@sqmgr.com", "my-unique-password")
+	user, err := m.NewUser(randString()+"@sqmgr.com", "my-unique-password")
 	g.Expect(err).Should(gomega.Succeed())
 
 	squares, err := m.NewSquares(user.ID, "My Squares", SquaresTypeStd100, "my-other-unique-password")

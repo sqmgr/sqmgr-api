@@ -237,6 +237,35 @@ func (u *User) Delete() error {
 	return nil
 }
 
+// JoinSquares will link a user to a squares game.
+func (u *User) JoinSquares(s *Squares) error {
+	_, err := u.db.Exec("INSERT INTO squares_users (squares_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", s.ID, u.ID)
+	return err
+}
+
+// IsMemberOf will return true if the user belongs to the squares
+func (u *User) IsMemberOf(s *Squares) (bool, error) {
+	// user is the admin
+	if u.ID == s.UserID {
+		return true, nil
+	}
+
+	// otherwise, check to see if they are a member
+
+	row := u.db.QueryRow("SELECT true FROM squares_users WHERE squares_id = $1 AND user_id = $2", s.ID, u.ID)
+
+	var ok bool
+	if err := row.Scan(&ok); err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	return ok, nil
+}
+
 func (m *Model) userByRow(row *sql.Row) (*User, error) {
 	u := &User{Model: m}
 

@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/synacor/argon2id"
 )
 
@@ -157,4 +158,17 @@ func (s *Squares) Save() error {
 	}
 
 	return tx.Commit()
+}
+
+// PasswordIsValid is will return true if the password matches
+func (s *Squares) PasswordIsValid(password string) bool {
+	if err := argon2id.Compare(s.passwordHash, password); err != nil {
+		if err != argon2id.ErrMismatchedHashAndPassword {
+			logrus.WithError(err).Error("could not check password")
+		}
+
+		return false
+	}
+
+	return true
 }
