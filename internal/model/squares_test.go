@@ -17,6 +17,7 @@ limitations under the License.
 package model
 
 import (
+	"context"
 	"database/sql"
 	"os"
 	"testing"
@@ -121,7 +122,7 @@ func TestSquares(t *testing.T) {
 	g.Expect(squares2.Settings.HomeTeamName).Should(gomega.BeNil())
 	g.Expect(*squares2.Settings.AwayTeamName).Should(gomega.Equal("Different Away Team"))
 
-	squares3, err := m.SquaresByToken(squares2.Token)
+	squares3, err := m.SquaresByToken(context.Background(), squares2.Token)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(squares3).ShouldNot(gomega.BeNil())
 	g.Expect(squares3).Should(gomega.Equal(squares2))

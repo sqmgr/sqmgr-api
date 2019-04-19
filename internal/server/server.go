@@ -219,6 +219,28 @@ func (s *Server) authHandler(nextHandler http.Handler) http.Handler {
 	})
 }
 
+// EffectiveUser will return a model.EffectiveUser which is either a logged in *model.User or a *model.SessionUser
+func (s *Server) EffectiveUser(r *http.Request) (model.EffectiveUser, error) {
+	sess := s.Session(r)
+
+	if user, err := sess.LoggedInUser(); err != nil {
+		if err != ErrNotLoggedIn {
+			return nil, err
+		}
+	} else {
+		logrus.Trace("effective user is logged in")
+		return user, nil
+	}
+
+	ids, ok := sess.Values[squaresIDsKey].(map[int64]bool)
+	if !ok {
+		ids = make(map[int64]bool)
+	}
+
+	logrus.Trace("effective user is session user")
+	return model.NewSessionUser(ids), nil
+}
+
 // AuthUser will return the currently authenticated user. This MUST only be called the calling handler has been
 // wrapped by authHandler
 func (s *Server) AuthUser(r *http.Request) *model.User {

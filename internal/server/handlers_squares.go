@@ -18,6 +18,7 @@ package server
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -35,7 +36,7 @@ func (s *Server) squaresHandler() http.HandlerFunc {
 		vars := mux.Vars(r)
 		token := vars["token"]
 
-		squares, err := s.model.SquaresByToken(token)
+		squares, err := s.model.SquaresByToken(r.Context(), token)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				s.Error(w, r, http.StatusNotFound)
@@ -43,6 +44,23 @@ func (s *Server) squaresHandler() http.HandlerFunc {
 			}
 
 			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		user, err := s.EffectiveUser(r)
+		if err != nil {
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		isMember, err := user.IsMemberOf(r.Context(), squares)
+		if err != nil {
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		if !isMember {
+			http.Redirect(w, r, fmt.Sprintf("/squares/%s/login", squares.Token), http.StatusSeeOther)
 			return
 		}
 

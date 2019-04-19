@@ -57,6 +57,15 @@ func main() {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
+	if os.Getenv("LOG_LEVEL") != "" {
+		lvl, err := logrus.ParseLevel(os.Getenv("LOG_LEVEL"))
+		if err != nil {
+			logrus.WithError(err).Fatal("could not parse LOG_LEVEL")
+		}
+
+		logrus.SetLevel(lvl)
+	}
+
 	srv := &http.Server{
 		Addr:         *addr,
 		Handler:      handlers.CombinedLoggingHandler(os.Stdout, handlers.ProxyHeaders(s)),

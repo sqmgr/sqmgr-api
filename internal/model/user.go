@@ -18,6 +18,7 @@ package model
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -244,7 +245,7 @@ func (u *User) JoinSquares(s *Squares) error {
 }
 
 // IsMemberOf will return true if the user belongs to the squares
-func (u *User) IsMemberOf(s *Squares) (bool, error) {
+func (u *User) IsMemberOf(ctx context.Context, s *Squares) (bool, error) {
 	// user is the admin
 	if u.ID == s.UserID {
 		return true, nil
@@ -252,7 +253,7 @@ func (u *User) IsMemberOf(s *Squares) (bool, error) {
 
 	// otherwise, check to see if they are a member
 
-	row := u.db.QueryRow("SELECT true FROM squares_users WHERE squares_id = $1 AND user_id = $2", s.ID, u.ID)
+	row := u.db.QueryRowContext(ctx, "SELECT true FROM squares_users WHERE squares_id = $1 AND user_id = $2", s.ID, u.ID)
 
 	var ok bool
 	if err := row.Scan(&ok); err != nil {
@@ -264,6 +265,11 @@ func (u *User) IsMemberOf(s *Squares) (bool, error) {
 	}
 
 	return ok, nil
+}
+
+// IsAdminOf will return true if the user is the admin of the squares
+func (u *User) IsAdminOf(ctx context.Context, s *Squares) bool {
+	return u.ID == s.UserID
 }
 
 func (m *Model) userByRow(row *sql.Row) (*User, error) {

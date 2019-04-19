@@ -17,6 +17,7 @@ limitations under the License.
 package model
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -64,8 +65,8 @@ func (m *Model) squaresByRow(row *sql.Row, loadSettings bool) (*Squares, error) 
 	return &s, nil
 }
 
-func (m *Model) SquaresByToken(token string) (*Squares, error) {
-	row := m.db.QueryRow("SELECT * FROM squares WHERE token = $1", token)
+func (m *Model) SquaresByToken(ctx context.Context, token string) (*Squares, error) {
+	row := m.db.QueryRowContext(ctx, "SELECT * FROM squares WHERE token = $1", token)
 	return m.squaresByRow(row, true)
 }
 
