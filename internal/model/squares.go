@@ -45,10 +45,12 @@ type executer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
-func (m *Model) squaresByRow(row *sql.Row, loadSettings bool) (*Squares, error) {
+type scanFunc func(dest ...interface{}) error
+
+func (m *Model) squaresByRow(scan scanFunc, loadSettings bool) (*Squares, error) {
 	var locks *time.Time
 	s := Squares{model: m}
-	if err := row.Scan(&s.ID, &s.Token, &s.UserID, &s.Name, &s.SquaresType, &s.passwordHash, &locks, &s.Created, &s.Modified); err != nil {
+	if err := scan(&s.ID, &s.Token, &s.UserID, &s.Name, &s.SquaresType, &s.passwordHash, &locks, &s.Created, &s.Modified); err != nil {
 		return nil, err
 	}
 
@@ -65,14 +67,44 @@ func (m *Model) squaresByRow(row *sql.Row, loadSettings bool) (*Squares, error) 
 	return &s, nil
 }
 
+func (m *Model) SquaresCollectionByUser(ctx context.Context, u *User, offset, limit int) ([]*Squares, error) {
+	// FIXME - there's currently a sequence scan. will need to refactor
+	const query = `
+		SELECT squares.*
+		FROM squares
+		LEFT JOIN squares_users ON squares.id = squares_users.squares_id
+		WHERE squares_users.user_id = $1 OR squares.user_id = $1
+		ORDER BY squares.id DESC
+		OFFSET $2
+		LIMIT $3`
+
+	rows, err := m.db.QueryContext(ctx, query, u.ID, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	squaresCollection := make([]*Squares, 0)
+	for rows.Next() {
+		squares, err := m.squaresByRow(rows.Scan, false)
+		if err != nil {
+			return nil, err
+		}
+
+		squaresCollection = append(squaresCollection, squares)
+	}
+
+	return squaresCollection, nil
+}
+
 func (m *Model) SquaresByToken(ctx context.Context, token string) (*Squares, error) {
 	row := m.db.QueryRowContext(ctx, "SELECT * FROM squares WHERE token = $1", token)
-	return m.squaresByRow(row, true)
+	return m.squaresByRow(row.Scan, true)
 }
 
 func (m *Model) SquaresByID(id int64) (*Squares, error) {
 	row := m.db.QueryRow("SELECT * FROM squares WHERE id = $1", id)
-	return m.squaresByRow(row, true)
+	return m.squaresByRow(row.Scan, true)
 }
 
 // NewSquares will save new squares into the database
@@ -92,7 +124,7 @@ func (m *Model) NewSquares(userID int64, name string, squaresType SquaresType, p
 	}
 	row := m.db.QueryRow("SELECT * FROM new_squares($1, $2, $3, $4, $5)", token, userID, name, squaresType, passwordHash)
 
-	s, err := m.squaresByRow(row, false)
+	s, err := m.squaresByRow(row.Scan, false)
 	if err != nil {
 		return nil, err
 	}

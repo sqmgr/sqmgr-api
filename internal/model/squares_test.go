@@ -136,3 +136,30 @@ func TestNewSquaresInvalidSquaresType(t *testing.T) {
 	g.Expect(s).Should(gomega.BeNil())
 	g.Expect(err).Should(gomega.MatchError(ErrInvalidSquaresType))
 }
+
+func TestSquaresCollectionByUser(t *testing.T) {
+	if len(os.Getenv("INTEGRATION")) == 0 {
+		t.Skip("skipping. to run, use -integration flag")
+	}
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+
+	user, err := m.NewUser(randString()+"@sqmgr.com", "my-unique-password")
+	g.Expect(err).Should(gomega.Succeed())
+
+	squares, err := m.NewSquares(user.ID, "Test for Collection", SquaresTypeStd100, "my-other-unique-password")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(squares).ShouldNot(gomega.BeNil())
+
+	user2, err := m.NewUser(randString()+"@sqmgr.com", "my-unique-password-2")
+	g.Expect(err).Should(gomega.Succeed())
+
+	collection, err := m.SquaresCollectionByUser(context.Background(), user2, 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(collection)).Should(gomega.Equal(0))
+
+	collection, err = m.SquaresCollectionByUser(context.Background(), user, 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(collection)).Should(gomega.Equal(1))
+}
