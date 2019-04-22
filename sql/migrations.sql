@@ -177,4 +177,6 @@ CREATE TABLE squares_users (
 	PRIMARY KEY (user_id, squares_id)
 );
 
+CREATE INDEX squares_users_squares_id_idx ON squares_users (squares_id);
+
 --rollback DROP TABLE squares_users;

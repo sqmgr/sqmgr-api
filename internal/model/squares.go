@@ -67,18 +67,33 @@ func (m *Model) squaresByRow(scan scanFunc, loadSettings bool) (*Squares, error)
 	return &s, nil
 }
 
-func (m *Model) SquaresCollectionByUser(ctx context.Context, u *User, offset, limit int) ([]*Squares, error) {
+func (m *Model) SquaresCollectionJoinedByUser(ctx context.Context, u *User, offset, limit int) ([]*Squares, error) {
 	// FIXME - there's currently a sequence scan. will need to refactor
 	const query = `
 		SELECT squares.*
 		FROM squares
 		LEFT JOIN squares_users ON squares.id = squares_users.squares_id
-		WHERE squares_users.user_id = $1 OR squares.user_id = $1
+		WHERE squares_users.user_id = $1
 		ORDER BY squares.id DESC
 		OFFSET $2
 		LIMIT $3`
 
-	rows, err := m.db.QueryContext(ctx, query, u.ID, offset, limit)
+	return m.squaresCollectionByRows(m.db.QueryContext(ctx, query, u.ID, offset, limit))
+}
+
+func (m *Model) SquaresCollectionOwnedByUser(ctx context.Context, u *User, offset, limit int) ([]*Squares, error) {
+	const query = `
+		SELECT *
+		FROM squares
+		WHERE user_id = $1
+		ORDER BY squares.id DESC
+		OFFSET $2
+		LIMIT $3`
+
+	return m.squaresCollectionByRows(m.db.QueryContext(ctx, query, u.ID, offset, limit))
+}
+
+func (m *Model) squaresCollectionByRows(rows *sql.Rows, err error) ([]*Squares, error) {
 	if err != nil {
 		return nil, err
 	}
