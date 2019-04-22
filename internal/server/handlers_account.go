@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"database/sql"
 	"encoding/base64"
 	"net/http"
 	"strings"
@@ -26,9 +27,36 @@ import (
 )
 
 func (s *Server) accountHandler() http.HandlerFunc {
+	type data struct {
+		User          *model.User
+		OwnedSquares  []*model.Squares
+		JoinedSquares []*model.Squares
+	}
+
 	tpl := s.loadTemplate("account.html")
 	return func(w http.ResponseWriter, r *http.Request) {
-		s.ExecuteTemplate(w, r, tpl, s.AuthUser(r))
+		user := s.AuthUser(r)
+		ctx := r.Context()
+
+		// FIXME
+		owned, err := s.model.SquaresCollectionOwnedByUser(ctx, user, 0, 10)
+		if err != nil && err != sql.ErrNoRows {
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		// FIXME
+		joined, err := s.model.SquaresCollectionJoinedByUser(ctx, user, 0, 10)
+		if err != nil && err != sql.ErrNoRows {
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		s.ExecuteTemplate(w, r, tpl, data{
+			User:          user,
+			OwnedSquares:  owned,
+			JoinedSquares: joined,
+		})
 	}
 }
 

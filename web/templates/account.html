@@ -20,13 +20,42 @@ limitations under the License.
 <link href="/static/css/account.css" rel="stylesheet">
 {{ end }}
 
+{{ define "squares" }}
+	<table>
+		<thead>
+			<tr>
+				<th>Name
+				<th>Type
+				<th>Created
+			</tr>
+		</thead>
+		<tbody>
+			{{ range . }}
+			<tr>
+				<td><a href="/squares/{{.Token}}">{{.Name}}</a>
+				<td>{{.SquaresType}}
+				<td>{{.Created.Format "01/02/2006"}}
+			</tr>
+			{{ end }}
+		</tbody>
+	</table>
+{{ end }}
+
 {{ define "content" }}
 <section class="account">
 	<div class="columns">
 		<div class="actions col-3">
-			<p>Welcome {{.Local.Email}}
+			<p>Welcome {{.Local.User.Email}}
 
 			<p><a href="/create">Create</a> a new squares board
+
+			<h3>Owned Squares</h3>
+
+			{{ template "squares" .Local.OwnedSquares }}
+
+			<h3>Joined Squares</h3>
+
+			{{ template "squares" .Local.JoinedSquares }}
 		</div>
 		<div class="account-management">
 			<h3>Account Management</h3>

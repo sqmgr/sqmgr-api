@@ -46,6 +46,11 @@ func (s SquaresType) Description() string {
 	return string(s)
 }
 
+// String will return the string description. For now it just calls Description()
+func (s SquaresType) String() string {
+	return s.Description()
+}
+
 // IsValidSquaresType will check to see if the string is a valid square type. If it's valid, nil is returned.
 func IsValidSquaresType(val string) error {
 	if _, ok := validSquaresTypes[SquaresType(val)]; !ok {
