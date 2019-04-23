@@ -32,7 +32,6 @@ type PaginationBuilder struct {
 	// CapBuffer is the number of items to show at beginning and end of pagination
 	CapBuffer int
 	// WindowBuffer is the size of the window
-	// FIXME - change to match description
 	WindowBuffer int
 	currentPage  int
 	pages        int

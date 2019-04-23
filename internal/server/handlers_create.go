@@ -26,7 +26,7 @@ import (
 const minJoinPasswordLen = 5
 
 func (s *Server) createHandler() http.HandlerFunc {
-	tpl := s.loadTemplate("create.html")
+	tpl := s.loadTemplate("create.html", "form-errors.html")
 
 	type data struct {
 		MinJoinPasswordLen int

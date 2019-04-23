@@ -26,36 +26,52 @@ import (
 	"github.com/weters/sqmgr/internal/validator"
 )
 
+const rowsPerTable = 10
+
+type squaresTemplateData struct {
+	CurrentPage int64
+	Pages       int64
+	Squares     []*model.Squares
+}
+
 func (s *Server) accountHandler() http.HandlerFunc {
 	type data struct {
 		User          *model.User
-		OwnedSquares  []*model.Squares
-		JoinedSquares []*model.Squares
+		OwnedSquares  squaresTemplateData
+		JoinedSquares squaresTemplateData
 	}
 
-	tpl := s.loadTemplate("account.html")
+	tpl := s.loadTemplate("account.html", "account-squares-table.html")
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := s.AuthUser(r)
 		ctx := r.Context()
 
 		// FIXME
-		owned, err := s.model.SquaresCollectionOwnedByUser(ctx, user, 0, 10)
+		owned, err := s.model.SquaresCollectionOwnedByUser(ctx, user, 0, rowsPerTable)
 		if err != nil && err != sql.ErrNoRows {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
 		// FIXME
-		joined, err := s.model.SquaresCollectionJoinedByUser(ctx, user, 0, 10)
+		joined, err := s.model.SquaresCollectionJoinedByUser(ctx, user, 0, rowsPerTable)
 		if err != nil && err != sql.ErrNoRows {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
 		s.ExecuteTemplate(w, r, tpl, data{
-			User:          user,
-			OwnedSquares:  owned,
-			JoinedSquares: joined,
+			User: user,
+			OwnedSquares: squaresTemplateData{
+				CurrentPage: 2,
+				Pages:       5,
+				Squares:     owned,
+			},
+			JoinedSquares: squaresTemplateData{
+				CurrentPage: 10,
+				Pages:       10,
+				Squares:     joined,
+			},
 		})
 	}
 }
