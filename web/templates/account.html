@@ -26,13 +26,11 @@ limitations under the License.
 		<div class="actions col-3">
 			<p>Welcome {{.Local.User.Email}}
 
-			<p><a href="/create">Create</a> a new squares board
-
-			<h3>Owned Squares</h3>
+			<h3>Squares You Created</h3>
 
 			{{ template "squares" .Local.OwnedSquares }}
 
-			<h3>Joined Squares</h3>
+			<h3>Squares You Joined</h3>
 
 			{{ template "squares" .Local.JoinedSquares }}
 		</div>
@@ -40,6 +38,7 @@ limitations under the License.
 			<h3>Account Management</h3>
 
 			<ul>
+				<li><strong><a href="/create">Create</a></strong>
 				<li><a href="/logout">Logout</a>
 				<li><a href="/account/change-password">Change Password</a>
 				<li><a href="/account/delete">Delete Account</a>

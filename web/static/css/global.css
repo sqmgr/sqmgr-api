@@ -20,7 +20,7 @@ limitations under the License.
 	--spacing: 20px;
 	
 	--light-gray: #eee;
-	--gray: #999;
+	--gray: #bbb;
 	--red: #f44336;
 	--border-color: #ccc;
 	--font: 'Roboto';
@@ -243,8 +243,14 @@ p.generated-by {
 /* pagination */
 nav.pagination ul {
 	list-style: none;
-	margin: 0 0 var(--spacing) 0;
+	margin: 0;
 	text-align: center;
+}
+nav.pagination p.showing {
+	color: var(--gray);
+	font-size: 0.8em;
+	text-align: center;
+	margin: var(--minimal-spacing) 0 var(--spacing);
 }
 nav.pagination a {
 	color: #000;

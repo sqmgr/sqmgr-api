@@ -36,12 +36,14 @@ limitations under the License.
 				{{ end }}
 			{{ end }}
 
-			{{ if eq .CurrentPage .Total }}
+			{{ if eq .CurrentPage .NumPages }}
 				<li class="next"><span class="current"><span>Next</span></span>
 			{{ else }}
 				<li class="next"><a href="{{.Link .NextPage}}" data-page="{{.NextPage}}"><span>Next</span></a>
 			{{ end }}
 		</ul>
+
+		<p class="showing">Showing {{.ShowingStart}}-{{.ShowingEnd}} of {{.Total}}
 	</nav>
 {{ end }}
 

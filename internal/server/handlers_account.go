@@ -20,7 +20,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -59,9 +58,7 @@ func getSquaresData(ctx context.Context, user *model.User, link string, collFn c
 		return nil, err
 	}
 
-	total := int64(math.Ceil(float64(count) / float64(rowsPerTable)))
-
-	p := NewPagination(int(total), page)
+	p := NewPagination(count, rowsPerTable, page)
 	p.SetBaseURL(link)
 
 	return &squaresTemplateData{

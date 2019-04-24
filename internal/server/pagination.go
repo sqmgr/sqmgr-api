@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"math"
 	"net/url"
 	"strconv"
 )
@@ -31,22 +32,29 @@ const (
 
 // Pagination is a list of pages that have been paginated
 type Pagination struct {
-	baseURL      string
+	baseURL     string
+	total       int64
+	numPages    int
+	perPage     int
+	currentPage int
+	pages       []int
+
 	capBuffer    int
 	windowBuffer int
-	currentPage  int
-	total        int
-	pages        []int
 }
 
 // NewPagination will return a new pagination object
-func NewPagination(total, currentPage int) *Pagination {
+func NewPagination(total int64, perPage, currentPage int) *Pagination {
+	numPages := int(math.Ceil(float64(total) / float64(perPage)))
 	return &Pagination{
 		capBuffer:    defaultCapBuffer,
 		windowBuffer: defaultWindowBuffer,
-		total:        total,
-		currentPage:  currentPage,
-		baseURL:      "#",
+
+		total:       total,
+		perPage:     perPage,
+		numPages:    numPages,
+		currentPage: currentPage,
+		baseURL:     "#",
 	}
 }
 
@@ -71,9 +79,9 @@ func (p *Pagination) SetBaseURL(baseURL string) {
 	p.baseURL = baseURL
 }
 
-// Total returns the total number of pages
-func (p *Pagination) Total() int {
-	return p.total
+// NumPages returns the total number of pages
+func (p *Pagination) NumPages() int {
+	return p.numPages
 }
 
 // CurrentPage returns the current page
@@ -100,8 +108,8 @@ func (p *Pagination) NextPage() int {
 		p.build()
 	}
 
-	if p.currentPage >= p.total {
-		return p.total
+	if p.currentPage >= p.numPages {
+		return p.numPages
 	}
 
 	return p.currentPage + 1
@@ -145,9 +153,9 @@ func (p *Pagination) build() {
 
 	visible := p.capBuffer*2 + p.windowBuffer + 1
 
-	if p.total <= visible {
-		items := make([]int, p.total)
-		for i := 0; i < p.total; i++ {
+	if p.numPages <= visible {
+		items := make([]int, p.numPages)
+		for i := 0; i < p.numPages; i++ {
 			items[i] = i + 1
 		}
 
@@ -163,8 +171,8 @@ func (p *Pagination) build() {
 	windowEnd := p.currentPage + (p.windowBuffer / 2)
 	windowStart := windowEnd - p.windowBuffer + 1
 
-	capRightStart := p.total - p.capBuffer + 1
-	capRightEnd := p.total
+	capRightStart := p.numPages - p.capBuffer + 1
+	capRightEnd := p.numPages
 
 	if windowStart <= p.capBuffer {
 		windowStart = p.capBuffer + 1
@@ -174,8 +182,8 @@ func (p *Pagination) build() {
 	if windowEnd >= capRightStart {
 		windowEnd = capRightStart - 1
 
-		if p.total-p.windowBuffer+1 < windowStart {
-			windowStart = p.total - p.windowBuffer + 1
+		if p.numPages-p.windowBuffer+1 < windowStart {
+			windowStart = p.numPages - p.windowBuffer + 1
 		}
 	}
 
@@ -196,4 +204,25 @@ func (p *Pagination) build() {
 	}
 
 	p.pages = items
+}
+
+func (p *Pagination) PerPage() int {
+	return p.perPage
+}
+
+func (p *Pagination) ShowingStart() int64 {
+	return int64((p.currentPage-1)*p.perPage) + 1
+}
+
+func (p *Pagination) ShowingEnd() int64 {
+	end := p.ShowingStart() + int64(p.perPage) - 1
+	if end > p.total {
+		return p.total
+	}
+
+	return end
+}
+
+func (p *Pagination) Total() int64 {
+	return p.total
 }
