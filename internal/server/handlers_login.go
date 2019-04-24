@@ -60,6 +60,18 @@ func (s *Server) loginHandler() http.HandlerFunc {
 					return
 				}
 			} else {
+				ids, ok := session.Values[squaresIDsKey].(map[int64]bool)
+				if ok {
+					for id := range ids {
+						if err := user.JoinSquares(r.Context(), &model.Squares{ID: id}); err != nil {
+							s.Error(w, r, http.StatusInternalServerError, err)
+							return
+						}
+					}
+
+					delete(session.Values, squaresIDsKey)
+				}
+
 				session.Login(user, len(rememberMe) > 0)
 				session.Save()
 
