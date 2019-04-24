@@ -62,4 +62,7 @@ migrations-down:
 		--password ${PG_PASSWORD} \
 		rollbackCount ${ROLLBACK_COUNT}
 
+testdata:
+	go run hack/testdata/*.go
+
 .PHONY: run docker-build docker-push test clean-integration test-integration cover cover-integration dev-db integration-db git-hooks migrations migrations-down
