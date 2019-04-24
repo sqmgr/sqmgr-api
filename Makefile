@@ -33,14 +33,16 @@ cover: test
 cover-integration: test-integration
 	go tool cover -html coverage.out
 
-dev-db:
+dev-db: git-hooks
 	-docker run --name sqmgr-postgres --detach --publish 5432:5432 postgres:11
 
 integration-db: dev-db clean-integration
 	docker exec -it sqmgr-postgres createdb -Upostgres integration
 
-git-hooks:
+.git/hooks/pre-commit:
 	ln -s ../../git-hooks/pre-commit .git/hooks/pre-commit
+
+git-hooks: .git/hooks/pre-commit
 
 migrations:
 	liquibase \
