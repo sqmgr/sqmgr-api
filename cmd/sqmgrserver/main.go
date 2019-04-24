@@ -18,7 +18,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"flag"
 	"net/http"
 	"os"
@@ -28,6 +27,7 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/sirupsen/logrus"
+	"github.com/weters/sqmgr/internal/database"
 	"github.com/weters/sqmgr/internal/server"
 
 	_ "github.com/lib/pq"
@@ -44,7 +44,7 @@ const (
 func main() {
 	flag.Parse()
 
-	db, err := openDB()
+	db, err := database.Open()
 	if err != nil {
 		logrus.Fatalf("could not open database: %v", err)
 	}
@@ -93,22 +93,4 @@ func main() {
 		logrus.WithError(err).Fatalln("could not shut down server")
 	}
 	logrus.Infoln("shutdown complete")
-}
-
-func openDB() (*sql.DB, error) {
-	dsn := os.Getenv("DSN")
-	if dsn == "" {
-		dsn = "host=localhost port=5432 user=postgres sslmode=disable"
-	}
-
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := db.Ping(); err != nil {
-		return nil, err
-	}
-
-	return db, nil
 }

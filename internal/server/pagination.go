@@ -16,6 +16,8 @@ limitations under the License.
 
 package server
 
+import "fmt"
+
 const (
 	// how many elements to show at beginning and end
 	defaultCapBuffer = 1
@@ -26,6 +28,7 @@ const (
 
 // Pagination is a list of pages that have been paginated
 type Pagination struct {
+	baseURL      string
 	capBuffer    int
 	windowBuffer int
 	currentPage  int
@@ -40,7 +43,17 @@ func NewPagination(total, currentPage int) *Pagination {
 		windowBuffer: defaultWindowBuffer,
 		total:        total,
 		currentPage:  currentPage,
+		baseURL:      "#",
 	}
+}
+
+func (p *Pagination) Link(page int) string {
+	return p.baseURL + fmt.Sprintf("?page=%d", page)
+}
+
+// SetBaseURL will set the base URL
+func (p *Pagination) SetBaseURL(baseURL string) {
+	p.baseURL = baseURL
 }
 
 // Total returns the total number of pages
@@ -109,6 +122,7 @@ func (p *Pagination) SetWindowBuffer(windowBuffer int) {
 
 	p.windowBuffer = windowBuffer
 }
+
 func (p *Pagination) build() {
 	if p.pages != nil {
 		panic("Build() already called")

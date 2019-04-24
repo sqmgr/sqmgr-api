@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"database/sql"
 	"encoding/base64"
 	"math"
@@ -30,17 +31,39 @@ import (
 const rowsPerTable = 10
 
 type squaresTemplateData struct {
-	CurrentPage int
-	TotalPages  int
-	Pagination  Pagination
-	Squares     []*model.Squares
+	Pagination *Pagination
+	Squares    []*model.Squares
 }
 
 func (s *Server) accountHandler() http.HandlerFunc {
 	type data struct {
 		User          *model.User
-		OwnedSquares  squaresTemplateData
-		JoinedSquares squaresTemplateData
+		OwnedSquares  *squaresTemplateData
+		JoinedSquares *squaresTemplateData
+	}
+
+	type collectionFn func(ctx context.Context, u *model.User, offset int, limit int) ([]*model.Squares, error)
+	type countFn func(ctx context.Context, u *model.User) (int64, error)
+
+	getSquaresData := func(ctx context.Context, user *model.User, collFn collectionFn, cntFn countFn) (*squaresTemplateData, error) {
+		squares, err := collFn(ctx, user, 0, rowsPerTable)
+		if err != nil && err != sql.ErrNoRows {
+			return nil, err
+		}
+
+		count, err := cntFn(ctx, user)
+		if err != nil {
+			return nil, err
+		}
+
+		total := int64(math.Ceil(float64(count) / float64(rowsPerTable)))
+
+		p := NewPagination(int(total), 1)
+
+		return &squaresTemplateData{
+			Pagination: p,
+			Squares:    squares,
+		}, nil
 	}
 
 	tpl := s.loadTemplate("account.html", "account-squares-table.html")
@@ -48,46 +71,22 @@ func (s *Server) accountHandler() http.HandlerFunc {
 		user := s.AuthUser(r)
 		ctx := r.Context()
 
-		owned, err := s.model.SquaresCollectionOwnedByUser(ctx, user, 0, rowsPerTable)
+		joinedData, err := getSquaresData(ctx, user, s.model.SquaresCollectionJoinedByUser, s.model.SquaresCollectionJoinedByUserCount)
 		if err != nil && err != sql.ErrNoRows {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
-		ownedCount, err := s.model.SquaresCollectionOwnedByUserCount(ctx, user)
-		if err != nil {
-			s.Error(w, r, http.StatusInternalServerError, err)
-			return
-		}
-		totalOwnedPages := divCeil(int(ownedCount), rowsPerTable)
-
-		joined, err := s.model.SquaresCollectionJoinedByUser(ctx, user, 0, rowsPerTable)
+		ownedData, err := getSquaresData(ctx, user, s.model.SquaresCollectionOwnedByUser, s.model.SquaresCollectionOwnedByUserCount)
 		if err != nil && err != sql.ErrNoRows {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
-
-		joinedCount, err := s.model.SquaresCollectionJoinedByUserCount(ctx, user)
-		if err != nil {
-			s.Error(w, r, http.StatusInternalServerError, err)
-			return
-		}
-		totalJoinedPages := divCeil(int(joinedCount), rowsPerTable)
 
 		s.ExecuteTemplate(w, r, tpl, data{
-			User: user,
-			OwnedSquares: squaresTemplateData{
-				CurrentPage: 1,
-				Pagination:  DefaultPagination(0, totalOwnedPages),
-				TotalPages:  totalOwnedPages,
-				Squares:     owned,
-			},
-			JoinedSquares: squaresTemplateData{
-				CurrentPage: 1,
-				Pagination:  DefaultPagination(0, totalJoinedPages),
-				TotalPages:  totalJoinedPages,
-				Squares:     joined,
-			},
+			User:          user,
+			OwnedSquares:  ownedData,
+			JoinedSquares: joinedData,
 		})
 	}
 }
@@ -247,13 +246,4 @@ func (s *Server) accountVerifyHandler() http.HandlerFunc {
 
 		s.ExecuteTemplate(w, r, tpl, tplData)
 	}
-}
-
-func divCeil(num, denom int) int {
-	if true {
-		return 28
-	}
-
-	val := math.Ceil(float64(num) / float64(denom))
-	return int(val)
 }

@@ -68,7 +68,6 @@ func (m *Model) squaresByRow(scan scanFunc, loadSettings bool) (*Squares, error)
 }
 
 func (m *Model) SquaresCollectionJoinedByUser(ctx context.Context, u *User, offset, limit int) ([]*Squares, error) {
-	// FIXME - there's currently a sequence scan. will need to refactor
 	const query = `
 		SELECT squares.*
 		FROM squares
@@ -81,6 +80,16 @@ func (m *Model) SquaresCollectionJoinedByUser(ctx context.Context, u *User, offs
 	return m.squaresCollectionByRows(m.db.QueryContext(ctx, query, u.ID, offset, limit))
 }
 
+func (m *Model) SquaresCollectionJoinedByUserCount(ctx context.Context, u *User) (int64, error) {
+	const query = `
+		SELECT COUNT(*)
+		FROM squares
+		LEFT JOIN squares_users ON squares.id = squares_users.squares_id
+		WHERE squares_users.user_id = $1`
+
+	return m.squaresCollectionCount(m.db.QueryRowContext(ctx, query, u.ID))
+}
+
 func (m *Model) SquaresCollectionOwnedByUser(ctx context.Context, u *User, offset, limit int) ([]*Squares, error) {
 	const query = `
 		SELECT *
@@ -91,6 +100,15 @@ func (m *Model) SquaresCollectionOwnedByUser(ctx context.Context, u *User, offse
 		LIMIT $3`
 
 	return m.squaresCollectionByRows(m.db.QueryContext(ctx, query, u.ID, offset, limit))
+}
+
+func (m *Model) SquaresCollectionOwnedByUserCount(ctx context.Context, u *User) (int64, error) {
+	const query = `
+		SELECT COUNT(*)
+		FROM squares
+		WHERE user_id = $1`
+
+	return m.squaresCollectionCount(m.db.QueryRowContext(ctx, query, u.ID))
 }
 
 func (m *Model) squaresCollectionByRows(rows *sql.Rows, err error) ([]*Squares, error) {
@@ -110,6 +128,15 @@ func (m *Model) squaresCollectionByRows(rows *sql.Rows, err error) ([]*Squares, 
 	}
 
 	return squaresCollection, nil
+}
+
+func (m *Model) squaresCollectionCount(row *sql.Row) (int64, error) {
+	var count int64
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
 
 func (m *Model) SquaresByToken(ctx context.Context, token string) (*Squares, error) {

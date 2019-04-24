@@ -20,27 +20,6 @@ limitations under the License.
 <link href="/static/css/account.css" rel="stylesheet">
 {{ end }}
 
-{{ define "squares" }}
-	<table>
-		<thead>
-			<tr>
-				<th>Name
-				<th>Type
-				<th>Created
-			</tr>
-		</thead>
-		<tbody>
-			{{ range . }}
-			<tr>
-				<td><a href="/squares/{{.Token}}">{{.Name}}</a>
-				<td>{{.SquaresType}}
-				<td>{{.Created.Format "01/02/2006"}}
-			</tr>
-			{{ end }}
-		</tbody>
-	</table>
-{{ end }}
-
 {{ define "content" }}
 <section class="account">
 	<div class="columns">

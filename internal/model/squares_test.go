@@ -176,3 +176,44 @@ func TestSquaresCollection(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(0))
 }
+
+func TestSquaresCollectionPagination(t *testing.T) {
+	if len(os.Getenv("INTEGRATION")) == 0 {
+		t.Skip("skipping. to run, use -integration flag")
+	}
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+
+	user1, err := m.NewUser(randString()+"@sqmgr.com", "my-unique-password")
+	g.Expect(err).Should(gomega.Succeed())
+
+	user2, err := m.NewUser(randString()+"@sqmgr.com", "my-unique-password")
+	g.Expect(err).Should(gomega.Succeed())
+
+	for i := 0; i < 30; i++ {
+		squares, err := m.NewSquares(user1.ID, randString(), SquaresTypeStd100, "my-other-unique-password")
+		g.Expect(err).Should(gomega.Succeed())
+
+		if i < 20 {
+			g.Expect(user2.JoinSquares(squares)).Should(gomega.Succeed())
+		}
+	}
+
+	count, err := m.SquaresCollectionOwnedByUserCount(context.Background(), user1)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(30)))
+
+	count, err = m.SquaresCollectionOwnedByUserCount(context.Background(), user2)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(0)))
+
+	count, err = m.SquaresCollectionJoinedByUserCount(context.Background(), user1)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(0)))
+
+	count, err = m.SquaresCollectionJoinedByUserCount(context.Background(), user2)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(20)))
+
+}
