@@ -16,7 +16,10 @@ limitations under the License.
 
 package server
 
-import "fmt"
+import (
+	"net/url"
+	"strconv"
+)
 
 const (
 	// how many elements to show at beginning and end
@@ -47,8 +50,20 @@ func NewPagination(total, currentPage int) *Pagination {
 	}
 }
 
+// Link will return the link to use
 func (p *Pagination) Link(page int) string {
-	return p.baseURL + fmt.Sprintf("?page=%d", page)
+	// XXX: will this be a bottleneck???
+	u, err := url.Parse(p.baseURL)
+	if err != nil {
+		panic(err)
+	}
+
+	query := u.Query()
+	query.Set("page", strconv.Itoa(page))
+
+	u.RawQuery = query.Encode()
+
+	return u.String()
 }
 
 // SetBaseURL will set the base URL

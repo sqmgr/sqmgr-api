@@ -39,7 +39,7 @@ type WordList struct {
 
 var seed = flag.Int64("seed", time.Now().UnixNano(), "seed value")
 var numAccounts = flag.Int("accounts", 5, "number of test accounts to create")
-var numSquares = flag.Int("squares", 100, "number of squares to generate")
+var numSquares = flag.Int("squares", 250, "number of squares to generate")
 var chance = flag.Int("chance", 50, "percent change to join a square")
 
 func main() {

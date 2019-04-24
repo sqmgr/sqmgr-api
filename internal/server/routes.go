@@ -44,6 +44,8 @@ func (s *Server) setupRoutes() {
 
 	// account management
 	s.Router.Path("/account").Methods(http.MethodGet).Handler(s.authHandler(s.accountHandler()))
+	s.Router.Path("/account/joined").Methods(http.MethodGet).Handler(s.authHandler(s.accountSquaresHandler(joined)))
+	s.Router.Path("/account/owned").Methods(http.MethodGet).Handler(s.authHandler(s.accountSquaresHandler(owned)))
 	s.Router.Path("/account/change-password").Methods(http.MethodGet, http.MethodPost).Handler(s.authHandler(s.accountChangePasswordHandler()))
 	s.Router.Path("/account/delete").Methods(http.MethodGet, http.MethodPost).Handler(s.authHandler(s.accountDeleteHandler()))
 	s.Router.Path("/account/deleted").Methods(http.MethodGet).Handler(s.authHandler(s.accountDeletedHandler()))

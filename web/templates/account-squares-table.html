@@ -15,59 +15,31 @@ limitations under the License.
 */}}
 
 {{ define "squares" }}
-	{{ if .Squares }}
-	<table>
-		<thead>
-			<tr>
-				<th>Name
-				<th>Type
-				<th>Created
-			</tr>
-		</thead>
-		<tbody>
-			{{ range .Squares }}
-			<tr>
-				<td><a href="/squares/{{.Token}}">{{.Name}}</a>
-				<td>{{.SquaresType.Description}}
-				<td>{{.Created.Format "01/02/2006"}}
-			</tr>
-			{{ end }}
-		</tbody>
-	</table>
-
-	{{ if .Pagination }}
-		<nav class="pagination">
-			<ul>
-				{{ if eq .Pagination.CurrentPage 1 }}
-					<li class="prev"><span class="current">Prev</span>
-				{{ else }}
-					<li class="prev"><span><a href="{{.Pagination.Link .Pagination.PrevPage}}" data-page="{{.Pagination.PrevPage}}">Prev</a></span>
+	<div class="squares" data-pagination="parent-node">
+		{{ if .Squares }}
+		<table>
+			<thead>
+				<tr>
+					<th>Name
+					<th>Type
+					<th>Created
+				</tr>
+			</thead>
+			<tbody>
+				{{ range .Squares }}
+				<tr>
+					<td><a href="/squares/{{.Token}}">{{.Name}}</a>
+					<td>{{.SquaresType.Description}}
+					<td>{{.Created.Format "01/02/2006"}}
+				</tr>
 				{{ end }}
+			</tbody>
+		</table>
 
-				{{ $pagination := .Pagination }}
-				{{ range .Pagination.Pages }}
-					{{ if eq . 0 }}
-						<li class="ellipses"><span>...</span>
-					{{ else }}
-						{{ if eq . $pagination.CurrentPage }}
-							<li class="page"><span class="current">{{.}}</span>
-						{{ else }}
-							<li class="page"><span><a href="{{$pagination.Link .}}" data-page="{{.}}">{{.}}</a></span>
-						{{ end }}
-					{{ end }}
-				{{ end }}
+		{{ template "pagination.html" .Pagination }}
 
-				{{ if eq .Pagination.CurrentPage .Pagination.Total }}
-					<li class="next"><span class="current">Next</span>
-				{{ else }}
-					<li class="next"><span><a href="{{.Pagination.Link .Pagination.NextPage}}" data-page="{{.Pagination.NextPage}}">Next</a></span>
-				{{ end }}
-			</ul>
-		</nav>
-	{{ end }}
-
-	{{ else }}
-		<p>No squares found.
-	{{ end }}
+		{{ else }}
+			<p>No squares found.
+		{{ end }}
+	</div>
 {{ end }}
-

@@ -119,6 +119,18 @@ func (s *Server) Shutdown() error {
 	return nil
 }
 
+func (s *Server) ExecuteTemplateFragment(w http.ResponseWriter, r *http.Request, t *template.Template, name string, tplData interface{}) {
+	// if Reload is enabled, will attempt to read the templates from disk again.
+	if s.Reload {
+		t = reload(t, name)
+	}
+
+	if err := t.ExecuteTemplate(w, name, tplData); err != nil {
+		logrus.WithError(err).Errorln("could not execute template")
+		return
+	}
+}
+
 // ExecuteTemplate will execute the template. Template values can be passed in as localData and will be accessible in
 // the template at {{.Local.*}}
 func (s *Server) ExecuteTemplate(w http.ResponseWriter, r *http.Request, t *template.Template, localData interface{}) {
@@ -135,26 +147,31 @@ func (s *Server) ExecuteTemplate(w http.ResponseWriter, r *http.Request, t *temp
 
 	// if Reload is enabled, will attempt to read the templates from disk again.
 	if s.Reload {
-		newTemplate := template.New("").Funcs(funcMap)
-		whatReloaded := make([]string, 0)
-		for _, tpl := range t.Templates() {
-			if strings.HasSuffix(tpl.Name(), ".html") {
-				whatReloaded = append(whatReloaded, tpl.Name())
-				newTemplate, err = newTemplate.ParseFiles(filepath.Join(templatesDir, tpl.Name()))
-				if err != nil {
-					panic(err)
-				}
-			}
-
-		}
-		logrus.Debugf("reloaded templates %s", strings.Join(whatReloaded, ", "))
-		t = newTemplate.Lookup("base.html")
+		t = reload(t, "base.html")
 	}
 
 	if err := t.Execute(w, tplData); err != nil {
 		logrus.WithError(err).Errorln("could not execute template")
 		return
 	}
+}
+
+func reload(t *template.Template, name string) *template.Template {
+	newTemplate := template.New("").Funcs(funcMap)
+	whatReloaded := make([]string, 0)
+	for _, tpl := range t.Templates() {
+		if strings.HasSuffix(tpl.Name(), ".html") {
+			whatReloaded = append(whatReloaded, tpl.Name())
+			var err error
+			newTemplate, err = newTemplate.ParseFiles(filepath.Join(templatesDir, tpl.Name()))
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	logrus.Debugf("reloaded templates %s", strings.Join(whatReloaded, ", "))
+	return newTemplate.Lookup("base.html")
 }
 
 // Error will serve a custom error page. err is a varargs and if supplied, will log the error.

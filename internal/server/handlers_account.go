@@ -22,6 +22,7 @@ import (
 	"encoding/base64"
 	"math"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/weters/sqmgr/internal/model"
@@ -30,9 +31,43 @@ import (
 
 const rowsPerTable = 10
 
+type accountSquaresHandlerType int
+
+const (
+	joined accountSquaresHandlerType = iota
+	owned
+)
+
 type squaresTemplateData struct {
 	Pagination *Pagination
 	Squares    []*model.Squares
+}
+
+type collectionFn func(ctx context.Context, u *model.User, offset int, limit int) ([]*model.Squares, error)
+type countFn func(ctx context.Context, u *model.User) (int64, error)
+
+// page is index-1 based.
+func getSquaresData(ctx context.Context, user *model.User, link string, collFn collectionFn, cntFn countFn, page int) (*squaresTemplateData, error) {
+	offset := (page - 1) * rowsPerTable // remember to adjust for page being index-1 based, not index 0
+	squares, err := collFn(ctx, user, offset, rowsPerTable)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+
+	count, err := cntFn(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	total := int64(math.Ceil(float64(count) / float64(rowsPerTable)))
+
+	p := NewPagination(int(total), page)
+	p.SetBaseURL(link)
+
+	return &squaresTemplateData{
+		Pagination: p,
+		Squares:    squares,
+	}, nil
 }
 
 func (s *Server) accountHandler() http.HandlerFunc {
@@ -42,42 +77,18 @@ func (s *Server) accountHandler() http.HandlerFunc {
 		JoinedSquares *squaresTemplateData
 	}
 
-	type collectionFn func(ctx context.Context, u *model.User, offset int, limit int) ([]*model.Squares, error)
-	type countFn func(ctx context.Context, u *model.User) (int64, error)
-
-	getSquaresData := func(ctx context.Context, user *model.User, collFn collectionFn, cntFn countFn) (*squaresTemplateData, error) {
-		squares, err := collFn(ctx, user, 0, rowsPerTable)
-		if err != nil && err != sql.ErrNoRows {
-			return nil, err
-		}
-
-		count, err := cntFn(ctx, user)
-		if err != nil {
-			return nil, err
-		}
-
-		total := int64(math.Ceil(float64(count) / float64(rowsPerTable)))
-
-		p := NewPagination(int(total), 1)
-
-		return &squaresTemplateData{
-			Pagination: p,
-			Squares:    squares,
-		}, nil
-	}
-
-	tpl := s.loadTemplate("account.html", "account-squares-table.html")
+	tpl := s.loadTemplate("account.html", "account-squares-table.html", "pagination.html")
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := s.AuthUser(r)
 		ctx := r.Context()
 
-		joinedData, err := getSquaresData(ctx, user, s.model.SquaresCollectionJoinedByUser, s.model.SquaresCollectionJoinedByUserCount)
+		joinedData, err := getSquaresData(ctx, user, "/account/joined", s.model.SquaresCollectionJoinedByUser, s.model.SquaresCollectionJoinedByUserCount, 1)
 		if err != nil && err != sql.ErrNoRows {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
-		ownedData, err := getSquaresData(ctx, user, s.model.SquaresCollectionOwnedByUser, s.model.SquaresCollectionOwnedByUserCount)
+		ownedData, err := getSquaresData(ctx, user, "/account/owned", s.model.SquaresCollectionOwnedByUser, s.model.SquaresCollectionOwnedByUserCount, 1)
 		if err != nil && err != sql.ErrNoRows {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
@@ -88,6 +99,41 @@ func (s *Server) accountHandler() http.HandlerFunc {
 			OwnedSquares:  ownedData,
 			JoinedSquares: joinedData,
 		})
+	}
+}
+
+func (s *Server) accountSquaresHandler(asType accountSquaresHandlerType) http.HandlerFunc {
+	tpl := s.loadTemplate("account-squares-table.html", "pagination.html")
+
+	var clFn collectionFn
+	var cnFn countFn
+
+	switch asType {
+	case owned:
+		clFn = s.model.SquaresCollectionOwnedByUser
+		cnFn = s.model.SquaresCollectionOwnedByUserCount
+	default:
+		clFn = s.model.SquaresCollectionJoinedByUser
+		cnFn = s.model.SquaresCollectionJoinedByUserCount
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		page := r.FormValue("page")
+		pageInt, _ := strconv.Atoi(page)
+		if pageInt <= 0 {
+			s.Error(w, r, http.StatusBadRequest)
+			return
+		}
+
+		user := s.AuthUser(r)
+		ctx := r.Context()
+		data, err := getSquaresData(ctx, user, r.URL.Path, clFn, cnFn, pageInt)
+		if err != nil {
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		s.ExecuteTemplateFragment(w, r, tpl, "squares", data)
 	}
 }
 

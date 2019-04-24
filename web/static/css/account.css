@@ -23,25 +23,3 @@ div.account-management {
 section.account table {
 	margin-bottom: var(--spacing);
 }
-
-nav.pagination ul {
-	list-style: none;
-	margin: 0 0 var(--spacing) 0;
-}
-nav.pagination a {
-	display: inline-block;
-	padding: var(--minimal-spacing);
-}
-nav.pagination span.current {
-	display: inline-block;
-	padding: var(--minimal-spacing);
-}
-nav.pagination li {
-	display: inline-block;
-}
-nav.pagination li {
-	margin-right: var(--minimal-spacing);
-}
-nav.pagination li:last-child {
-	margin-right: 0;
-}
