@@ -119,6 +119,7 @@ func (s *Server) Shutdown() error {
 	return nil
 }
 
+// ExecuteTemplateFragment executes a fragment in a template. This differs from ExecuteTemplate in that it doesn't use base.html
 func (s *Server) ExecuteTemplateFragment(w http.ResponseWriter, r *http.Request, t *template.Template, name string, tplData interface{}) {
 	// if Reload is enabled, will attempt to read the templates from disk again.
 	if s.Reload {

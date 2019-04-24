@@ -206,14 +206,17 @@ func (p *Pagination) build() {
 	p.pages = items
 }
 
+// PerPage will return the number of items per page
 func (p *Pagination) PerPage() int {
 	return p.perPage
 }
 
+// ShowingStart will return the start index (1-based) of the items in window
 func (p *Pagination) ShowingStart() int64 {
 	return int64((p.currentPage-1)*p.perPage) + 1
 }
 
+// ShowingEnd will return the end index (1-based) of the items in window
 func (p *Pagination) ShowingEnd() int64 {
 	end := p.ShowingStart() + int64(p.perPage) - 1
 	if end > p.total {
@@ -223,6 +226,7 @@ func (p *Pagination) ShowingEnd() int64 {
 	return end
 }
 
+// Total returns the total number of items
 func (p *Pagination) Total() int64 {
 	return p.total
 }
