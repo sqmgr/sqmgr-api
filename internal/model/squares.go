@@ -67,6 +67,7 @@ func (m *Model) squaresByRow(scan scanFunc, loadSettings bool) (*Squares, error)
 	return &s, nil
 }
 
+// SquaresCollectionJoinedByUser will return a collection of squares that the user joined
 func (m *Model) SquaresCollectionJoinedByUser(ctx context.Context, u *User, offset, limit int) ([]*Squares, error) {
 	const query = `
 		SELECT squares.*
@@ -80,6 +81,7 @@ func (m *Model) SquaresCollectionJoinedByUser(ctx context.Context, u *User, offs
 	return m.squaresCollectionByRows(m.db.QueryContext(ctx, query, u.ID, offset, limit))
 }
 
+// SquaresCollectionJoinedByUserCount will return a how many squares the user joined
 func (m *Model) SquaresCollectionJoinedByUserCount(ctx context.Context, u *User) (int64, error) {
 	const query = `
 		SELECT COUNT(*)
@@ -90,6 +92,7 @@ func (m *Model) SquaresCollectionJoinedByUserCount(ctx context.Context, u *User)
 	return m.squaresCollectionCount(m.db.QueryRowContext(ctx, query, u.ID))
 }
 
+// SquaresCollectionOwnedByUser will return a collection of squares that were created by the user
 func (m *Model) SquaresCollectionOwnedByUser(ctx context.Context, u *User, offset, limit int) ([]*Squares, error) {
 	const query = `
 		SELECT *
@@ -102,6 +105,7 @@ func (m *Model) SquaresCollectionOwnedByUser(ctx context.Context, u *User, offse
 	return m.squaresCollectionByRows(m.db.QueryContext(ctx, query, u.ID, offset, limit))
 }
 
+// SquaresCollectionOwnedByUserCount will return how many squares were created by the user
 func (m *Model) SquaresCollectionOwnedByUserCount(ctx context.Context, u *User) (int64, error) {
 	const query = `
 		SELECT COUNT(*)
@@ -139,11 +143,13 @@ func (m *Model) squaresCollectionCount(row *sql.Row) (int64, error) {
 	return count, nil
 }
 
+// SquaresByToken will return the squares with the matching token
 func (m *Model) SquaresByToken(ctx context.Context, token string) (*Squares, error) {
 	row := m.db.QueryRowContext(ctx, "SELECT * FROM squares WHERE token = $1", token)
 	return m.squaresByRow(row.Scan, true)
 }
 
+// SquaresByID will return the squares with the matching ID
 func (m *Model) SquaresByID(id int64) (*Squares, error) {
 	row := m.db.QueryRow("SELECT * FROM squares WHERE id = $1", id)
 	return m.squaresByRow(row.Scan, true)

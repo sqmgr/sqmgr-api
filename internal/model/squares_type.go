@@ -32,6 +32,7 @@ var validSquaresTypes = map[SquaresType]bool{
 	SquaresTypeStd25:  true,
 }
 
+// ErrInvalidSquaresType is an error when a string has been typecast to a squares type that does not exist
 var ErrInvalidSquaresType = errors.New("internal/model: invalid squares type")
 
 // Description returns a human friendly description of the square type

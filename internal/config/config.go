@@ -28,10 +28,12 @@ var conf = config{
 	fromAddress: "weters19@gmail.com",
 }
 
+// Load will load the config
 func Load() error {
 	return nil
 }
 
+// GetURL will get the URL to the site
 func GetURL(optionalPath ...string) string {
 	if len(optionalPath) > 0 {
 		return conf.url + optionalPath[0]
@@ -40,10 +42,12 @@ func GetURL(optionalPath ...string) string {
 	return conf.url + "/"
 }
 
+// GetSMTP will load the SMTP configuration
 func GetSMTP() string {
 	return conf.smtp
 }
 
+// GetFromAddress will get the address emails should appear from
 func GetFromAddress() string {
 	return conf.fromAddress
 }

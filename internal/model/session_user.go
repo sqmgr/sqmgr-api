@@ -24,6 +24,7 @@ type SessionUser struct {
 	joinFunc   JoinSquares
 }
 
+// NewSessionUser returns a new session user
 func NewSessionUser(ids map[int64]bool, joinFunc JoinSquares) *SessionUser {
 	return &SessionUser{ids, joinFunc}
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/weters/sqmgr/pkg/tokengen"
 )
 
+// ErrRetryLimitExceeded is an error when too many attempts were made
 var ErrRetryLimitExceeded = errors.New("internal/model: maximum number of retries attempted")
 
 const maxRetries = 3

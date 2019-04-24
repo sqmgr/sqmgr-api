@@ -63,6 +63,7 @@ func (s *SquaresSettings) Save(q executer) error {
 	return err
 }
 
+// SetHomeTeamName will set the home team name
 func (s *SquaresSettings) SetHomeTeamName(str string) {
 	if len(str) == 0 {
 		s.HomeTeamName = nil
@@ -72,6 +73,7 @@ func (s *SquaresSettings) SetHomeTeamName(str string) {
 	s.HomeTeamName = &str
 }
 
+// SetHomeTeamColor1 will set the home team color1
 func (s *SquaresSettings) SetHomeTeamColor1(str string) {
 	if len(str) == 0 {
 		s.HomeTeamColor1 = nil
@@ -81,6 +83,7 @@ func (s *SquaresSettings) SetHomeTeamColor1(str string) {
 	s.HomeTeamColor1 = &str
 }
 
+// SetHomeTeamColor2 will set the home team color2
 func (s *SquaresSettings) SetHomeTeamColor2(str string) {
 	if len(str) == 0 {
 		s.HomeTeamColor2 = nil
@@ -90,6 +93,7 @@ func (s *SquaresSettings) SetHomeTeamColor2(str string) {
 	s.HomeTeamColor2 = &str
 }
 
+// SetHomeTeamColor3 will set the home team color3
 func (s *SquaresSettings) SetHomeTeamColor3(str string) {
 	if len(str) == 0 {
 		s.HomeTeamColor3 = nil
@@ -99,6 +103,7 @@ func (s *SquaresSettings) SetHomeTeamColor3(str string) {
 	s.HomeTeamColor3 = &str
 }
 
+// SetAwayTeamName will set the away team name
 func (s *SquaresSettings) SetAwayTeamName(str string) {
 	if len(str) == 0 {
 		s.AwayTeamName = nil
@@ -108,6 +113,7 @@ func (s *SquaresSettings) SetAwayTeamName(str string) {
 	s.AwayTeamName = &str
 }
 
+// SetAwayTeamColor1 will set the away team color1
 func (s *SquaresSettings) SetAwayTeamColor1(str string) {
 	if len(str) == 0 {
 		s.AwayTeamColor1 = nil
@@ -117,6 +123,7 @@ func (s *SquaresSettings) SetAwayTeamColor1(str string) {
 	s.AwayTeamColor1 = &str
 }
 
+// SetAwayTeamColor2 will set the away team color2
 func (s *SquaresSettings) SetAwayTeamColor2(str string) {
 	if len(str) == 0 {
 		s.AwayTeamColor2 = nil
@@ -126,6 +133,7 @@ func (s *SquaresSettings) SetAwayTeamColor2(str string) {
 	s.AwayTeamColor2 = &str
 }
 
+// SetAwayTeamColor3 will set the away team color3
 func (s *SquaresSettings) SetAwayTeamColor3(str string) {
 	if len(str) == 0 {
 		s.AwayTeamColor3 = nil

@@ -21,6 +21,7 @@ import (
 	"os"
 )
 
+// Open will open a database based on an environment variable DSN
 func Open() (*sql.DB, error) {
 	dsn := os.Getenv("DSN")
 	if dsn == "" {

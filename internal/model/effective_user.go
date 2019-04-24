@@ -18,6 +18,7 @@ package model
 
 import "context"
 
+// EffectiveUser provides common user functionality
 type EffectiveUser interface {
 	JoinSquares(ctx context.Context, s *Squares) error
 	IsMemberOf(ctx context.Context, s *Squares) (bool, error)
