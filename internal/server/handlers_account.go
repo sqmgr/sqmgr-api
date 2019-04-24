@@ -19,6 +19,7 @@ package server
 import (
 	"database/sql"
 	"encoding/base64"
+	"math"
 	"net/http"
 	"strings"
 
@@ -29,8 +30,9 @@ import (
 const rowsPerTable = 10
 
 type squaresTemplateData struct {
-	CurrentPage int64
-	Pages       int64
+	CurrentPage int
+	TotalPages  int
+	Pagination  Pagination
 	Squares     []*model.Squares
 }
 
@@ -46,30 +48,44 @@ func (s *Server) accountHandler() http.HandlerFunc {
 		user := s.AuthUser(r)
 		ctx := r.Context()
 
-		// FIXME
 		owned, err := s.model.SquaresCollectionOwnedByUser(ctx, user, 0, rowsPerTable)
 		if err != nil && err != sql.ErrNoRows {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
-		// FIXME
+		ownedCount, err := s.model.SquaresCollectionOwnedByUserCount(ctx, user)
+		if err != nil {
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+		totalOwnedPages := divCeil(int(ownedCount), rowsPerTable)
+
 		joined, err := s.model.SquaresCollectionJoinedByUser(ctx, user, 0, rowsPerTable)
 		if err != nil && err != sql.ErrNoRows {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
+		joinedCount, err := s.model.SquaresCollectionJoinedByUserCount(ctx, user)
+		if err != nil {
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+		totalJoinedPages := divCeil(int(joinedCount), rowsPerTable)
+
 		s.ExecuteTemplate(w, r, tpl, data{
 			User: user,
 			OwnedSquares: squaresTemplateData{
-				CurrentPage: 2,
-				Pages:       5,
+				CurrentPage: 1,
+				Pagination:  DefaultPagination(0, totalOwnedPages),
+				TotalPages:  totalOwnedPages,
 				Squares:     owned,
 			},
 			JoinedSquares: squaresTemplateData{
-				CurrentPage: 10,
-				Pages:       10,
+				CurrentPage: 1,
+				Pagination:  DefaultPagination(0, totalJoinedPages),
+				TotalPages:  totalJoinedPages,
 				Squares:     joined,
 			},
 		})
@@ -231,4 +247,13 @@ func (s *Server) accountVerifyHandler() http.HandlerFunc {
 
 		s.ExecuteTemplate(w, r, tpl, tplData)
 	}
+}
+
+func divCeil(num, denom int) int {
+	if true {
+		return 28
+	}
+
+	val := math.Ceil(float64(num) / float64(denom))
+	return int(val)
 }

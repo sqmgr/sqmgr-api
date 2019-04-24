@@ -25,54 +25,68 @@ import (
 func TestDefaultPagination(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
-	p := DefaultPagination(3, 7)
-	g.Expect(p).Should(gomega.Equal(Pagination{1, 2, 3, 4, 5, 6, 7}))
+	p := NewPagination(7, 3)
+	g.Expect(p.Pages()).Should(gomega.Equal([]int{1, 2, 3, 4, 5, 6, 7}))
+	g.Expect(p.PrevPage()).Should(gomega.Equal(2))
+	g.Expect(p.NextPage()).Should(gomega.Equal(4))
+	g.Expect(p.Total()).Should(gomega.Equal(7))
+	g.Expect(p.CurrentPage()).Should(gomega.Equal(3))
 
-	p = DefaultPagination(1, 10)
-	g.Expect(p).Should(gomega.Equal(Pagination{1, 2, 3, 4, 5, 0, 10}))
+	p = NewPagination(10, 1)
+	g.Expect(p.Pages()).Should(gomega.Equal([]int{1, 2, 3, 4, 5, 0, 10}))
+	g.Expect(p.PrevPage()).Should(gomega.Equal(1))
+	g.Expect(p.NextPage()).Should(gomega.Equal(2))
 
-	p = DefaultPagination(2, 10)
-	g.Expect(p).Should(gomega.Equal(Pagination{1, 2, 3, 4, 5, 0, 10}))
+	p = NewPagination(10, 2)
+	g.Expect(p.Pages()).Should(gomega.Equal([]int{1, 2, 3, 4, 5, 0, 10}))
 
-	p = DefaultPagination(3, 10)
-	g.Expect(p).Should(gomega.Equal(Pagination{1, 2, 3, 4, 5, 0, 10}))
+	p = NewPagination(10, 3)
+	g.Expect(p.Pages()).Should(gomega.Equal([]int{1, 2, 3, 4, 5, 0, 10}))
 
-	p = DefaultPagination(4, 10)
-	g.Expect(p).Should(gomega.Equal(Pagination{1, 2, 3, 4, 5, 6, 0, 10}))
+	p = NewPagination(10, 4)
+	g.Expect(p.Pages()).Should(gomega.Equal([]int{1, 2, 3, 4, 5, 6, 0, 10}))
 
-	p = DefaultPagination(5, 10)
-	g.Expect(p).Should(gomega.Equal(Pagination{1, 0, 3, 4, 5, 6, 7, 0, 10}))
+	p = NewPagination(10, 5)
+	g.Expect(p.Pages()).Should(gomega.Equal([]int{1, 0, 3, 4, 5, 6, 7, 0, 10}))
 
-	p = DefaultPagination(6, 10)
-	g.Expect(p).Should(gomega.Equal(Pagination{1, 0, 4, 5, 6, 7, 8, 0, 10}))
+	p = NewPagination(10, 6)
+	g.Expect(p.Pages()).Should(gomega.Equal([]int{1, 0, 4, 5, 6, 7, 8, 0, 10}))
 
-	p = DefaultPagination(7, 10)
-	g.Expect(p).Should(gomega.Equal(Pagination{1, 0, 5, 6, 7, 8, 9, 10}))
+	p = NewPagination(10, 7)
+	g.Expect(p.Pages()).Should(gomega.Equal([]int{1, 0, 5, 6, 7, 8, 9, 10}))
 
-	p = DefaultPagination(8, 10)
-	g.Expect(p).Should(gomega.Equal(Pagination{1, 0, 6, 7, 8, 9, 10}))
+	p = NewPagination(10, 8)
+	g.Expect(p.Pages()).Should(gomega.Equal([]int{1, 0, 6, 7, 8, 9, 10}))
 
-	p = DefaultPagination(9, 10)
-	g.Expect(p).Should(gomega.Equal(Pagination{1, 0, 6, 7, 8, 9, 10}))
+	p = NewPagination(10, 9)
+	g.Expect(p.Pages()).Should(gomega.Equal([]int{1, 0, 6, 7, 8, 9, 10}))
 
-	p = DefaultPagination(10, 10)
-	g.Expect(p).Should(gomega.Equal(Pagination{1, 0, 6, 7, 8, 9, 10}))
+	p = NewPagination(10, 10)
+	g.Expect(p.Pages()).Should(gomega.Equal([]int{1, 0, 6, 7, 8, 9, 10}))
+	g.Expect(p.PrevPage()).Should(gomega.Equal(9))
+	g.Expect(p.NextPage()).Should(gomega.Equal(10))
 }
 
 func TestPaginationBuilder(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
-	b := NewPaginationBuilder(5, 10)
-	b.CapBuffer = 2
-	b.WindowBuffer = 1
-	g.Expect(b.Build()).Should(gomega.Equal(Pagination{1, 2, 0, 5, 0, 9, 10}))
+	p := NewPagination(10, 5)
+	p.SetCapBuffer(2)
+	p.SetWindowBuffer(1)
+	g.Expect(p.Pages()).Should(gomega.Equal([]int{1, 2, 0, 5, 0, 9, 10}))
 
-	b.WindowBuffer = 2
-	g.Expect(b.Build()).Should(gomega.Equal(Pagination{1, 2, 0, 5, 6, 0, 9, 10}))
+	p = NewPagination(10, 5)
+	p.SetCapBuffer(2)
+	p.SetWindowBuffer(2)
+	g.Expect(p.Pages()).Should(gomega.Equal([]int{1, 2, 0, 5, 6, 0, 9, 10}))
 
-	b.WindowBuffer = 3
-	g.Expect(b.Build()).Should(gomega.Equal(Pagination{1, 2, 0, 4, 5, 6, 0, 9, 10}))
+	p = NewPagination(10, 5)
+	p.SetCapBuffer(2)
+	p.SetWindowBuffer(3)
+	g.Expect(p.Pages()).Should(gomega.Equal([]int{1, 2, 0, 4, 5, 6, 0, 9, 10}))
 
-	b.WindowBuffer = 4
-	g.Expect(b.Build()).Should(gomega.Equal(Pagination{1, 2, 0, 4, 5, 6, 7, 0, 9, 10}))
+	p = NewPagination(10, 5)
+	p.SetCapBuffer(2)
+	p.SetWindowBuffer(4)
+	g.Expect(p.Pages()).Should(gomega.Equal([]int{1, 2, 0, 4, 5, 6, 7, 0, 9, 10}))
 }
