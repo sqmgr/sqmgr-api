@@ -25,7 +25,7 @@ import (
 var ErrRetryLimitExceeded = errors.New("internal/model: maximum number of retries attempted")
 
 const maxRetries = 3
-const tokenLen = 6
+const tokenLen = 8
 
 // NewToken will attempt to generate a random unique token up to X times.
 func (m *Model) NewToken() (string, error) {

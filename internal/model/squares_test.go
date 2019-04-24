@@ -81,7 +81,7 @@ func TestSquares(t *testing.T) {
 
 	g.Expect(squares.ID).Should(gomega.BeNumerically(">", 0))
 	g.Expect(squares.UserID).Should(gomega.Equal(user.ID))
-	g.Expect(squares.Token).Should(gomega.MatchRegexp(`^[A-Za-z0-9_-]{6}\z`))
+	g.Expect(squares.Token).Should(gomega.MatchRegexp(`^[A-Za-z0-9_-]{8}\z`))
 	g.Expect(squares.Name).Should(gomega.Equal("My Squares"))
 	g.Expect(squares.passwordHash).ShouldNot(gomega.Equal("my-other-unique-password"))
 	g.Expect(argon2id.Compare(squares.passwordHash, "my-other-unique-password")).Should(gomega.Succeed())
