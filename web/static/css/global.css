@@ -207,6 +207,7 @@ section.error {
 
 table {
 	border-collapse: collapse;
+	width: 100%;
 }
 
 th, td {
@@ -243,14 +244,16 @@ p.generated-by {
 nav.pagination ul {
 	list-style: none;
 	margin: 0 0 var(--spacing) 0;
+	text-align: center;
 }
 nav.pagination a {
+	color: #000;
 	display: inline-block;
-	padding: var(--minimal-spacing);
+	padding: 2px var(--minimal-spacing);
 }
 nav.pagination span.current {
 	display: inline-block;
-	padding: var(--minimal-spacing);
+	padding: 2px var(--minimal-spacing);
 }
 nav.pagination li {
 	display: inline-block;
@@ -263,8 +266,26 @@ nav.pagination li.next span.current {
 	color: var(--light-gray);
 }
 nav.pagination li.page span.current {
-	font-weight: bold;
+	background-color: var(--primary);
+	color: #fff;
+	border-radius: 3px;
 }
 nav.pagination li:last-child {
 	margin-right: 0;
+}
+nav.pagination li.prev a span,
+nav.pagination li.next a span,
+nav.pagination li.prev span.current span,
+nav.pagination li.next span.current span {
+	display: none;
+}
+nav.pagination li.next span.current::before,
+nav.pagination li.next a::before {
+	display: 'inline-block';
+	content: '\2771';
+}
+nav.pagination li.prev span.current::before,
+nav.pagination li.prev a::before {
+	display: 'inline-block';
+	content: '\2770';
 }

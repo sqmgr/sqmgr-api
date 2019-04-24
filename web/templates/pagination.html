@@ -18,28 +18,28 @@ limitations under the License.
 	<nav class="pagination">
 		<ul>
 			{{ if eq .CurrentPage 1 }}
-				<li class="prev"><span class="current">Prevous</span>
+				<li class="prev"><span class="current"><span>Prevous</span></span>
 			{{ else }}
-				<li class="prev"><span><a href="{{.Link .PrevPage}}" data-page="{{.PrevPage}}">Previous</a></span>
+				<li class="prev"><a href="{{.Link .PrevPage}}" data-page="{{.PrevPage}}"><span>Previous</span></a>
 			{{ end }}
 
 			{{ $pagination := . }}
 			{{ range .Pages }}
 				{{ if eq . 0 }}
-					<li class="ellipses"><span>...</span>
+					<li class="ellipses"><span>&mldr;</span>
 				{{ else }}
 					{{ if eq . $pagination.CurrentPage }}
 						<li class="page"><span class="current">{{.}}</span>
 					{{ else }}
-						<li class="page"><span><a href="{{$pagination.Link .}}" data-page="{{.}}">{{.}}</a></span>
+						<li class="page"><a href="{{$pagination.Link .}}" data-page="{{.}}"><span>{{.}}</span></a>
 					{{ end }}
 				{{ end }}
 			{{ end }}
 
 			{{ if eq .CurrentPage .Total }}
-				<li class="next"><span class="current">Next</span>
+				<li class="next"><span class="current"><span>Next</span></span>
 			{{ else }}
-				<li class="next"><span><a href="{{.Link .NextPage}}" data-page="{{.NextPage}}">Next</a></span>
+				<li class="next"><a href="{{.Link .NextPage}}" data-page="{{.NextPage}}"><span>Next</span></a>
 			{{ end }}
 		</ul>
 	</nav>
