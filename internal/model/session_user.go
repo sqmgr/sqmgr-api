@@ -21,10 +21,11 @@ import "context"
 // SessionUser represents a user who has not logged in
 type SessionUser struct {
 	squaresIDs map[int64]bool
+	joinFunc   JoinSquares
 }
 
-func NewSessionUser(ids map[int64]bool) *SessionUser {
-	return &SessionUser{ids}
+func NewSessionUser(ids map[int64]bool, joinFunc JoinSquares) *SessionUser {
+	return &SessionUser{ids, joinFunc}
 }
 
 // IsAdminOf will always return false for a session-based user
@@ -37,3 +38,11 @@ func (u *SessionUser) IsMemberOf(ctx context.Context, s *Squares) (bool, error) 
 	_, found := u.squaresIDs[s.ID]
 	return found, nil
 }
+
+// JoinSquares will attempt to join the squares
+func (u *SessionUser) JoinSquares(ctx context.Context, s *Squares) error {
+	return u.joinFunc(ctx, s)
+}
+
+// JoinSquares is a function which can be called to join squares
+type JoinSquares func(ctx context.Context, s *Squares) error

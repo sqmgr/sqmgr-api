@@ -53,6 +53,7 @@ func (s *Server) setupRoutes() {
 
 	// squares
 	s.Router.Path("/squares/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodGet).Handler(s.squaresHandler())
+	s.Router.Path("/squares/{token:[A-Za-z0-9_-]{8}}/join").Methods(http.MethodGet, http.MethodPost).Handler(s.squaresJoinHandler())
 
 	// signup
 	s.Router.Path("/signup").Methods(http.MethodGet, http.MethodPost).Handler(s.signupHandler())

@@ -136,6 +136,8 @@ form div.errors {
 }
 form div.errors ul {
 	font-weight: bold;
+	margin-left: 0;
+	margin-bottom: 0;
 	list-style: none;
 }
 form div.errors ul ul {

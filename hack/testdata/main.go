@@ -18,6 +18,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -103,7 +104,7 @@ func main() {
 
 			if rand.Intn(100) < *chance {
 				logrus.WithFields(logrus.Fields{"name": name, "user": account.Email}).Info("joining squares")
-				if err := account.JoinSquares(squares); err != nil {
+				if err := account.JoinSquares(context.Background(), squares); err != nil {
 					logrus.WithError(err).Fatal("could not join squares")
 				}
 			}

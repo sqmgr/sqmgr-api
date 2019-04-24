@@ -255,7 +255,19 @@ func (s *Server) EffectiveUser(r *http.Request) (model.EffectiveUser, error) {
 	}
 
 	logrus.Trace("effective user is session user")
-	return model.NewSessionUser(ids), nil
+	return model.NewSessionUser(ids, model.JoinSquares(func(ctx context.Context, squares *model.Squares) error {
+		ids, ok := sess.Values[squaresIDsKey].(map[int64]bool)
+		if !ok {
+			ids = make(map[int64]bool)
+		}
+
+		ids[squares.ID] = true
+
+		sess.Values[squaresIDsKey] = ids
+		sess.Save()
+
+		return nil
+	})), nil
 }
 
 // AuthUser will return the currently authenticated user. This MUST only be called the calling handler has been

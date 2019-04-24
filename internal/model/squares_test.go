@@ -163,7 +163,7 @@ func TestSquaresCollection(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(0))
 
-	g.Expect(user2.JoinSquares(squares)).Should(gomega.Succeed())
+	g.Expect(user2.JoinSquares(context.Background(), squares)).Should(gomega.Succeed())
 	collection, err = m.SquaresCollectionJoinedByUser(context.Background(), user2, 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(1))
@@ -196,7 +196,7 @@ func TestSquaresCollectionPagination(t *testing.T) {
 		g.Expect(err).Should(gomega.Succeed())
 
 		if i < 20 {
-			g.Expect(user2.JoinSquares(squares)).Should(gomega.Succeed())
+			g.Expect(user2.JoinSquares(context.Background(), squares)).Should(gomega.Succeed())
 		}
 	}
 

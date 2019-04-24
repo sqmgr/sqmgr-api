@@ -62,6 +62,7 @@ const (
 
 func init() {
 	gob.Register(loginSession{})
+	gob.Register(map[int64]bool{})
 }
 
 func newSession(w http.ResponseWriter, r *http.Request, s *Server) *Session {

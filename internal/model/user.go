@@ -239,8 +239,8 @@ func (u *User) Delete() error {
 }
 
 // JoinSquares will link a user to a squares game.
-func (u *User) JoinSquares(s *Squares) error {
-	_, err := u.db.Exec("INSERT INTO squares_users (squares_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", s.ID, u.ID)
+func (u *User) JoinSquares(ctx context.Context, s *Squares) error {
+	_, err := u.db.ExecContext(ctx, "INSERT INTO squares_users (squares_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", s.ID, u.ID)
 	return err
 }
 

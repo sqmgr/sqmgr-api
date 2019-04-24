@@ -60,10 +60,71 @@ func (s *Server) squaresHandler() http.HandlerFunc {
 		}
 
 		if !isMember {
-			http.Redirect(w, r, fmt.Sprintf("/squares/%s/login", squares.Token), http.StatusSeeOther)
+			http.Redirect(w, r, fmt.Sprintf("/squares/%s/join", squares.Token), http.StatusSeeOther)
 			return
 		}
 
 		s.ExecuteTemplate(w, r, tpl, data{squares})
+	}
+}
+
+func (s *Server) squaresJoinHandler() http.HandlerFunc {
+	tpl := s.loadTemplate("squares-join.html")
+
+	type data struct {
+		Error string
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		token := vars["token"]
+
+		squares, err := s.model.SquaresByToken(r.Context(), token)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				s.Error(w, r, http.StatusNotFound)
+				return
+			}
+
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		user, err := s.EffectiveUser(r)
+		if err != nil {
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		isMember, err := user.IsMemberOf(r.Context(), squares)
+		if err != nil {
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		if isMember {
+			http.Redirect(w, r, fmt.Sprintf("/squares/%s", squares.Token), http.StatusSeeOther)
+			return
+		}
+
+		tplData := data{}
+		if r.Method == http.MethodPost {
+			password := r.PostFormValue("password")
+			if squares.PasswordIsValid(password) {
+
+				if err := user.JoinSquares(r.Context(), squares); err != nil {
+					s.Error(w, r, http.StatusInternalServerError, err)
+					return
+				}
+
+				http.Redirect(w, r, fmt.Sprintf("/squares/%s", squares.Token), http.StatusSeeOther)
+				return
+			}
+
+			tplData.Error = "password is not valid"
+		}
+
+		s.ExecuteTemplate(w, r, tpl, tplData)
+		return
 	}
 }

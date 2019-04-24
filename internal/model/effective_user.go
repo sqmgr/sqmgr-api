@@ -19,6 +19,7 @@ package model
 import "context"
 
 type EffectiveUser interface {
+	JoinSquares(ctx context.Context, s *Squares) error
 	IsMemberOf(ctx context.Context, s *Squares) (bool, error)
 	IsAdminOf(ctx context.Context, s *Squares) bool
 }
