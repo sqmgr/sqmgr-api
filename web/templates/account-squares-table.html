@@ -20,6 +20,7 @@ limitations under the License.
 		<table>
 			<thead>
 				<tr>
+					<th>ID
 					<th>Name
 					<th>Type
 					<th>Created
@@ -28,7 +29,8 @@ limitations under the License.
 			<tbody>
 				{{ range .Squares }}
 				<tr>
-					<td><a href="/squares/{{.Token}}">{{.Name}}</a>
+					<td><a href="/squares/{{.Token}}">{{.Token}}</a>
+					<td>{{.Name}}
 					<td>{{.SquaresType.Description}}
 					<td>{{.Created.Format "01/02/2006"}}
 				</tr>

@@ -19,6 +19,7 @@ limitations under the License.
 	--minimal-spacing: 4px;
 	--spacing: 20px;
 	
+	--midnight-gray: #171717;
 	--light-gray: #eee;
 	--gray: #bbb;
 	--red: #f44336;
@@ -40,7 +41,7 @@ html, body {
 }
 
 header {
-	background-color: #171717;
+	background-color: var(--midnight-gray);
 	color: #fff;
 	padding: var(--spacing) 0;
 }
@@ -134,7 +135,7 @@ header p a {
 h1 {
 	font-family: 'Alfa Slab One', sans-serif;
 	font-size: 1.6em;
-	text-shadow: 3px 3px #171717, 5px 5px var(--primary);
+	text-shadow: 3px 3px var(--midnight-gray), 5px 5px var(--primary);
 	display: inline-block;
 }
 header h1 a {
@@ -211,11 +212,20 @@ table {
 }
 
 th, td {
-	padding: var(--minimal-spacing) calc(2 * var(--minimal-spacing));
+	padding: calc(2 * var(--minimal-spacing));
 }
 
 th {
-	border-bottom: 2px solid var(--border-color);
+	background-color: var(--midnight-gray);
+	color: #fff;
+	text-align: left;
+}
+
+tr:nth-child(odd) td {
+	background-color: #fff;
+}
+tr:nth-child(even) td {
+	background-color: var(--light-gray);
 }
 
 td {
