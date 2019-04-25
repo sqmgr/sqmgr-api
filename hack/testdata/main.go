@@ -97,6 +97,18 @@ func main() {
 			panic(err)
 		}
 
+		homeTeam := words.Create(2, " ")
+		squares.Settings.HomeTeamName = &homeTeam
+		squares.Settings.HomeTeamColor1 = color()
+		squares.Settings.HomeTeamColor2 = color()
+		awayTeam := words.Create(2, " ")
+		squares.Settings.AwayTeamName = &awayTeam
+		squares.Settings.AwayTeamColor1 = color()
+		squares.Settings.AwayTeamColor2 = color()
+		if err := squares.Save(); err != nil {
+			panic(err)
+		}
+
 		for _, account := range accounts {
 			if user == account {
 				continue
@@ -144,4 +156,14 @@ func loadWords() WordList {
 	}
 
 	return WordList{words: w}
+}
+
+func color() *string {
+	b := make([]byte, 3)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
+
+	s := fmt.Sprintf("#%X", b)
+	return &s
 }
