@@ -54,6 +54,10 @@ func (m *Model) squaresByRow(scan scanFunc, loadSettings bool) (*Squares, error)
 		return nil, err
 	}
 
+	// XXX: do we want the ability to let the user choose the time zone?
+	s.Created = s.Created.In(locationNewYork)
+	s.Modified = s.Modified.In(locationNewYork)
+
 	if locks != nil {
 		s.Locks = *locks
 	}
