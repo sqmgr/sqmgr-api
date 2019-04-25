@@ -115,7 +115,9 @@ func main() {
 func (w *WordList) Create(nWords int, sep string) string {
 	words := make([]string, nWords)
 	for i, _ := range words {
-		words[i] = w.words[w.pointer]
+		word := w.words[w.pointer]
+		word = strings.ToUpper(string(word[0])) + string(word[1:])
+		words[i] = word
 		w.pointer++
 	}
 
