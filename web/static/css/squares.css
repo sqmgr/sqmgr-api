@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed');
+@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed|Lobster');
 
 :root {
 	--team-primary: #000;
@@ -45,15 +45,17 @@ div.home-team {
 }
 
 div.team {
-	background-color: var(--team-secondary);
+	background: linear-gradient(var(--team-primary), var(--team-primary) 50%, var(--team-secondary) calc(50% + 1px), var(--team-secondary) 100%);
 	color: #fff;
+	font-family: Lobster, sans-serif;
 	font-weight: bold;
-	font-size: 1.4em;
+	font-size: 1.5em;
 	position: relative;
-	text-shadow: 1px 1px var(--team-primary);
+	text-shadow: 0 0 3px rgb(0, 0, 0, 0.8);
 }
 
 div.away-team {
+	background: linear-gradient(90deg, var(--team-primary), var(--team-primary) 50%, var(--team-secondary) calc(50% + 1px), var(--team-secondary) 100%);
 	grid-row-start: 3;
 	grid-row-end: 13;
 }

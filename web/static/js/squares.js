@@ -19,14 +19,14 @@ SqMGR.Config = {
 		Teams: {
 			Away: {
 				Name: 'Away Team',
-				Color1: '#4caf50',
-				Color2: '#171717',
+				Color1: '#F3D03E',
+				Color2: '#003087',
 				Color3: 'transparent',
 			},
 			Home: {
 				Name: 'Home Team',
-				Color1: '#4caf50',
-				Color2: '#171717',
+				Color1: '#00338D',
+				Color2: '#C60C30',
 				Color3: 'transparent',
 			}
 		}
