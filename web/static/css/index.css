@@ -23,3 +23,9 @@ section.index {
 section.index > div h3 {
 	text-align: center;
 }
+
+@media(max-width: 800px) {
+	section.index {
+		display: block;
+	}
+}

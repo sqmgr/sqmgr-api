@@ -23,17 +23,6 @@ limitations under the License.
 {{ define "content" }}
 <section class="account">
 	<div class="columns">
-		<div class="actions col-3">
-			<p>Welcome {{.Local.User.Email}}
-
-			<h3>Squares You Created</h3>
-
-			{{ template "squares" .Local.OwnedSquares }}
-
-			<h3>Squares You Joined</h3>
-
-			{{ template "squares" .Local.JoinedSquares }}
-		</div>
 		<div class="account-management">
 			<h3>Actions</h3>
 
@@ -48,6 +37,17 @@ limitations under the License.
 				<li><a href="/account/change-password">Change Password</a>
 				<li><a href="/account/delete">Delete Account</a>
 			</ul>
+		</div>
+		<div class="actions col-3">
+			<p>Welcome {{.Local.User.Email}}
+
+			<h3>Squares You Created</h3>
+
+			{{ template "squares" .Local.OwnedSquares }}
+
+			<h3>Squares You Joined</h3>
+
+			{{ template "squares" .Local.JoinedSquares }}
 		</div>
 	</div>
 </section>

@@ -17,26 +17,28 @@ limitations under the License.
 {{ define "squares" }}
 	<div class="squares" data-pagination="parent-node">
 		{{ if .Squares }}
-		<table>
-			<thead>
-				<tr>
-					<th>ID
-					<th>Name
-					<th>Type
-					<th>Created
-				</tr>
-			</thead>
-			<tbody>
-				{{ range .Squares }}
-				<tr>
-					<td><a href="/squares/{{.Token}}">{{.Token}}</a>
-					<td>{{.Name}}
-					<td>{{.SquaresType.Description}}
-					<td>{{.Created.Format "01/02/2006"}}
-				</tr>
-				{{ end }}
-			</tbody>
-		</table>
+		<div class="table-container">
+			<table>
+				<thead>
+					<tr>
+						<th>ID
+						<th>Name
+						<th>Type
+						<th>Created
+					</tr>
+				</thead>
+				<tbody>
+					{{ range .Squares }}
+					<tr>
+						<td><a href="/squares/{{.Token}}">{{.Token}}</a>
+						<td>{{.Name}}
+						<td>{{.SquaresType.Description}}
+						<td>{{.Created.Format "01/02/2006"}}
+					</tr>
+					{{ end }}
+				</tbody>
+			</table>
+		</div>
 
 		{{ template "pagination.html" .Pagination }}
 

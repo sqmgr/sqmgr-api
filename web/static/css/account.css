@@ -18,8 +18,18 @@ div.account-management {
 	background-color: var(--light-gray);
 	border: 1px solid var(--border-color);
 	padding: var(--spacing);
+	grid-column-start: 4;
+	grid-row-start: 1;
 }
 
 section.account table {
+	grid-column-start: 1;
+	grid-row-start: 1;
 	margin-bottom: var(--spacing);
+}
+
+@media (max-width: 800px) {
+	div.account-management {
+		margin-bottom: var(--spacing);
+	}
 }

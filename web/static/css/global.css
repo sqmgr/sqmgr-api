@@ -206,6 +206,11 @@ section.error {
 	margin: 0 auto;
 }
 
+div.table-container {
+	width: 100%;
+	overflow: auto;
+}
+
 table {
 	border-collapse: collapse;
 	width: 100%;
@@ -238,6 +243,16 @@ p.generated-by {
 }
 
 @media (max-width: 800px) {
+	div.columns {
+		display: block;
+	}
+	div.columns > * {
+		margin-bottom: var(--spacing);
+	}
+	div.columns > *:last-child {
+		margin-bottom: 0;
+	}
+
 	header nav {
 		margin-top: var(--spacing);
 		position: static;
