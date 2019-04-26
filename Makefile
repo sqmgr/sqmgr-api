@@ -71,4 +71,12 @@ migrations-down:
 testdata:
 	go run hack/testdata/*.go
 
-.PHONY: run docker-build docker-push test clean-integration test-integration cover cover-integration dev-db integration-db git-hooks migrations migrations-down
+dev-db-delete:
+	-docker rm -f -v sqmgr-postgres
+
+wait:
+	sleep 1
+
+dev-db-reset: dev-db-delete dev-db wait migrations
+
+.PHONY: run docker-build docker-push test clean-integration test-integration cover cover-integration dev-db integration-db git-hooks migrations migrations-down wait dev-db-delete dev-db-reset testdata
