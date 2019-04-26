@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed|Lobster');
+@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed|Alfa+Slab+One');
 
 :root {
 	--team-primary: #000;
@@ -47,11 +47,10 @@ div.home-team {
 div.team {
 	background: linear-gradient(var(--team-primary), var(--team-primary) 50%, var(--team-secondary) calc(50% + 1px), var(--team-secondary) 100%);
 	color: #fff;
-	font-family: Lobster, sans-serif;
-	font-weight: bold;
+	font-family: 'Alfa Slab One', sans-serif;
 	font-size: 1.5em;
 	position: relative;
-	text-shadow: 0 0 3px rgb(0, 0, 0, 0.8);
+	text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
 }
 
 div.away-team {
