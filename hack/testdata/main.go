@@ -158,12 +158,14 @@ func loadWords() WordList {
 	return WordList{words: w}
 }
 
-func color() *string {
-	b := make([]byte, 3)
-	if _, err := rand.Read(b); err != nil {
-		panic(err)
-	}
+var colorList = []string{"000000", "002244", "002C5F", "00338D", "004953", "00539B", "005778", "005A8B", "006778", "0073CF", "0085CA",
+	"008E97", "03202F", "0B162A", "0B2265", "203731", "22150C", "241773", "34302B",
+	"4B92DB", "4F2683", "565A5C", "5B2B2F", "69BE28", "773141", "97233F", "9E7C0C", "9F792C",
+	"9F8958", "A5ACAF", "A71930", "AA0000", "ACC0C6", "B0B7BC", "B1BABF", "B3995D",
+	"BFC0BF", "C60C30", "C83803", "D50A0A", "D7A22A", "E31837", "E9BF9B", "F58220", "FB4F14", "FF7900", "FFB612", "FFC62F",
+}
 
-	s := fmt.Sprintf("#%X", b)
-	return &s
+func color() *string {
+	c := "#" + colorList[rand.Intn(len(colorList))]
+	return &c
 }
