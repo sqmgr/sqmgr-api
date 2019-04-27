@@ -45,7 +45,7 @@ div.home-team {
 }
 
 div.team {
-	background: linear-gradient(var(--team-primary), var(--team-primary) 50%, var(--team-secondary) calc(50% + 1px), var(--team-secondary) 100%);
+	background: linear-gradient(var(--team-primary), var(--team-primary) calc(50% - 1px), #fff calc(50% - 1px), #fff calc(50% + 1px), var(--team-secondary) calc(50% + 1px), var(--team-secondary) 100%);
 	color: #fff;
 	font-family: 'Alfa Slab One', sans-serif;
 	font-size: 1.5em;
@@ -54,7 +54,7 @@ div.team {
 }
 
 div.away-team {
-	background: linear-gradient(90deg, var(--team-primary), var(--team-primary) 50%, var(--team-secondary) calc(50% + 1px), var(--team-secondary) 100%);
+	background: linear-gradient(90deg, var(--team-primary), var(--team-primary) calc(50% - 1px), #fff calc(50% - 1px), #fff calc(50% + 1px), var(--team-secondary) calc(50% + 1px), var(--team-secondary) 100%);
 	grid-row-start: 3;
 	grid-row-end: 13;
 }
