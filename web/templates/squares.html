@@ -17,12 +17,44 @@ limitations under the License.
 {{ define "title" }}{{.Local.Squares.Name}} - {{ end }}
 {{ define "header" }}
 <link href="/static/css/squares.css" rel="stylesheet">
+<link href="/static/css/form.css" rel="stylesheet">
 {{ end }}
 {{ define "content" }}
 <section class="squares">
 	<h3>{{.Local.Squares.Name}}</h3>
 
+	{{ if .Local.IsAdmin }}
+		<p><a href="/squares/{{.Local.Squares.Token}}/customize">Customize</a>
+	{{ end }}
+
 	<div id="squares-container"></div>
+
+	<div class="squares-metadata">
+		<table>
+			<tbody>
+				<tr>
+					<td>ID
+					<td>{{.Local.Squares.Token}}
+				</tr>
+				<tr>
+					<td>Type
+					<td>{{.Local.Squares.SquaresType.Description}}
+				</tr>
+				<tr>
+					<td>Locks
+					<td>{{ if .Local.Squares.Locks.IsZero }}&nbsp;{{ else }}{{.Local.Squares.Locks}}{{ end }}
+				</tr>
+				<tr>
+					<td>Created
+					<td>{{ .Local.Squares.Created.Format "Mon, Jan 2 2006 at 3:04 PM" }}
+				</tr>
+				<tr>
+					<td>Last Modified
+					<td>{{ .Local.Squares.Modified.Format "Mon, Jan 2 2006 at 3:04 PM" }}
+				</tr>
+			</tbody>
+		</table>
+	</div>
 </section>
 {{ end }}
 {{ define "javascripts" }}

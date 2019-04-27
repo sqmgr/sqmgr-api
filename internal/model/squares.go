@@ -199,7 +199,8 @@ func (s *Squares) SetPassword(password string) error {
 // LoadSettings will update the settings from the database
 func (s *Squares) LoadSettings() error {
 	row := s.model.db.QueryRow(`
-		SELECT home_team_name, home_team_color_1, home_team_color_2, home_team_color_3,
+		SELECT squares_id,
+			   home_team_name, home_team_color_1, home_team_color_2, home_team_color_3,
 			   away_team_name, away_team_color_1, away_team_color_2, away_team_color_3,
 			   modified
 		FROM squares_settings
@@ -207,6 +208,7 @@ func (s *Squares) LoadSettings() error {
 	`, s.ID)
 
 	return row.Scan(
+		&s.Settings.SquaresID,
 		&s.Settings.HomeTeamName,
 		&s.Settings.HomeTeamColor1,
 		&s.Settings.HomeTeamColor2,

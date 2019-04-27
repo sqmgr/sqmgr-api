@@ -1,0 +1,85 @@
+{{/*
+Copyright 2019 Tom Peters
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+
+{{ define "title" }}Customize {{.Local.Squares.Name}} - {{ end }}
+
+{{ define "header" }}
+<link href="/static/css/forms.css" rel="stylesheet">
+{{ end }}
+
+{{ define "content" }}
+<section class="squares-customize">
+	<h3>Customize {{.Local.Squares.Name}}</h3>
+
+	<p><a href="/squares/{{.Local.Squares.Token}}">Back to squares</a>
+
+	<form method="post">
+		{{ template "form-errors" . }}
+		{{ if .Local.DidUpdate }}
+			<p class="message">Changes successfully saved.
+		{{ end }}
+		<fieldset>
+			<legend>General Settings</legend>
+
+			<div class="field">
+				<label for="name">Name</label>
+				<input type="text" id="name" name="name" placeholder="{{.Local.Squares.Name}}" value="{{.Local.FormValues.Name}}" required>
+			</div>
+
+			<div class="field">
+				<label for="locks" class="optional">Lock Entries</label>
+				<input type="date" id="locks" name="locks" placeholder="Lock Date">
+				<input type="time" id="locks" name="locks" placeholder="Lock Time">
+			</div>
+		</fieldset>
+		<fieldset>
+			<legend>Styling</legend>
+
+			<div class="field">
+				<label for="home-team-name" class="optional">Home Team Name</label>
+				<input type="text" id="home-team-name" name="home-team-name" placeholder="Home Team" value="{{.Local.FormValues.HomeTeamName}}">
+			</div>
+
+			<div class="field">
+				<label for="home-team-color-1" class="optional">Home Team Primary Color</label>
+				<input type="color" id="home-team-color-1" name="home-team-color-1" placeholder="#000000" value="{{.Local.FormValues.HomeTeamColor1}}">
+			</div>
+
+			<div class="field">
+				<label for="home-team-color-2" class="optional">Home Team Secondary Color</label>
+				<input type="color" id="home-team-color-2" name="home-team-color-2" placeholder="#000000" value="{{.Local.FormValues.HomeTeamColor2}}">
+			</div>
+
+			<div class="field">
+				<label for="away-team-name" class="optional">Away Team Name</label>
+				<input type="text" id="away-team-name" name="away-team-name" placeholder="Away Team" value="{{.Local.FormValues.AwayTeamName}}">
+			</div>
+
+			<div class="field">
+				<label for="away-team-color-1" class="optional">Away Team Primary Color</label>
+				<input type="color" id="away-team-color-1" name="away-team-color-1" placeholder="#000000" value="{{.Local.FormValues.AwayTeamColor1}}">
+			</div>
+
+			<div class="field">
+				<label for="away-team-color-2" class="optional">Away Team Secondary Color</label>
+				<input type="color" id="away-team-color-2" name="away-team-color-2" placeholder="#000000" value="{{.Local.FormValues.AwayTeamColor2}}">
+			</div>
+		</fieldset>
+
+		<input type="submit" name="submit" value="Save">
+	</form>
+</section>
+{{ end }}

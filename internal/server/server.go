@@ -49,6 +49,7 @@ type TemplateData struct {
 const (
 	ctxKeySession ctxKey = iota
 	ctxKeyUser
+	ctxKeySquares
 )
 
 var store *sessions.CookieStore

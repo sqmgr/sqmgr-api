@@ -52,8 +52,9 @@ func (s *Server) setupRoutes() {
 	s.Router.Path("/account/verify").Methods(http.MethodGet, http.MethodPost).Handler(s.authHandler(s.accountVerifyHandler()))
 
 	// squares
-	s.Router.Path("/squares/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodGet).Handler(s.squaresHandler())
-	s.Router.Path("/squares/{token:[A-Za-z0-9_-]{8}}/join").Methods(http.MethodGet, http.MethodPost).Handler(s.squaresJoinHandler())
+	s.Router.Path("/squares/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodGet).Handler(s.squaresMemberHandler(true, false, s.squaresHandler()))
+	s.Router.Path("/squares/{token:[A-Za-z0-9_-]{8}}/join").Methods(http.MethodGet, http.MethodPost).Handler(s.squaresMemberHandler(false, false, s.squaresJoinHandler()))
+	s.Router.Path("/squares/{token:[A-Za-z0-9_-]{8}}/customize").Methods(http.MethodGet, http.MethodPost).Handler(s.squaresMemberHandler(true, true, s.squaresCustomizeHandler()))
 
 	// signup
 	s.Router.Path("/signup").Methods(http.MethodGet, http.MethodPost).Handler(s.signupHandler())

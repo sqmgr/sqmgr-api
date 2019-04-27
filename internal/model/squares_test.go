@@ -126,6 +126,11 @@ func TestSquares(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(squares3).ShouldNot(gomega.BeNil())
 	g.Expect(squares3).Should(gomega.Equal(squares2))
+
+	loadedSquares, err := m.SquaresByID(squares.ID)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(loadedSquares.LoadSettings()).Should(gomega.Succeed())
+	g.Expect(loadedSquares.Settings.SquaresID).Should(gomega.Equal(squares.ID))
 }
 
 func TestNewSquaresInvalidSquaresType(t *testing.T) {

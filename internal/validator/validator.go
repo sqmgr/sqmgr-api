@@ -30,6 +30,7 @@ import (
 )
 
 var nonPrintableRx = regexp.MustCompile(`\p{C}`)
+var colorRx = regexp.MustCompile(`^#[a-fA-F0-9]{3,6}\z`)
 
 // Errors is a mapping of fields to a list of errors
 type Errors map[string][]string
@@ -47,7 +48,11 @@ func New() *Validator {
 }
 
 // Printable will ensure that all characters in the string can be printed to string (i.e. no control characters)
-func (v *Validator) Printable(key, val string) string {
+func (v *Validator) Printable(key, val string, isOptional ...bool) string {
+	if len(isOptional) > 0 && isOptional[0] && len(val) == 0 {
+		return ""
+	}
+
 	if len(val) == 0 || nonPrintableRx.MatchString(val) {
 		v.AddError(key, "must be a valid string")
 		return ""
@@ -64,6 +69,20 @@ func (v *Validator) Email(key, email string) string {
 	}
 
 	return email
+}
+
+// Color will ensure the color is a valid hex color in the form of #000 or #000000
+func (v *Validator) Color(key, val string, isOptional ...bool) string {
+	if len(isOptional) > 0 && isOptional[0] && len(val) == 0 {
+		return ""
+	}
+
+	if !colorRx.MatchString(val) {
+		v.AddError(key, "must be a valid hex color")
+		return ""
+	}
+
+	return val
 }
 
 // NotPwnedPassword will ensure that the password provided has not been pwned.

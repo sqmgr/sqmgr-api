@@ -170,6 +170,11 @@ div.input-error::before {
 	top: calc(-1 * var(--size));
 	left: calc(var(--minimal-spacing) + 2px);
 }
+input[type="color"] {
+	--size: 30px;
+	width: calc( 1.618 * var(--size) );
+	height: var(--size);
+}
 input[type="password"]:invalid {
 	box-shadow: none;
 }
@@ -184,5 +189,7 @@ div.datetime {
 	grid-template-columns: 1fr 1fr;
 	grid-gap: var(--minimal-spacing);
 }
-input[type="date"] {
+input[type="date"], input[type="time"] {
+	display: inline-block;
+	width: auto;
 }

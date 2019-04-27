@@ -26,6 +26,7 @@ section.account table {
 	grid-column-start: 1;
 	grid-row-start: 1;
 	margin-bottom: var(--spacing);
+	width: 100%;
 }
 
 @media (max-width: 800px) {
