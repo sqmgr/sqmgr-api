@@ -33,7 +33,7 @@ var nonPrintableRx = regexp.MustCompile(`\p{C}`)
 
 // \r\n (\x0d \x0a) is included in \p{C} (specifically \p{Cc}, so we need to work around it
 var nonPrintableExcludeNewlineRx = regexp.MustCompile(`[\p{Cf}\p{Co}\p{Cs}\x00-\x09\x0b\x0c\x0e-\x1f\x7f-\x9f]`)
-var colorRx = regexp.MustCompile(`^#[a-fA-F0-9]{3,6}\z`)
+var colorRx = regexp.MustCompile(`^#[a-fA-F0-9]{6}\z`)
 
 // Errors is a mapping of fields to a list of errors
 type Errors map[string][]string
@@ -84,7 +84,7 @@ func (v *Validator) Email(key, email string) string {
 	return email
 }
 
-// Color will ensure the color is a valid hex color in the form of #000 or #000000
+// Color will ensure the color is a valid hex color in the form of #000000
 func (v *Validator) Color(key, val string, isOptional ...bool) string {
 	if len(isOptional) > 0 && isOptional[0] && len(val) == 0 {
 		return ""
