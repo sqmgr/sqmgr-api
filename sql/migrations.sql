@@ -124,6 +124,7 @@ CREATE TABLE squares_settings (
 	away_team_color_1 text,
 	away_team_color_2 text,
 	away_team_color_3 text,
+	notes text,
 	modified timestamp not null default (now() at time zone 'utc')
 );
 

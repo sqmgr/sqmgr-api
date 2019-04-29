@@ -100,6 +100,7 @@ func TestSquares(t *testing.T) {
 		AwayTeamColor1: nil,
 		AwayTeamColor2: nil,
 		AwayTeamColor3: nil,
+		Notes:          nil,
 	}))
 
 	future := time.Now().UTC().Add(time.Hour)

@@ -23,6 +23,8 @@ limitations under the License.
 <section class="squares">
 	<h3>{{.Local.Squares.Name}}</h3>
 
+	<div class="notes">{{.Local.Squares.Settings.Notes}}</div>
+
 	{{ if .Local.IsAdmin }}
 		<p><a href="/squares/{{.Local.Squares.Token}}/customize">Customize</a>
 	{{ end }}

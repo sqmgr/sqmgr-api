@@ -131,6 +131,12 @@ div.std25 div.square {
 	grid-column-start: span 2;
 }
 
+div.notes {
+	margin-bottom: var(--spacing);
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
 @media (max-width: 800px) {
 	div#squares-container {
 		overflow: auto;

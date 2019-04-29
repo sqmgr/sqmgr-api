@@ -30,6 +30,9 @@ import (
 )
 
 var nonPrintableRx = regexp.MustCompile(`\p{C}`)
+
+// \r\n (\x0d \x0a) is included in \p{C} (specifically \p{Cc}, so we need to work around it
+var nonPrintableExcludeNewlineRx = regexp.MustCompile(`[\p{Cf}\p{Co}\p{Cs}\x00-\x09\x0b\x0c\x0e-\x1f\x7f-\x9f]`)
 var colorRx = regexp.MustCompile(`^#[a-fA-F0-9]{3,6}\z`)
 
 // Errors is a mapping of fields to a list of errors
@@ -47,18 +50,28 @@ func New() *Validator {
 	}
 }
 
-// Printable will ensure that all characters in the string can be printed to string (i.e. no control characters)
-func (v *Validator) Printable(key, val string, isOptional ...bool) string {
+// InverseRegexp will make sure that the string is non-empty and does not match the regex. It can be empty if isOptional is true.
+func (v *Validator) InverseRegexp(key, val string, rx *regexp.Regexp, isOptional ...bool) string {
 	if len(isOptional) > 0 && isOptional[0] && len(val) == 0 {
 		return ""
 	}
 
-	if len(val) == 0 || nonPrintableRx.MatchString(val) {
+	if len(val) == 0 || rx.MatchString(val) {
 		v.AddError(key, "must be a valid string")
 		return ""
 	}
 
 	return val
+}
+
+// Printable will ensure that all characters in the string can be printed to string (i.e. no control characters)
+func (v *Validator) Printable(key, val string, isOptional ...bool) string {
+	return v.InverseRegexp(key, val, nonPrintableRx, isOptional...)
+}
+
+// PrintableWithNewline will ensure that all characters in the string can be printed to string (i.e. no control characters except for \r\n)
+func (v *Validator) PrintableWithNewline(key, val string, isOptional ...bool) string {
+	return v.InverseRegexp(key, val, nonPrintableExcludeNewlineRx, isOptional...)
 }
 
 // Email will ensure the email address is valid

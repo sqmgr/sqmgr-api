@@ -202,7 +202,7 @@ func (s *Squares) LoadSettings() error {
 		SELECT squares_id,
 			   home_team_name, home_team_color_1, home_team_color_2, home_team_color_3,
 			   away_team_name, away_team_color_1, away_team_color_2, away_team_color_3,
-			   modified
+			   notes, modified
 		FROM squares_settings
 		WHERE squares_id = $1
 	`, s.ID)
@@ -217,6 +217,7 @@ func (s *Squares) LoadSettings() error {
 		&s.Settings.AwayTeamColor1,
 		&s.Settings.AwayTeamColor2,
 		&s.Settings.AwayTeamColor3,
+		&s.Settings.Notes,
 		&s.Settings.Modified,
 	)
 }

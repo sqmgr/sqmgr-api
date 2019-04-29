@@ -60,7 +60,8 @@ input[type="radio"] + label {
 
 input,
 select,
-button {
+button,
+textarea {
 	border-radius: 3px;
 	border: 1px solid var(--border-color);
 	font: 1em var(--font);
@@ -69,6 +70,9 @@ button {
 }
 input[type="password"] + input[type="password"] {
 	margin-top: var(--minimal-spacing);
+}
+textarea {
+	min-height: 80px;
 }
 div.field::after {
 	content: '';

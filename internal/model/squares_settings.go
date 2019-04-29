@@ -18,7 +18,10 @@ package model
 
 import (
 	"time"
+	"unicode/utf8"
 )
+
+const maxNotesLen = 500
 
 // SquaresSettings will contain various user-defined settings
 type SquaresSettings struct {
@@ -31,6 +34,7 @@ type SquaresSettings struct {
 	AwayTeamColor1 *string    `json:"awayTeamColor1"`
 	AwayTeamColor2 *string    `json:"awayTeamColor2"`
 	AwayTeamColor3 *string    `json:"awayTeamColor3"`
+	Notes          *string    `json:"notes"`
 	Modified       *time.Time `json:"-"`
 }
 
@@ -46,8 +50,9 @@ func (s *SquaresSettings) Save(q executer) error {
 			away_team_color_1 = $6,
 			away_team_color_2 = $7,
 			away_team_color_3 = $8,
+			notes = $9,
 			modified = (NOW() AT TIME ZONE 'utc')
-		WHERE squares_id = $9
+		WHERE squares_id = $10
 	`,
 		s.HomeTeamName,
 		s.HomeTeamColor1,
@@ -57,6 +62,7 @@ func (s *SquaresSettings) Save(q executer) error {
 		s.AwayTeamColor1,
 		s.AwayTeamColor2,
 		s.AwayTeamColor3,
+		s.Notes,
 		s.SquaresID,
 	)
 
@@ -141,4 +147,20 @@ func (s *SquaresSettings) SetAwayTeamColor3(str string) {
 	}
 
 	s.AwayTeamColor3 = &str
+}
+
+// SetNotes will set the notes of the squares
+func (s *SquaresSettings) SetNotes(str string) {
+	if len(str) == 0 {
+		s.Notes = nil
+		return
+	}
+
+	nRunes := utf8.RuneCountInString(str)
+	if nRunes > maxNotesLen {
+		strChars := []rune(str)
+		str = string(strChars[0:maxNotesLen])
+	}
+
+	s.Notes = &str
 }

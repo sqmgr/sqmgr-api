@@ -40,6 +40,11 @@ limitations under the License.
 			</div>
 
 			<div class="field">
+				<label for="notes" class="optional">Notes</label>
+				<textarea id="notes" name="notes" placeholder="Notes">{{.Local.FormValues.Notes}}</textarea>
+			</div>
+
+			<div class="field">
 				<label for="locks" class="optional">Lock Entries</label>
 				<input type="date" id="locks" name="locks" placeholder="Lock Date">
 				<input type="time" id="locks" name="locks" placeholder="Lock Time">

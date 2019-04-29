@@ -150,6 +150,7 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 			formValues["AwayTeamColor1"] = r.PostFormValue("away-team-color-1")
 			formValues["AwayTeamColor2"] = r.PostFormValue("away-team-color-2")
 			formValues["AwayTeamColor3"] = r.PostFormValue("away-team-color-3")
+			formValues["Notes"] = r.PostFormValue("notes")
 
 			name := v.Printable("name", r.PostFormValue("name"))
 			homeTeamName := v.Printable("home-team-name", r.PostFormValue("home-team-name"), true)
@@ -160,6 +161,7 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 			awayTeamColor1 := v.Color("away-team-color-1", r.PostFormValue("away-team-color-1"), true)
 			awayTeamColor2 := v.Color("away-team-color-2", r.PostFormValue("away-team-color-2"), true)
 			awayTeamColor3 := v.Color("away-team-color-3", r.PostFormValue("away-team-color-3"), true)
+			notes := v.PrintableWithNewline("notes", r.PostFormValue("notes"), true)
 
 			if v.OK() {
 				squares.Name = name
@@ -171,6 +173,7 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 				squares.Settings.AwayTeamColor1 = &awayTeamColor1
 				squares.Settings.AwayTeamColor2 = &awayTeamColor2
 				squares.Settings.AwayTeamColor3 = &awayTeamColor3
+				squares.Settings.Notes = &notes
 
 				if err := squares.Save(); err != nil {
 					s.Error(w, r, http.StatusInternalServerError, err)
@@ -196,6 +199,7 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 			formValues["AwayTeamColor1"] = str(squares.Settings.AwayTeamColor1)
 			formValues["AwayTeamColor2"] = str(squares.Settings.AwayTeamColor2)
 			formValues["AwayTeamColor3"] = str(squares.Settings.AwayTeamColor3)
+			formValues["Notes"] = str(squares.Settings.Notes)
 
 			session := s.Session(r)
 			tplData.DidUpdate = session.Flashes(didUpdate) != nil

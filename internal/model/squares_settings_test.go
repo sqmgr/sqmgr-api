@@ -17,6 +17,7 @@ limitations under the License.
 package model
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/onsi/gomega"
@@ -36,6 +37,7 @@ func TestSquaresSettings(t *testing.T) {
 		g.Expect(s.AwayTeamColor1).Should(gomega.BeNil(), msg)
 		g.Expect(s.AwayTeamColor2).Should(gomega.BeNil(), msg)
 		g.Expect(s.AwayTeamColor3).Should(gomega.BeNil(), msg)
+		g.Expect(s.Notes).Should(gomega.BeNil(), msg)
 	}
 
 	testDefaultsAreUsed("initial defaults")
@@ -48,6 +50,7 @@ func TestSquaresSettings(t *testing.T) {
 	s.SetAwayTeamColor1("F")
 	s.SetAwayTeamColor2("G")
 	s.SetAwayTeamColor3("H")
+	s.SetNotes("I")
 
 	g.Expect(*s.HomeTeamName).Should(gomega.Equal("A"))
 	g.Expect(*s.HomeTeamColor1).Should(gomega.Equal("B"))
@@ -57,6 +60,7 @@ func TestSquaresSettings(t *testing.T) {
 	g.Expect(*s.AwayTeamColor1).Should(gomega.Equal("F"))
 	g.Expect(*s.AwayTeamColor2).Should(gomega.Equal("G"))
 	g.Expect(*s.AwayTeamColor3).Should(gomega.Equal("H"))
+	g.Expect(*s.Notes).Should(gomega.Equal("I"))
 
 	s.SetHomeTeamName("")
 	s.SetHomeTeamColor1("")
@@ -66,6 +70,26 @@ func TestSquaresSettings(t *testing.T) {
 	s.SetAwayTeamColor1("")
 	s.SetAwayTeamColor2("")
 	s.SetAwayTeamColor3("")
+	s.SetNotes("")
 
 	testDefaultsAreUsed("set back to nil")
+}
+
+func TestNotesLength(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	s := &SquaresSettings{}
+
+	str := strings.Repeat("é", maxNotesLen)
+	s.SetNotes(str)
+
+	g.Expect(*s.Notes).Should(gomega.Equal(str))
+	g.Expect(len(*s.Notes)).Should(gomega.Equal(maxNotesLen * 2)) // é is two bytes
+
+	truncStr := strings.Repeat("á", maxNotesLen)
+	longerStr := truncStr + "á"
+	s.SetNotes(longerStr)
+	g.Expect(*s.Notes).Should(gomega.Equal(truncStr))
+	g.Expect(len(*s.Notes)).Should(gomega.Equal(maxNotesLen * 2)) // é is two bytes
+	g.Expect(len([]rune(*s.Notes))).Should(gomega.Equal(maxNotesLen))
 }
