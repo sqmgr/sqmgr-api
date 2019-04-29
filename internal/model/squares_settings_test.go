@@ -37,19 +37,20 @@ func TestSquaresSettings(t *testing.T) {
 		g.Expect(s.AwayTeamColor1).Should(gomega.BeNil(), msg)
 		g.Expect(s.AwayTeamColor2).Should(gomega.BeNil(), msg)
 		g.Expect(s.AwayTeamColor3).Should(gomega.BeNil(), msg)
-		g.Expect(s.Notes).Should(gomega.BeNil(), msg)
+		g.Expect(s.notes).Should(gomega.BeNil(), msg)
 	}
 
 	testDefaultsAreUsed("initial defaults")
 
-	s.SetHomeTeamName("A")
-	s.SetHomeTeamColor1("B")
-	s.SetHomeTeamColor2("C")
-	s.SetHomeTeamColor3("D")
-	s.SetAwayTeamName("E")
-	s.SetAwayTeamColor1("F")
-	s.SetAwayTeamColor2("G")
-	s.SetAwayTeamColor3("H")
+	ptr := func(s string) *string { return &s }
+	s.HomeTeamName = ptr("A")
+	s.HomeTeamColor1 = ptr("B")
+	s.HomeTeamColor2 = ptr("C")
+	s.HomeTeamColor3 = ptr("D")
+	s.AwayTeamName = ptr("E")
+	s.AwayTeamColor1 = ptr("F")
+	s.AwayTeamColor2 = ptr("G")
+	s.AwayTeamColor3 = ptr("H")
 	s.SetNotes("I")
 
 	g.Expect(*s.HomeTeamName).Should(gomega.Equal("A"))
@@ -60,16 +61,16 @@ func TestSquaresSettings(t *testing.T) {
 	g.Expect(*s.AwayTeamColor1).Should(gomega.Equal("F"))
 	g.Expect(*s.AwayTeamColor2).Should(gomega.Equal("G"))
 	g.Expect(*s.AwayTeamColor3).Should(gomega.Equal("H"))
-	g.Expect(*s.Notes).Should(gomega.Equal("I"))
+	g.Expect(s.Notes()).Should(gomega.Equal("I"))
 
-	s.SetHomeTeamName("")
-	s.SetHomeTeamColor1("")
-	s.SetHomeTeamColor2("")
-	s.SetHomeTeamColor3("")
-	s.SetAwayTeamName("")
-	s.SetAwayTeamColor1("")
-	s.SetAwayTeamColor2("")
-	s.SetAwayTeamColor3("")
+	s.HomeTeamName = nil
+	s.HomeTeamColor1 = nil
+	s.HomeTeamColor2 = nil
+	s.HomeTeamColor3 = nil
+	s.AwayTeamName = nil
+	s.AwayTeamColor1 = nil
+	s.AwayTeamColor2 = nil
+	s.AwayTeamColor3 = nil
 	s.SetNotes("")
 
 	testDefaultsAreUsed("set back to nil")
@@ -80,16 +81,16 @@ func TestNotesLength(t *testing.T) {
 
 	s := &SquaresSettings{}
 
-	str := strings.Repeat("é", maxNotesLen)
+	str := strings.Repeat("é", NotesMaxLength)
 	s.SetNotes(str)
 
-	g.Expect(*s.Notes).Should(gomega.Equal(str))
-	g.Expect(len(*s.Notes)).Should(gomega.Equal(maxNotesLen * 2)) // é is two bytes
+	g.Expect(s.Notes()).Should(gomega.Equal(str))
+	g.Expect(len(s.Notes())).Should(gomega.Equal(NotesMaxLength * 2)) // é is two bytes
 
-	truncStr := strings.Repeat("á", maxNotesLen)
+	truncStr := strings.Repeat("á", NotesMaxLength)
 	longerStr := truncStr + "á"
 	s.SetNotes(longerStr)
-	g.Expect(*s.Notes).Should(gomega.Equal(truncStr))
-	g.Expect(len(*s.Notes)).Should(gomega.Equal(maxNotesLen * 2)) // é is two bytes
-	g.Expect(len([]rune(*s.Notes))).Should(gomega.Equal(maxNotesLen))
+	g.Expect(s.Notes()).Should(gomega.Equal(truncStr))
+	g.Expect(len(s.Notes())).Should(gomega.Equal(NotesMaxLength * 2)) // é is two bytes
+	g.Expect(len([]rune(s.Notes()))).Should(gomega.Equal(NotesMaxLength))
 }

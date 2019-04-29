@@ -100,7 +100,7 @@ func TestSquares(t *testing.T) {
 		AwayTeamColor1: nil,
 		AwayTeamColor2: nil,
 		AwayTeamColor3: nil,
-		Notes:          nil,
+		notes:          nil,
 	}))
 
 	future := time.Now().UTC().Add(time.Hour)
@@ -108,7 +108,8 @@ func TestSquares(t *testing.T) {
 	squares.Locks = future
 	squares.SquaresType = SquaresTypeStd25
 
-	squares.Settings.SetAwayTeamName("Different Away Team")
+	awayTeamName := "Different Away Team"
+	squares.Settings.AwayTeamName = &awayTeamName
 
 	err = squares.Save()
 	g.Expect(err).Should(gomega.Succeed())

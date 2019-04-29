@@ -217,7 +217,7 @@ func (s *Squares) LoadSettings() error {
 		&s.Settings.AwayTeamColor1,
 		&s.Settings.AwayTeamColor2,
 		&s.Settings.AwayTeamColor3,
-		&s.Settings.Notes,
+		&s.Settings.notes,
 		&s.Settings.Modified,
 	)
 }

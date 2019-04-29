@@ -41,7 +41,7 @@ limitations under the License.
 
 			<div class="field">
 				<label for="notes" class="optional">Notes</label>
-				<textarea id="notes" name="notes" placeholder="Notes">{{.Local.FormValues.Notes}}</textarea>
+				<textarea id="notes" maxlength="{{.Local.NotesMaxLength}}" name="notes" placeholder="Notes">{{.Local.FormValues.Notes}}</textarea>
 			</div>
 
 			<div class="field">

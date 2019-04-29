@@ -27,7 +27,7 @@ import (
 	"github.com/weters/sqmgr/internal/validator"
 )
 
-type SquaresContextData struct {
+type squaresContextData struct {
 	EffectiveUser model.EffectiveUser
 	Squares       *model.Squares
 	IsMember      bool
@@ -74,7 +74,7 @@ func (s *Server) squaresMemberHandler(mustBeMember, mustBeAdmin bool, nextHandle
 		}
 
 		// add value
-		r = r.WithContext(context.WithValue(r.Context(), ctxKeySquares, &SquaresContextData{
+		r = r.WithContext(context.WithValue(r.Context(), ctxKeySquares, &squaresContextData{
 			EffectiveUser: user,
 			Squares:       squares,
 			IsMember:      isMember,
@@ -94,7 +94,7 @@ func (s *Server) squaresHandler() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		sqCtxData := r.Context().Value(ctxKeySquares).(*SquaresContextData)
+		sqCtxData := r.Context().Value(ctxKeySquares).(*squaresContextData)
 
 		s.ExecuteTemplate(w, r, tpl, data{
 			IsAdmin: sqCtxData.IsAdmin,
@@ -109,10 +109,11 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 	const didUpdate = "didUpdate"
 
 	type data struct {
-		FormValues map[string]string
-		FormErrors validator.Errors
-		Squares    *model.Squares
-		DidUpdate  bool
+		FormValues     map[string]string
+		FormErrors     validator.Errors
+		Squares        *model.Squares
+		DidUpdate      bool
+		NotesMaxLength int
 	}
 
 	str := func(s *string) string {
@@ -124,7 +125,7 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		sqCtxData := r.Context().Value(ctxKeySquares).(*SquaresContextData)
+		sqCtxData := r.Context().Value(ctxKeySquares).(*squaresContextData)
 		squares := sqCtxData.Squares
 
 		if err := squares.LoadSettings(); err != nil {
@@ -134,8 +135,9 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 
 		formValues := make(map[string]string)
 		tplData := data{
-			Squares:    squares,
-			FormValues: formValues,
+			Squares:        squares,
+			FormValues:     formValues,
+			NotesMaxLength: model.NotesMaxLength,
 		}
 
 		v := validator.New()
@@ -173,7 +175,7 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 				squares.Settings.AwayTeamColor1 = &awayTeamColor1
 				squares.Settings.AwayTeamColor2 = &awayTeamColor2
 				squares.Settings.AwayTeamColor3 = &awayTeamColor3
-				squares.Settings.Notes = &notes
+				squares.Settings.SetNotes(notes)
 
 				if err := squares.Save(); err != nil {
 					s.Error(w, r, http.StatusInternalServerError, err)
@@ -199,7 +201,7 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 			formValues["AwayTeamColor1"] = str(squares.Settings.AwayTeamColor1)
 			formValues["AwayTeamColor2"] = str(squares.Settings.AwayTeamColor2)
 			formValues["AwayTeamColor3"] = str(squares.Settings.AwayTeamColor3)
-			formValues["Notes"] = str(squares.Settings.Notes)
+			formValues["Notes"] = squares.Settings.Notes()
 
 			session := s.Session(r)
 			tplData.DidUpdate = session.Flashes(didUpdate) != nil
@@ -219,7 +221,7 @@ func (s *Server) squaresJoinHandler() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		sqCtxData := r.Context().Value(ctxKeySquares).(*SquaresContextData)
+		sqCtxData := r.Context().Value(ctxKeySquares).(*squaresContextData)
 		squares := sqCtxData.Squares
 		user := sqCtxData.EffectiveUser
 

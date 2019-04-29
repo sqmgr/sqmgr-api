@@ -17,25 +17,54 @@ limitations under the License.
 package model
 
 import (
+	"encoding/json"
 	"time"
 	"unicode/utf8"
 )
 
-const maxNotesLen = 500
+// NotesMaxLength is the maximum number of characters the notes can be
+const NotesMaxLength = 500
 
 // SquaresSettings will contain various user-defined settings
 type SquaresSettings struct {
-	SquaresID      int64      `json:"-"`
-	HomeTeamName   *string    `json:"homeTeamName"`
-	HomeTeamColor1 *string    `json:"homeTeamColor1"`
-	HomeTeamColor2 *string    `json:"homeTeamColor2"`
-	HomeTeamColor3 *string    `json:"homeTeamColor3"`
-	AwayTeamName   *string    `json:"awayTeamName"`
-	AwayTeamColor1 *string    `json:"awayTeamColor1"`
-	AwayTeamColor2 *string    `json:"awayTeamColor2"`
-	AwayTeamColor3 *string    `json:"awayTeamColor3"`
-	Notes          *string    `json:"notes"`
+	SquaresID      int64   `json:"-"`
+	HomeTeamName   *string `json:"homeTeamName"`
+	HomeTeamColor1 *string `json:"homeTeamColor1"`
+	HomeTeamColor2 *string `json:"homeTeamColor2"`
+	HomeTeamColor3 *string `json:"homeTeamColor3"`
+	AwayTeamName   *string `json:"awayTeamName"`
+	AwayTeamColor1 *string `json:"awayTeamColor1"`
+	AwayTeamColor2 *string `json:"awayTeamColor2"`
+	AwayTeamColor3 *string `json:"awayTeamColor3"`
+	notes          *string
 	Modified       *time.Time `json:"-"`
+}
+
+type squaresSettingsJSON struct {
+	HomeTeamName   *string `json:"homeTeamName"`
+	HomeTeamColor1 *string `json:"homeTeamColor1"`
+	HomeTeamColor2 *string `json:"homeTeamColor2"`
+	HomeTeamColor3 *string `json:"homeTeamColor3"`
+	AwayTeamName   *string `json:"awayTeamName"`
+	AwayTeamColor1 *string `json:"awayTeamColor1"`
+	AwayTeamColor2 *string `json:"awayTeamColor2"`
+	AwayTeamColor3 *string `json:"awayTeamColor3"`
+	Notes          *string `json:"notes"`
+}
+
+// MarshalJSON adds custom JSON marshalling support
+func (s *SquaresSettings) MarshalJSON() ([]byte, error) {
+	return json.Marshal(squaresSettingsJSON{
+		HomeTeamName:   s.HomeTeamName,
+		HomeTeamColor1: s.HomeTeamColor1,
+		HomeTeamColor2: s.HomeTeamColor2,
+		HomeTeamColor3: s.HomeTeamColor3,
+		AwayTeamName:   s.AwayTeamName,
+		AwayTeamColor1: s.AwayTeamColor1,
+		AwayTeamColor2: s.AwayTeamColor2,
+		AwayTeamColor3: s.AwayTeamColor3,
+		Notes:          s.notes,
+	})
 }
 
 // Save will save the settings
@@ -62,105 +91,34 @@ func (s *SquaresSettings) Save(q executer) error {
 		s.AwayTeamColor1,
 		s.AwayTeamColor2,
 		s.AwayTeamColor3,
-		s.Notes,
+		s.notes,
 		s.SquaresID,
 	)
 
 	return err
 }
 
-// SetHomeTeamName will set the home team name
-func (s *SquaresSettings) SetHomeTeamName(str string) {
-	if len(str) == 0 {
-		s.HomeTeamName = nil
-		return
-	}
-
-	s.HomeTeamName = &str
-}
-
-// SetHomeTeamColor1 will set the home team color1
-func (s *SquaresSettings) SetHomeTeamColor1(str string) {
-	if len(str) == 0 {
-		s.HomeTeamColor1 = nil
-		return
-	}
-
-	s.HomeTeamColor1 = &str
-}
-
-// SetHomeTeamColor2 will set the home team color2
-func (s *SquaresSettings) SetHomeTeamColor2(str string) {
-	if len(str) == 0 {
-		s.HomeTeamColor2 = nil
-		return
-	}
-
-	s.HomeTeamColor2 = &str
-}
-
-// SetHomeTeamColor3 will set the home team color3
-func (s *SquaresSettings) SetHomeTeamColor3(str string) {
-	if len(str) == 0 {
-		s.HomeTeamColor3 = nil
-		return
-	}
-
-	s.HomeTeamColor3 = &str
-}
-
-// SetAwayTeamName will set the away team name
-func (s *SquaresSettings) SetAwayTeamName(str string) {
-	if len(str) == 0 {
-		s.AwayTeamName = nil
-		return
-	}
-
-	s.AwayTeamName = &str
-}
-
-// SetAwayTeamColor1 will set the away team color1
-func (s *SquaresSettings) SetAwayTeamColor1(str string) {
-	if len(str) == 0 {
-		s.AwayTeamColor1 = nil
-		return
-	}
-
-	s.AwayTeamColor1 = &str
-}
-
-// SetAwayTeamColor2 will set the away team color2
-func (s *SquaresSettings) SetAwayTeamColor2(str string) {
-	if len(str) == 0 {
-		s.AwayTeamColor2 = nil
-		return
-	}
-
-	s.AwayTeamColor2 = &str
-}
-
-// SetAwayTeamColor3 will set the away team color3
-func (s *SquaresSettings) SetAwayTeamColor3(str string) {
-	if len(str) == 0 {
-		s.AwayTeamColor3 = nil
-		return
-	}
-
-	s.AwayTeamColor3 = &str
-}
-
 // SetNotes will set the notes of the squares
 func (s *SquaresSettings) SetNotes(str string) {
 	if len(str) == 0 {
-		s.Notes = nil
+		s.notes = nil
 		return
 	}
 
 	nRunes := utf8.RuneCountInString(str)
-	if nRunes > maxNotesLen {
+	if nRunes > NotesMaxLength {
 		strChars := []rune(str)
-		str = string(strChars[0:maxNotesLen])
+		str = string(strChars[0:NotesMaxLength])
 	}
 
-	s.Notes = &str
+	s.notes = &str
+}
+
+// Notes returns the notes
+func (s *SquaresSettings) Notes() string {
+	if s.notes == nil {
+		return ""
+	}
+
+	return *s.notes
 }
