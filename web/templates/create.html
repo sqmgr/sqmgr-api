@@ -32,14 +32,15 @@ limitations under the License.
 
 				<div class="field">
 					<label for="squares-name">Squares Name</label>
-					<input type="name" id="squares-name" name="squares-name" placeholder="Squares Name" autocomplete="off" required>
+					<input type="name" id="squares-name" name="squares-name" placeholder="Squares Name" autocomplete="off" value="{{.Local.FormData.Name}}" maxlength="{{.Local.NameMaxLength}}" required>
 				</div>
 
 				<div class="field">
 					<label for="squares-type">Squares Configuration</label>
 					<select id="squares-type" name="squares-type">
+						{{ $squaresType := .Local.FormData.Type }}
 						{{ range .Local.SquaresTypes }}
-						<option value="{{.}}">{{.Description}}
+						<option value="{{.}}"{{ if eq . $squaresType }} selected="selected"{{ end }}>{{.Description}}
 						{{ end }}
 					</select>
 				</div>

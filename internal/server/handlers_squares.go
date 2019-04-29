@@ -114,6 +114,7 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 		Squares        *model.Squares
 		DidUpdate      bool
 		NotesMaxLength int
+		NameMaxLength  int
 	}
 
 	str := func(s *string) string {
@@ -138,6 +139,7 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 			Squares:        squares,
 			FormValues:     formValues,
 			NotesMaxLength: model.NotesMaxLength,
+			NameMaxLength:  maxNameLen,
 		}
 
 		v := validator.New()
@@ -155,15 +157,19 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 			formValues["Notes"] = r.PostFormValue("notes")
 
 			name := v.Printable("name", r.PostFormValue("name"))
+			name = v.MaxLength("name", name, maxNameLen)
 			homeTeamName := v.Printable("home-team-name", r.PostFormValue("home-team-name"), true)
+			homeTeamName = v.MaxLength("home-team-name", homeTeamName, maxNameLen)
 			homeTeamColor1 := v.Color("home-team-color-1", r.PostFormValue("home-team-color-1"), true)
 			homeTeamColor2 := v.Color("home-team-color-2", r.PostFormValue("home-team-color-2"), true)
 			homeTeamColor3 := v.Color("home-team-color-3", r.PostFormValue("home-team-color-3"), true)
 			awayTeamName := v.Printable("away-team-name", r.PostFormValue("away-team-name"), true)
+			awayTeamName = v.MaxLength("away-team-name", awayTeamName, maxNameLen)
 			awayTeamColor1 := v.Color("away-team-color-1", r.PostFormValue("away-team-color-1"), true)
 			awayTeamColor2 := v.Color("away-team-color-2", r.PostFormValue("away-team-color-2"), true)
 			awayTeamColor3 := v.Color("away-team-color-3", r.PostFormValue("away-team-color-3"), true)
 			notes := v.PrintableWithNewline("notes", r.PostFormValue("notes"), true)
+			notes = v.MaxLength("notes", notes, model.NotesMaxLength)
 
 			if v.OK() {
 				squares.Name = name

@@ -36,7 +36,7 @@ limitations under the License.
 
 			<div class="field">
 				<label for="name">Name</label>
-				<input type="text" id="name" name="name" placeholder="{{.Local.Squares.Name}}" value="{{.Local.FormValues.Name}}" required>
+				<input type="text" id="name" name="name" placeholder="{{.Local.Squares.Name}}" value="{{.Local.FormValues.Name}}" maxlength="{{.Local.NameMaxLength}}" required>
 			</div>
 
 			<div class="field">
@@ -55,7 +55,7 @@ limitations under the License.
 
 			<div class="field">
 				<label for="home-team-name" class="optional">Home Team Name</label>
-				<input type="text" id="home-team-name" name="home-team-name" placeholder="Home Team" value="{{.Local.FormValues.HomeTeamName}}">
+				<input type="text" id="home-team-name" name="home-team-name" placeholder="Home Team" value="{{.Local.FormValues.HomeTeamName}}" maxlength="{{.Local.NameMaxLength}}">
 			</div>
 
 			<div class="field">
@@ -66,7 +66,7 @@ limitations under the License.
 
 			<div class="field">
 				<label for="away-team-name" class="optional">Away Team Name</label>
-				<input type="text" id="away-team-name" name="away-team-name" placeholder="Away Team" value="{{.Local.FormValues.AwayTeamName}}">
+				<input type="text" id="away-team-name" name="away-team-name" placeholder="Away Team" value="{{.Local.FormValues.AwayTeamName}}" maxlength="{{.Local.NameMaxLength}}">
 			</div>
 
 			<div class="field">

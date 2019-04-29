@@ -23,6 +23,7 @@ import (
 	"github.com/weters/sqmgr/internal/validator"
 )
 
+const maxNameLen = 50
 const minJoinPasswordLen = 5
 
 func (s *Server) createHandler() http.HandlerFunc {
@@ -33,12 +34,16 @@ func (s *Server) createHandler() http.HandlerFunc {
 		FormData           map[string]string
 		FormErrors         validator.Errors
 		SquaresTypes       []model.SquaresType
+		NameMaxLength      int
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		tplData := data{
 			MinJoinPasswordLen: minJoinPasswordLen,
 			SquaresTypes:       model.SquaresTypes(),
+			// need to explicitly include Type for "eq" operator in template
+			FormData:      map[string]string{"Type": ""},
+			NameMaxLength: maxNameLen,
 		}
 
 		user := s.AuthUser(r)
@@ -51,7 +56,11 @@ func (s *Server) createHandler() http.HandlerFunc {
 			password := r.PostFormValue("password")
 			confirmPassword := r.PostFormValue("confirm-password")
 
+			tplData.FormData["Name"] = squaresName
+			tplData.FormData["Type"] = squaresType
+
 			v.Printable("Squares Name", squaresName)
+			v.MaxLength("Squares Name", squaresName, maxNameLen)
 			v.Password("Join Password", password, confirmPassword, minJoinPasswordLen)
 			if err := model.IsValidSquaresType(squaresType); err != nil {
 				v.AddError("Squares Configuration", "you must select a valid configuration option")

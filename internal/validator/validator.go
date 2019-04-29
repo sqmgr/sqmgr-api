@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strconv"
 	"time"
+	"unicode/utf8"
 
 	"github.com/sirupsen/logrus"
 	"github.com/weters/pwned"
@@ -48,6 +49,16 @@ func New() *Validator {
 	return &Validator{
 		Errors: make(Errors),
 	}
+}
+
+// MaxLength will ensure that the string is at most maxLength characters. 0 is valid.
+func (v *Validator) MaxLength(key, val string, maxLength int) string {
+	if utf8.RuneCountInString(val) > maxLength {
+		v.AddError(key, "must be <= %d characters", maxLength)
+		return ""
+	}
+
+	return val
 }
 
 // InverseRegexp will make sure that the string is non-empty and does not match the regex. It can be empty if isOptional is true.
