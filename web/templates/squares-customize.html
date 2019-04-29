@@ -80,3 +80,8 @@ limitations under the License.
 	</form>
 </section>
 {{ end }}
+
+{{ define "javascripts" }}
+<script>if (!window.SqMGR) { window.SqMGR = {} } SqMGR.NotesMaxLength = {{.Local.NotesMaxLength}}</script>
+<script src="/static/js/squares-customize.js"></script>
+{{ end }}

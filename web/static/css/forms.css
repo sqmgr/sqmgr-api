@@ -212,3 +212,9 @@ input[type="date"], input[type="time"] {
 	display: inline-block;
 	width: auto;
 }
+
+div.remaining {
+	color: var(--red);
+	font-size: 0.8em;
+	font-weight: bold;
+}
