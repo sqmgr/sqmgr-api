@@ -27,10 +27,10 @@ import (
 	"github.com/synacor/argon2id"
 )
 
-// NameMaxLength is the maximum length the squares name may be
+// NameMaxLength is the maximum length the grid name may be
 const NameMaxLength = 50
 
-// Grid is an individual squares board
+// Grid is an individual grid board
 // This object uses getters and setters to help guard against user input.
 type Grid struct {
 	model        *Model
@@ -157,11 +157,11 @@ func (m *Model) gridByRow(scan scanFunc, loadSettings bool) (*Grid, error) {
 // GridsJoinedByUser will return a collection of grids that the user joined
 func (m *Model) GridsJoinedByUser(ctx context.Context, u *User, offset, limit int) ([]*Grid, error) {
 	const query = `
-		SELECT squares.*
-		FROM squares
-		LEFT JOIN squares_users ON squares.id = squares_users.squares_id
-		WHERE squares_users.user_id = $1
-		ORDER BY squares.id DESC
+		SELECT grids.*
+		FROM grids
+		LEFT JOIN grids_users ON grids.id = grids_users.grid_id
+		WHERE grids_users.user_id = $1
+		ORDER BY grids.id DESC
 		OFFSET $2
 		LIMIT $3`
 
@@ -172,9 +172,9 @@ func (m *Model) GridsJoinedByUser(ctx context.Context, u *User, offset, limit in
 func (m *Model) GridsJoinedByUserCount(ctx context.Context, u *User) (int64, error) {
 	const query = `
 		SELECT COUNT(*)
-		FROM squares
-		LEFT JOIN squares_users ON squares.id = squares_users.squares_id
-		WHERE squares_users.user_id = $1`
+		FROM grids
+		LEFT JOIN grids_users ON grids.id = grids_users.grid_id
+		WHERE grids_users.user_id = $1`
 
 	return m.gridsCount(m.db.QueryRowContext(ctx, query, u.ID))
 }
@@ -183,9 +183,9 @@ func (m *Model) GridsJoinedByUserCount(ctx context.Context, u *User) (int64, err
 func (m *Model) GridsOwnedByUser(ctx context.Context, u *User, offset, limit int) ([]*Grid, error) {
 	const query = `
 		SELECT *
-		FROM squares
+		FROM grids
 		WHERE user_id = $1
-		ORDER BY squares.id DESC
+		ORDER BY grids.id DESC
 		OFFSET $2
 		LIMIT $3`
 
@@ -196,7 +196,7 @@ func (m *Model) GridsOwnedByUser(ctx context.Context, u *User, offset, limit int
 func (m *Model) GridsOwnedByUserCount(ctx context.Context, u *User) (int64, error) {
 	const query = `
 		SELECT COUNT(*)
-		FROM squares
+		FROM grids
 		WHERE user_id = $1`
 
 	return m.gridsCount(m.db.QueryRowContext(ctx, query, u.ID))
@@ -232,13 +232,13 @@ func (m *Model) gridsCount(row *sql.Row) (int64, error) {
 
 // GridByToken will return the grids with the matching token
 func (m *Model) GridByToken(ctx context.Context, token string) (*Grid, error) {
-	row := m.db.QueryRowContext(ctx, "SELECT * FROM squares WHERE token = $1", token)
+	row := m.db.QueryRowContext(ctx, "SELECT * FROM grids WHERE token = $1", token)
 	return m.gridByRow(row.Scan, true)
 }
 
 // GridByID will return the grids with the matching ID
 func (m *Model) GridByID(id int64) (*Grid, error) {
-	row := m.db.QueryRow("SELECT * FROM squares WHERE id = $1", id)
+	row := m.db.QueryRow("SELECT * FROM grids WHERE id = $1", id)
 	return m.gridByRow(row.Scan, true)
 }
 
@@ -257,7 +257,7 @@ func (m *Model) NewGrid(userID int64, name string, gridType GridType, password s
 	if err != nil {
 		return nil, err
 	}
-	row := m.db.QueryRow("SELECT * FROM new_squares($1, $2, $3, $4, $5)", token, userID, name, gridType, passwordHash)
+	row := m.db.QueryRow("SELECT * FROM new_grid($1, $2, $3, $4, $5)", token, userID, name, gridType, passwordHash)
 
 	s, err := m.gridByRow(row.Scan, false)
 	if err != nil {
@@ -282,12 +282,12 @@ func (g *Grid) SetPassword(password string) error {
 // LoadSettings will update the settings from the database
 func (g *Grid) LoadSettings() error {
 	row := g.model.db.QueryRow(`
-		SELECT squares_id,
+		SELECT grid_id,
 			   home_team_name, home_team_color_1, home_team_color_2,
 			   away_team_name, away_team_color_1, away_team_color_2,
 			   notes, modified
-		FROM squares_settings
-		WHERE squares_id = $1
+		FROM grid_settings
+		WHERE grid_id = $1
 	`, g.id)
 
 	return row.Scan(
@@ -303,7 +303,7 @@ func (g *Grid) LoadSettings() error {
 	)
 }
 
-// Settings returns the square settings
+// Settings returns the grid settings
 func (g *Grid) Settings() *GridSettings {
 	return &g.settings
 }
@@ -320,7 +320,7 @@ func (g *Grid) Save() error {
 		locks = &g.locks
 	}
 
-	if _, err := tx.Exec("UPDATE squares SET name = $1, squares_type = $2, password_hash = $3, locks = $4, modified = (NOW() AT TIME ZONE 'utc')  WHERE id = $5",
+	if _, err := tx.Exec("UPDATE grids SET name = $1, grid_type = $2, password_hash = $3, locks = $4, modified = (NOW() AT TIME ZONE 'utc')  WHERE id = $5",
 		g.name, g.gridType, g.passwordHash, locks, g.id); err != nil {
 		tx.Rollback()
 		return err

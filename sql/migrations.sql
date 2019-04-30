@@ -102,20 +102,20 @@ $$;
 
 --changeset weters:4
 
-CREATE TABLE squares (
+CREATE TABLE grids (
 	id bigserial not null primary key,
 	token text not null unique references tokens (token),
 	user_id bigint not null references users (id),
 	name text not null,
-	squares_type text not null,
+	grid_type text not null,
 	password_hash text not null,
 	locks timestamp,
 	created timestamp not null default (now() at time zone 'utc'),
 	modified timestamp not null default (now() at time zone 'utc')
 );
 
-CREATE TABLE squares_settings (
-	squares_id bigint not null primary key references squares (id),
+CREATE TABLE grid_settings (
+	grid_id bigint not null primary key references grids (id),
 	home_team_name text,
 	home_team_color_1 text,
 	home_team_color_2 text,
@@ -128,8 +128,8 @@ CREATE TABLE squares_settings (
 	modified timestamp not null default (now() at time zone 'utc')
 );
 
---rollback DROP TABLE squares_settings;
---rollback DROP TABLE squares;
+--rollback DROP TABLE grid_settings;
+--rollback DROP TABLE grids;
 
 --changeset weters:5 splitStatements:false
 
@@ -148,17 +148,17 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION new_squares(_token text, _user_id bigint, _name text, _squares_type text, _password_hash text) RETURNS squares
+CREATE FUNCTION new_grid(_token text, _user_id bigint, _name text, _grid_type text, _password_hash text) RETURNS grids
 	LANGUAGE plpgsql
 	AS $$
 DECLARE
-	_row squares;
+	_row grids;
 BEGIN
-	INSERT INTO squares (token, user_id, name, squares_type, password_hash)
-	VALUES (_token, _user_id, _name, _squares_type, _password_hash)
+	INSERT INTO grids (token, user_id, name, grid_type, password_hash)
+	VALUES (_token, _user_id, _name, _grid_type, _password_hash)
 	RETURNING * INTO _row;
 
-	INSERT INTO squares_settings (squares_id)
+	INSERT INTO grid_settings (grid_id)
 	VALUES (_row.id);
 
 	RETURN _row;
@@ -166,18 +166,18 @@ END;
 $$;
 
 --rollback DROP FUNCTION new_token(text);
---rollback DROP FUNCTION new_squares(text, bigint, text, text, text);
+--rollback DROP FUNCTION new_grid(text, bigint, text, text, text);
 
 --changeset weters:6
 
--- determine which squares a user has properly authenticated with
-CREATE TABLE squares_users (
-	squares_id bigint not null references squares (id),
+-- determine which grid a user has properly authenticated with
+CREATE TABLE grids_users (
+	grid_id bigint not null references grids (id),
 	user_id bigint not null references users (id),
 	created timestamp not null default (now() at time zone 'utc'),
-	PRIMARY KEY (user_id, squares_id)
+	PRIMARY KEY (user_id, grid_id)
 );
 
-CREATE INDEX squares_users_squares_id_idx ON squares_users (squares_id);
+CREATE INDEX grids_users_grid_id_idx ON grids_users (grid_id);
 
---rollback DROP TABLE squares_users;
+--rollback DROP TABLE grids_users;

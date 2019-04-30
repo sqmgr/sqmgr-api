@@ -34,7 +34,7 @@ func (u *SessionUser) IsAdminOf(ctx context.Context, s *Grid) bool {
 	return false
 }
 
-// IsMemberOf will return true if the user is a member of the squares
+// IsMemberOf will return true if the user is a member of the grid
 func (u *SessionUser) IsMemberOf(ctx context.Context, s *Grid) (bool, error) {
 	_, found := u.gridIDs[s.id]
 	return found, nil

@@ -40,8 +40,8 @@ type WordList struct {
 
 var seed = flag.Int64("seed", time.Now().UnixNano(), "seed value")
 var numAccounts = flag.Int("accounts", 5, "number of test accounts to create")
-var numSquares = flag.Int("squares", 250, "number of squares to generate")
-var chance = flag.Int("chance", 50, "percent change to join a square")
+var numGrids = flag.Int("grids", 250, "number of grids to generate")
+var chance = flag.Int("chance", 50, "percent change to join a grid")
 
 func main() {
 	flag.Parse()
@@ -82,30 +82,30 @@ func main() {
 		accounts[i] = user
 	}
 
-	for i := 0; i < *numSquares; i++ {
+	for i := 0; i < *numGrids; i++ {
 		user := accounts[rand.Intn(len(accounts))]
 
-		st := model.SquaresTypeStd100
+		st := model.GridTypeStd100
 		if rand.Intn(2) == 0 {
-			st = model.SquaresTypeStd25
+			st = model.GridTypeStd25
 		}
 
 		name := words.Create(2, " ")
-		logrus.WithFields(logrus.Fields{"name": name, "user": user.Email}).Info("creating squares")
-		squares, err := m.NewSquares(user.ID, name, st, "joinpw")
+		logrus.WithFields(logrus.Fields{"name": name, "user": user.Email}).Info("creating grid")
+		grid, err := m.NewGrid(user.ID, name, st, "joinpw")
 		if err != nil {
 			panic(err)
 		}
 
 		homeTeam := words.Create(2, " ")
-		squares.Settings.HomeTeamName = &homeTeam
-		squares.Settings.HomeTeamColor1 = color()
-		squares.Settings.HomeTeamColor2 = color()
+		grid.Settings().SetHomeTeamName(homeTeam)
+		grid.Settings().SetHomeTeamColor1(color())
+		grid.Settings().SetHomeTeamColor2(color())
 		awayTeam := words.Create(2, " ")
-		squares.Settings.AwayTeamName = &awayTeam
-		squares.Settings.AwayTeamColor1 = color()
-		squares.Settings.AwayTeamColor2 = color()
-		if err := squares.Save(); err != nil {
+		grid.Settings().SetAwayTeamName(awayTeam)
+		grid.Settings().SetAwayTeamColor1(color())
+		grid.Settings().SetAwayTeamColor2(color())
+		if err := grid.Save(); err != nil {
 			panic(err)
 		}
 
@@ -115,9 +115,9 @@ func main() {
 			}
 
 			if rand.Intn(100) < *chance {
-				logrus.WithFields(logrus.Fields{"name": name, "user": account.Email}).Info("joining squares")
-				if err := account.JoinSquares(context.Background(), squares); err != nil {
-					logrus.WithError(err).Fatal("could not join squares")
+				logrus.WithFields(logrus.Fields{"name": name, "user": account.Email}).Info("joining grid")
+				if err := account.JoinGrid(context.Background(), grid); err != nil {
+					logrus.WithError(err).Fatal("could not join grid")
 				}
 			}
 		}
@@ -165,7 +165,6 @@ var colorList = []string{"000000", "002244", "002C5F", "00338D", "004953", "0053
 	"BFC0BF", "C60C30", "C83803", "D50A0A", "D7A22A", "E31837", "E9BF9B", "F58220", "FB4F14", "FF7900", "FFB612", "FFC62F",
 }
 
-func color() *string {
-	c := "#" + colorList[rand.Intn(len(colorList))]
-	return &c
+func color() string {
+	return "#" + colorList[rand.Intn(len(colorList))]
 }

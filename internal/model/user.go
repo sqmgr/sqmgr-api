@@ -239,21 +239,21 @@ func (u *User) Delete() error {
 }
 
 // JoinGrid will link a user to a grid game.
-func (u *User) JoinGrid(ctx context.Context, s *Grid) error {
-	_, err := u.db.ExecContext(ctx, "INSERT INTO squares_users (squares_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", s.id, u.ID)
+func (u *User) JoinGrid(ctx context.Context, g *Grid) error {
+	_, err := u.db.ExecContext(ctx, "INSERT INTO grids_users (grid_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", g.id, u.ID)
 	return err
 }
 
 // IsMemberOf will return true if the user belongs to the grid
-func (u *User) IsMemberOf(ctx context.Context, s *Grid) (bool, error) {
+func (u *User) IsMemberOf(ctx context.Context, g *Grid) (bool, error) {
 	// user is the admin
-	if u.ID == s.userID {
+	if u.ID == g.userID {
 		return true, nil
 	}
 
 	// otherwise, check to see if they are a member
 
-	row := u.db.QueryRowContext(ctx, "SELECT true FROM squares_users WHERE squares_id = $1 AND user_id = $2", s.id, u.ID)
+	row := u.db.QueryRowContext(ctx, "SELECT true FROM grids_users WHERE grid_id = $1 AND user_id = $2", g.id, u.ID)
 
 	var ok bool
 	if err := row.Scan(&ok); err != nil {
@@ -268,8 +268,8 @@ func (u *User) IsMemberOf(ctx context.Context, s *Grid) (bool, error) {
 }
 
 // IsAdminOf will return true if the user is the admin of the grid
-func (u *User) IsAdminOf(ctx context.Context, s *Grid) bool {
-	return u.ID == s.userID
+func (u *User) IsAdminOf(ctx context.Context, g *Grid) bool {
+	return u.ID == g.userID
 }
 
 func (m *Model) userByRow(row *sql.Row) (*User, error) {

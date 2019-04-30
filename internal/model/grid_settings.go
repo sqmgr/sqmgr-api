@@ -81,7 +81,7 @@ func (g GridSettings) MarshalJSON() ([]byte, error) {
 // Save will save the settings
 func (g *GridSettings) Save(q executer) error {
 	_, err := q.Exec(`
-		UPDATE squares_settings SET
+		UPDATE grid_settings SET
 			home_team_name = $1,
 			home_team_color_1 = $2,
 			home_team_color_2 = $3,
@@ -90,7 +90,7 @@ func (g *GridSettings) Save(q executer) error {
 			away_team_color_2 = $6,
 			notes = $7,
 			modified = (NOW() AT TIME ZONE 'utc')
-		WHERE squares_id = $8
+		WHERE grid_id = $8
 	`,
 		g.homeTeamName,
 		g.homeTeamColor1,
