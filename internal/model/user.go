@@ -240,20 +240,20 @@ func (u *User) Delete() error {
 
 // JoinSquares will link a user to a squares game.
 func (u *User) JoinSquares(ctx context.Context, s *Squares) error {
-	_, err := u.db.ExecContext(ctx, "INSERT INTO squares_users (squares_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", s.ID, u.ID)
+	_, err := u.db.ExecContext(ctx, "INSERT INTO squares_users (squares_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", s.id, u.ID)
 	return err
 }
 
 // IsMemberOf will return true if the user belongs to the squares
 func (u *User) IsMemberOf(ctx context.Context, s *Squares) (bool, error) {
 	// user is the admin
-	if u.ID == s.UserID {
+	if u.ID == s.userID {
 		return true, nil
 	}
 
 	// otherwise, check to see if they are a member
 
-	row := u.db.QueryRowContext(ctx, "SELECT true FROM squares_users WHERE squares_id = $1 AND user_id = $2", s.ID, u.ID)
+	row := u.db.QueryRowContext(ctx, "SELECT true FROM squares_users WHERE squares_id = $1 AND user_id = $2", s.id, u.ID)
 
 	var ok bool
 	if err := row.Scan(&ok); err != nil {
@@ -269,7 +269,7 @@ func (u *User) IsMemberOf(ctx context.Context, s *Squares) (bool, error) {
 
 // IsAdminOf will return true if the user is the admin of the squares
 func (u *User) IsAdminOf(ctx context.Context, s *Squares) bool {
-	return u.ID == s.UserID
+	return u.ID == s.userID
 }
 
 func (m *Model) userByRow(row *sql.Row) (*User, error) {

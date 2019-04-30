@@ -19,26 +19,109 @@ package model
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"time"
+	"unicode/utf8"
 
 	"github.com/sirupsen/logrus"
 	"github.com/synacor/argon2id"
 )
 
+// NameMaxLength is the maximum length the squares name may be
+const NameMaxLength = 50
+
 // Squares is an individual squares board
+// This object uses getters and setters to help guard against user input.
 type Squares struct {
 	model        *Model
-	ID           int64       `json:"-"`
-	Token        string      `json:"token"`
-	UserID       int64       `json:"-"`
-	Name         string      `json:"name"`
-	SquaresType  SquaresType `json:"squaresType"`
+	id           int64
+	token        string
+	userID       int64
+	name         string
+	squaresType  SquaresType
 	passwordHash string
-	Locks        time.Time `json:"locks"`
-	Created      time.Time `json:"created"`
-	Modified     time.Time `json:"modified"`
+	locks        time.Time
+	created      time.Time
+	modified     time.Time
 
-	Settings SquaresSettings `json:"settings"`
+	settings SquaresSettings
+}
+
+// SquaresWithID returns an empty squares object with only the ID set
+func SquaresWithID(id int64) *Squares {
+	return &Squares{id: id}
+}
+
+type squaresJSON struct {
+	Token       string          `json:"token"`
+	Name        string          `json:"name"`
+	SquaresType SquaresType     `json:"squaresType"`
+	Locks       time.Time       `json:"locks"`
+	Created     time.Time       `json:"created"`
+	Modified    time.Time       `json:"modified"`
+	Settings    SquaresSettings `json:"settings"`
+}
+
+// ID returns the id
+func (s *Squares) ID() int64 {
+	return s.id
+}
+
+// Token is a getter for the token
+func (s *Squares) Token() string {
+	return s.token
+}
+
+// Name is a getter for the name
+func (s *Squares) Name() string {
+	return s.name
+}
+
+// Locks is a getter for the locks date
+func (s *Squares) Locks() time.Time {
+	return s.locks
+}
+
+// Created is a getter for the locks date
+func (s *Squares) Created() time.Time {
+	return s.created
+}
+
+// Modified is a getter for the modified date
+func (s *Squares) Modified() time.Time {
+	return s.modified
+}
+
+// SetName is a setter for the name
+func (s *Squares) SetName(name string) {
+	if utf8.RuneCountInString(name) > NameMaxLength {
+		name = string([]rune(name)[0:NameMaxLength])
+	}
+
+	s.name = name
+}
+
+// SquaresType is a getter for the squares type
+func (s *Squares) SquaresType() SquaresType {
+	return s.squaresType
+}
+
+// SetSquaresType is a setter for the squares type
+func (s *Squares) SetSquaresType(squaresType SquaresType) {
+	s.squaresType = squaresType
+}
+
+// MarshalJSON provides custom JSON marshalling
+func (s *Squares) MarshalJSON() ([]byte, error) {
+	return json.Marshal(squaresJSON{
+		Token:       s.token,
+		Name:        s.name,
+		SquaresType: s.squaresType,
+		Locks:       s.locks,
+		Created:     s.created,
+		Modified:    s.modified,
+		Settings:    s.settings,
+	})
 }
 
 type executer interface {
@@ -50,16 +133,16 @@ type scanFunc func(dest ...interface{}) error
 func (m *Model) squaresByRow(scan scanFunc, loadSettings bool) (*Squares, error) {
 	var locks *time.Time
 	s := Squares{model: m}
-	if err := scan(&s.ID, &s.Token, &s.UserID, &s.Name, &s.SquaresType, &s.passwordHash, &locks, &s.Created, &s.Modified); err != nil {
+	if err := scan(&s.id, &s.token, &s.userID, &s.name, &s.squaresType, &s.passwordHash, &locks, &s.created, &s.modified); err != nil {
 		return nil, err
 	}
 
 	// XXX: do we want the ability to let the user choose the time zone?
-	s.Created = s.Created.In(locationNewYork)
-	s.Modified = s.Modified.In(locationNewYork)
+	s.created = s.created.In(locationNewYork)
+	s.modified = s.modified.In(locationNewYork)
 
 	if locks != nil {
-		s.Locks = *locks
+		s.locks = *locks
 	}
 
 	if loadSettings {
@@ -181,7 +264,7 @@ func (m *Model) NewSquares(userID int64, name string, squaresType SquaresType, p
 		return nil, err
 	}
 
-	s.Settings = SquaresSettings{squaresID: s.ID}
+	s.settings = SquaresSettings{squaresID: s.id}
 	return s, nil
 }
 
@@ -205,19 +288,24 @@ func (s *Squares) LoadSettings() error {
 			   notes, modified
 		FROM squares_settings
 		WHERE squares_id = $1
-	`, s.ID)
+	`, s.id)
 
 	return row.Scan(
-		&s.Settings.squaresID,
-		&s.Settings.homeTeamName,
-		&s.Settings.homeTeamColor1,
-		&s.Settings.homeTeamColor2,
-		&s.Settings.awayTeamName,
-		&s.Settings.awayTeamColor1,
-		&s.Settings.awayTeamColor2,
-		&s.Settings.notes,
-		&s.Settings.modified,
+		&s.settings.squaresID,
+		&s.settings.homeTeamName,
+		&s.settings.homeTeamColor1,
+		&s.settings.homeTeamColor2,
+		&s.settings.awayTeamName,
+		&s.settings.awayTeamColor1,
+		&s.settings.awayTeamColor2,
+		&s.settings.notes,
+		&s.settings.modified,
 	)
+}
+
+// Settings returns the square settings
+func (s *Squares) Settings() *SquaresSettings {
+	return &s.settings
 }
 
 // Save will save the squares and settings using a transaction
@@ -228,17 +316,17 @@ func (s *Squares) Save() error {
 	}
 
 	var locks *time.Time
-	if !s.Locks.IsZero() {
-		locks = &s.Locks
+	if !s.locks.IsZero() {
+		locks = &s.locks
 	}
 
 	if _, err := tx.Exec("UPDATE squares SET name = $1, squares_type = $2, password_hash = $3, locks = $4, modified = (NOW() AT TIME ZONE 'utc')  WHERE id = $5",
-		s.Name, s.SquaresType, s.passwordHash, locks, s.ID); err != nil {
+		s.name, s.squaresType, s.passwordHash, locks, s.id); err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	if err := s.Settings.Save(tx); err != nil {
+	if err := s.settings.Save(tx); err != nil {
 		tx.Rollback()
 		return err
 	}

@@ -63,7 +63,7 @@ func (s *Server) loginHandler() http.HandlerFunc {
 				ids, ok := session.Values[squaresIDsKey].(map[int64]bool)
 				if ok {
 					for id := range ids {
-						if err := user.JoinSquares(r.Context(), &model.Squares{ID: id}); err != nil {
+						if err := user.JoinSquares(r.Context(), model.SquaresWithID(id)); err != nil {
 							s.Error(w, r, http.StatusInternalServerError, err)
 							return
 						}

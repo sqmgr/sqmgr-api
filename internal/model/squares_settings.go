@@ -22,8 +22,13 @@ import (
 	"unicode/utf8"
 )
 
-// NotesMaxLength is the maximum number of characters the notes can be
-const NotesMaxLength = 500
+const (
+	// NotesMaxLength is the maximum number of characters the notes can be
+	NotesMaxLength = 500
+
+	// TeamNameMaxLength is the maximum length of the team names
+	TeamNameMaxLength = 50
+)
 
 // constants for default colors
 const (
@@ -36,6 +41,7 @@ const (
 )
 
 // SquaresSettings will contain various user-defined settings
+// This object uses getters and setters to help guard against user input.
 type SquaresSettings struct {
 	squaresID      int64
 	homeTeamName   *string
@@ -48,6 +54,7 @@ type SquaresSettings struct {
 	modified       *time.Time
 }
 
+// squaresSettingsJSON is used for custom serialization
 type squaresSettingsJSON struct {
 	HomeTeamName   string `json:"homeTeamName"`
 	HomeTeamColor1 string `json:"homeTeamColor1"`
@@ -130,6 +137,10 @@ func (s *SquaresSettings) SetHomeTeamName(name string) {
 		return
 	}
 
+	if utf8.RuneCountInString(name) > TeamNameMaxLength {
+		name = string([]rune(name)[0:TeamNameMaxLength])
+	}
+
 	s.homeTeamName = &name
 }
 
@@ -158,6 +169,10 @@ func (s *SquaresSettings) SetAwayTeamName(name string) {
 	if name == "" {
 		s.awayTeamName = nil
 		return
+	}
+
+	if utf8.RuneCountInString(name) > TeamNameMaxLength {
+		name = string([]rune(name)[0:TeamNameMaxLength])
 	}
 
 	s.awayTeamName = &name

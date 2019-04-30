@@ -63,7 +63,7 @@ func (s *Server) squaresMemberHandler(mustBeMember, mustBeAdmin bool, nextHandle
 		}
 
 		if mustBeMember && !isMember {
-			http.Redirect(w, r, fmt.Sprintf("/squares/%s/join", squares.Token), http.StatusSeeOther)
+			http.Redirect(w, r, fmt.Sprintf("/squares/%s/join", squares.Token()), http.StatusSeeOther)
 			return
 		}
 
@@ -109,12 +109,13 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 	const didUpdate = "didUpdate"
 
 	type data struct {
-		FormValues     map[string]string
-		FormErrors     validator.Errors
-		Squares        *model.Squares
-		DidUpdate      bool
-		NotesMaxLength int
-		NameMaxLength  int
+		FormValues        map[string]string
+		FormErrors        validator.Errors
+		Squares           *model.Squares
+		DidUpdate         bool
+		NotesMaxLength    int
+		NameMaxLength     int
+		TeamNameMaxLength int
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -128,10 +129,11 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 
 		formValues := make(map[string]string)
 		tplData := data{
-			Squares:        squares,
-			FormValues:     formValues,
-			NotesMaxLength: model.NotesMaxLength,
-			NameMaxLength:  maxNameLen,
+			Squares:           squares,
+			FormValues:        formValues,
+			NotesMaxLength:    model.NotesMaxLength,
+			NameMaxLength:     maxNameLen,
+			TeamNameMaxLength: model.TeamNameMaxLength,
 		}
 
 		v := validator.New()
@@ -149,25 +151,26 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 			name := v.Printable("name", r.PostFormValue("name"))
 			name = v.MaxLength("name", name, maxNameLen)
 			homeTeamName := v.Printable("home-team-name", r.PostFormValue("home-team-name"), true)
-			homeTeamName = v.MaxLength("home-team-name", homeTeamName, maxNameLen)
+			homeTeamName = v.MaxLength("home-team-name", homeTeamName, model.TeamNameMaxLength)
 			homeTeamColor1 := v.Color("home-team-color-1", r.PostFormValue("home-team-color-1"), true)
 			homeTeamColor2 := v.Color("home-team-color-2", r.PostFormValue("home-team-color-2"), true)
 			awayTeamName := v.Printable("away-team-name", r.PostFormValue("away-team-name"), true)
-			awayTeamName = v.MaxLength("away-team-name", awayTeamName, maxNameLen)
+			awayTeamName = v.MaxLength("away-team-name", awayTeamName, model.TeamNameMaxLength)
 			awayTeamColor1 := v.Color("away-team-color-1", r.PostFormValue("away-team-color-1"), true)
 			awayTeamColor2 := v.Color("away-team-color-2", r.PostFormValue("away-team-color-2"), true)
 			notes := v.PrintableWithNewline("notes", r.PostFormValue("notes"), true)
 			notes = v.MaxLength("notes", notes, model.NotesMaxLength)
 
 			if v.OK() {
-				squares.Name = name
-				squares.Settings.SetHomeTeamName(homeTeamName)
-				squares.Settings.SetHomeTeamColor1(homeTeamColor1)
-				squares.Settings.SetHomeTeamColor2(homeTeamColor2)
-				squares.Settings.SetAwayTeamName(awayTeamName)
-				squares.Settings.SetAwayTeamColor1(awayTeamColor1)
-				squares.Settings.SetAwayTeamColor2(awayTeamColor2)
-				squares.Settings.SetNotes(notes)
+				squares.SetName(name)
+				settings := squares.Settings()
+				settings.SetHomeTeamName(homeTeamName)
+				settings.SetHomeTeamColor1(homeTeamColor1)
+				settings.SetHomeTeamColor2(homeTeamColor2)
+				settings.SetAwayTeamName(awayTeamName)
+				settings.SetAwayTeamColor1(awayTeamColor1)
+				settings.SetAwayTeamColor2(awayTeamColor2)
+				settings.SetNotes(notes)
 
 				if err := squares.Save(); err != nil {
 					s.Error(w, r, http.StatusInternalServerError, err)
@@ -184,14 +187,15 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 
 			tplData.FormErrors = v.Errors
 		} else {
-			formValues["Name"] = squares.Name
-			formValues["HomeTeamName"] = squares.Settings.HomeTeamName()
-			formValues["HomeTeamColor1"] = squares.Settings.HomeTeamColor1()
-			formValues["HomeTeamColor2"] = squares.Settings.HomeTeamColor2()
-			formValues["AwayTeamName"] = squares.Settings.AwayTeamName()
-			formValues["AwayTeamColor1"] = squares.Settings.AwayTeamColor1()
-			formValues["AwayTeamColor2"] = squares.Settings.AwayTeamColor2()
-			formValues["Notes"] = squares.Settings.Notes()
+			settings := squares.Settings()
+			formValues["Name"] = squares.Name()
+			formValues["HomeTeamName"] = settings.HomeTeamName()
+			formValues["HomeTeamColor1"] = settings.HomeTeamColor1()
+			formValues["HomeTeamColor2"] = settings.HomeTeamColor2()
+			formValues["AwayTeamName"] = settings.AwayTeamName()
+			formValues["AwayTeamColor1"] = settings.AwayTeamColor1()
+			formValues["AwayTeamColor2"] = settings.AwayTeamColor2()
+			formValues["Notes"] = settings.Notes()
 
 			session := s.Session(r)
 			tplData.DidUpdate = session.Flashes(didUpdate) != nil
@@ -216,7 +220,7 @@ func (s *Server) squaresJoinHandler() http.HandlerFunc {
 		user := sqCtxData.EffectiveUser
 
 		if sqCtxData.IsMember {
-			http.Redirect(w, r, fmt.Sprintf("/squares/%s", squares.Token), http.StatusSeeOther)
+			http.Redirect(w, r, fmt.Sprintf("/squares/%s", squares.Token()), http.StatusSeeOther)
 			return
 		}
 
@@ -230,7 +234,7 @@ func (s *Server) squaresJoinHandler() http.HandlerFunc {
 					return
 				}
 
-				http.Redirect(w, r, fmt.Sprintf("/squares/%s", squares.Token), http.StatusSeeOther)
+				http.Redirect(w, r, fmt.Sprintf("/squares/%s", squares.Token()), http.StatusSeeOther)
 				return
 			}
 

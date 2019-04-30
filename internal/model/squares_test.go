@@ -79,10 +79,10 @@ func TestSquares(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(squares).ShouldNot(gomega.BeNil())
 
-	g.Expect(squares.ID).Should(gomega.BeNumerically(">", 0))
-	g.Expect(squares.UserID).Should(gomega.Equal(user.ID))
-	g.Expect(squares.Token).Should(gomega.MatchRegexp(`^[A-Za-z0-9_-]{8}\z`))
-	g.Expect(squares.Name).Should(gomega.Equal("My Squares"))
+	g.Expect(squares.id).Should(gomega.BeNumerically(">", 0))
+	g.Expect(squares.userID).Should(gomega.Equal(user.ID))
+	g.Expect(squares.token).Should(gomega.MatchRegexp(`^[A-Za-z0-9_-]{8}\z`))
+	g.Expect(squares.name).Should(gomega.Equal("My Squares"))
 	g.Expect(squares.passwordHash).ShouldNot(gomega.Equal("my-other-unique-password"))
 	g.Expect(argon2id.Compare(squares.passwordHash, "my-other-unique-password")).Should(gomega.Succeed())
 
@@ -90,8 +90,8 @@ func TestSquares(t *testing.T) {
 	squares.SetPassword("my-other-unique-password")
 	g.Expect(squares.passwordHash).ShouldNot(gomega.Equal(originalPasswordHash))
 
-	g.Expect(squares.Settings).Should(gomega.Equal(SquaresSettings{
-		squaresID:      squares.ID,
+	g.Expect(squares.settings).Should(gomega.Equal(SquaresSettings{
+		squaresID:      squares.id,
 		homeTeamName:   nil,
 		homeTeamColor1: nil,
 		homeTeamColor2: nil,
@@ -102,35 +102,35 @@ func TestSquares(t *testing.T) {
 	}))
 
 	future := time.Now().UTC().Add(time.Hour)
-	squares.Name = "Different Name"
-	squares.Locks = future
-	squares.SquaresType = SquaresTypeStd25
+	squares.name = "Different Name"
+	squares.locks = future
+	squares.squaresType = SquaresTypeStd25
 
 	awayTeamName := "Different Away Team"
-	squares.Settings.SetAwayTeamName(awayTeamName)
+	squares.settings.SetAwayTeamName(awayTeamName)
 
 	err = squares.Save()
 	g.Expect(err).Should(gomega.Succeed())
 
-	squares2, err := m.SquaresByID(squares.ID)
+	squares2, err := m.SquaresByID(squares.id)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(squares2).ShouldNot(gomega.BeNil())
 
-	g.Expect(squares2.Name).Should(gomega.Equal("Different Name"))
-	g.Expect(squares2.Locks.Unix()).Should(gomega.Equal(future.Unix()))
-	g.Expect(squares2.SquaresType).Should(gomega.Equal(SquaresTypeStd25))
-	g.Expect(squares2.Settings.HomeTeamName()).Should(gomega.Equal(DefaultHomeTeamName))
-	g.Expect(squares2.Settings.AwayTeamName()).Should(gomega.Equal("Different Away Team"))
+	g.Expect(squares2.name).Should(gomega.Equal("Different Name"))
+	g.Expect(squares2.locks.Unix()).Should(gomega.Equal(future.Unix()))
+	g.Expect(squares2.squaresType).Should(gomega.Equal(SquaresTypeStd25))
+	g.Expect(squares2.settings.HomeTeamName()).Should(gomega.Equal(DefaultHomeTeamName))
+	g.Expect(squares2.settings.AwayTeamName()).Should(gomega.Equal("Different Away Team"))
 
-	squares3, err := m.SquaresByToken(context.Background(), squares2.Token)
+	squares3, err := m.SquaresByToken(context.Background(), squares2.token)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(squares3).ShouldNot(gomega.BeNil())
 	g.Expect(squares3).Should(gomega.Equal(squares2))
 
-	loadedSquares, err := m.SquaresByID(squares.ID)
+	loadedSquares, err := m.SquaresByID(squares.id)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(loadedSquares.LoadSettings()).Should(gomega.Succeed())
-	g.Expect(loadedSquares.Settings.squaresID).Should(gomega.Equal(squares.ID))
+	g.Expect(loadedSquares.settings.squaresID).Should(gomega.Equal(squares.id))
 }
 
 func TestNewSquaresInvalidSquaresType(t *testing.T) {
@@ -221,4 +221,40 @@ func TestSquaresCollectionPagination(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(20)))
 
+}
+
+func TestAccessors(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	locks := time.Now()
+	created := time.Now()
+	modified := time.Now()
+
+	s := &Squares{
+		locks:    locks,
+		created:  created,
+		modified: modified,
+	}
+
+	testMaxLength(g, s.Name, s.SetName, NameMaxLength, "name")
+
+	s.id = 12345
+	g.Expect(s.ID()).Should(gomega.Equal(int64(12345)))
+
+	s.token = "my-token"
+	g.Expect(s.Token()).Should(gomega.Equal("my-token"))
+
+	s.SetSquaresType(SquaresTypeStd25)
+	g.Expect(s.SquaresType()).Should(gomega.Equal(SquaresTypeStd25))
+	g.Expect(s.Locks()).Should(gomega.Equal(locks))
+	g.Expect(s.Created()).Should(gomega.Equal(created))
+	g.Expect(s.Modified()).Should(gomega.Equal(modified))
+
+	g.Expect(s.Settings()).Should(gomega.Equal(&s.settings))
+
+	var err error
+	s.passwordHash, err = argon2id.DefaultHashPassword("test")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(s.PasswordIsValid("test")).Should(gomega.BeTrue())
+	g.Expect(s.PasswordIsValid("no-match")).Should(gomega.BeFalse())
 }

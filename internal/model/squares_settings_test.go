@@ -18,7 +18,6 @@ package model
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/onsi/gomega"
@@ -70,21 +69,12 @@ func TestSquaresSettings(t *testing.T) {
 	testDefaultsAreUsed("set back to nil")
 }
 
-func TestNotesLength(t *testing.T) {
+func TestMaxLength(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
 	s := &SquaresSettings{}
 
-	str := strings.Repeat("é", NotesMaxLength)
-	s.SetNotes(str)
-
-	g.Expect(s.Notes()).Should(gomega.Equal(str))
-	g.Expect(len(s.Notes())).Should(gomega.Equal(NotesMaxLength * 2)) // é is two bytes
-
-	truncStr := strings.Repeat("á", NotesMaxLength)
-	longerStr := truncStr + "á"
-	s.SetNotes(longerStr)
-	g.Expect(s.Notes()).Should(gomega.Equal(truncStr))
-	g.Expect(len(s.Notes())).Should(gomega.Equal(NotesMaxLength * 2)) // é is two bytes
-	g.Expect(len([]rune(s.Notes()))).Should(gomega.Equal(NotesMaxLength))
+	testMaxLength(g, s.Notes, s.SetNotes, NotesMaxLength, "notes")
+	testMaxLength(g, s.HomeTeamName, s.SetHomeTeamName, TeamNameMaxLength, "homeTeamName")
+	testMaxLength(g, s.AwayTeamName, s.SetAwayTeamName, TeamNameMaxLength, "awayTeamName")
 }

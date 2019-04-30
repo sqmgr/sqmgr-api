@@ -73,7 +73,7 @@ func (s *Server) createHandler() http.HandlerFunc {
 					return
 				}
 
-				http.Redirect(w, r, "/squares/"+squares.Token, http.StatusSeeOther)
+				http.Redirect(w, r, "/squares/"+squares.Token(), http.StatusSeeOther)
 				return
 			}
 

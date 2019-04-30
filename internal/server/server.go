@@ -263,7 +263,7 @@ func (s *Server) EffectiveUser(r *http.Request) (model.EffectiveUser, error) {
 			ids = make(map[int64]bool)
 		}
 
-		ids[squares.ID] = true
+		ids[squares.ID()] = true
 
 		sess.Values[squaresIDsKey] = ids
 		sess.Save()
