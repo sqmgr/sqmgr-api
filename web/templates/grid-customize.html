@@ -14,17 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 
-{{ define "title" }}Customize {{.Local.Squares.Name}} - {{ end }}
+{{ define "title" }}Customize {{.Local.Grid.Name}} - {{ end }}
 
 {{ define "header" }}
 <link href="/static/css/forms.css" rel="stylesheet">
 {{ end }}
 
 {{ define "content" }}
-<section class="squares-customize">
-	<h3>Customize {{.Local.Squares.Name}}</h3>
+<section class="grid-customize">
+	<h3>Customize {{.Local.Grid.Name}}</h3>
 
-	<p><a href="/squares/{{.Local.Squares.Token}}">Back to squares</a>
+	<p><a href="/grid/{{.Local.Grid.Token}}">Back to squares pool</a>
 
 	<form method="post">
 		{{ template "form-errors" . }}
@@ -36,7 +36,7 @@ limitations under the License.
 
 			<div class="field">
 				<label for="name">Name</label>
-				<input type="text" id="name" name="name" placeholder="{{.Local.Squares.Name}}" value="{{.Local.FormValues.Name}}" maxlength="{{.Local.NameMaxLength}}" required>
+				<input type="text" id="name" name="name" placeholder="{{.Local.Grid.Name}}" value="{{.Local.FormValues.Name}}" maxlength="{{.Local.NameMaxLength}}" required>
 			</div>
 
 			<div class="field">
@@ -83,5 +83,5 @@ limitations under the License.
 
 {{ define "javascripts" }}
 <script>if (!window.SqMGR) { window.SqMGR = {} } SqMGR.NotesMaxLength = {{.Local.NotesMaxLength}}</script>
-<script src="/static/js/squares-customize.js"></script>
+<script src="/static/js/grid-customize.js"></script>
 {{ end }}

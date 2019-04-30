@@ -26,7 +26,7 @@ SqMGR.buildSquares = function() {
 }
 
 SqMGR.SquaresBuilder = function() {
-	var container = document.getElementById('squares-container'),
+	var container = document.getElementById('grid-container'),
 		parent = document.createElement('div'),
 		i, elem, elem2, numSquares
 

@@ -34,7 +34,7 @@ type gridContextData struct {
 	IsAdmin       bool
 }
 
-func (s *Server) squaresMemberHandler(mustBeMember, mustBeAdmin bool, nextHandler http.Handler) http.HandlerFunc {
+func (s *Server) gridMemberHandler(mustBeMember, mustBeAdmin bool, nextHandler http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		token := vars["token"]
@@ -85,12 +85,12 @@ func (s *Server) squaresMemberHandler(mustBeMember, mustBeAdmin bool, nextHandle
 	}
 }
 
-func (s *Server) squaresHandler() http.HandlerFunc {
-	tpl := s.loadTemplate("squares.html")
+func (s *Server) gridHandler() http.HandlerFunc {
+	tpl := s.loadTemplate("grid.html")
 
 	type data struct {
 		IsAdmin bool
-		Grid *model.Grid
+		Grid    *model.Grid
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -98,13 +98,13 @@ func (s *Server) squaresHandler() http.HandlerFunc {
 
 		s.ExecuteTemplate(w, r, tpl, data{
 			IsAdmin: gridCtxData.IsAdmin,
-			Grid: gridCtxData.Grid,
+			Grid:    gridCtxData.Grid,
 		})
 	}
 }
 
-func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
-	tpl := s.loadTemplate("squares-customize.html", "form-errors.html")
+func (s *Server) gridCustomizeHandler() http.HandlerFunc {
+	tpl := s.loadTemplate("grid-customize.html", "form-errors.html")
 
 	const didUpdate = "didUpdate"
 
@@ -207,8 +207,8 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 	}
 }
 
-func (s *Server) squaresJoinHandler() http.HandlerFunc {
-	tpl := s.loadTemplate("squares-join.html")
+func (s *Server) gridJoinHandler() http.HandlerFunc {
+	tpl := s.loadTemplate("grid-join.html")
 
 	type data struct {
 		Error string

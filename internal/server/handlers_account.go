@@ -74,7 +74,7 @@ func (s *Server) accountHandler() http.HandlerFunc {
 		Joined *gridsTemplateData
 	}
 
-	tpl := s.loadTemplate("account.html", "account-squares-table.html", "pagination.html")
+	tpl := s.loadTemplate("account.html", "account-grid-table.html", "pagination.html")
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := s.AuthUser(r)
 		ctx := r.Context()
@@ -100,7 +100,7 @@ func (s *Server) accountHandler() http.HandlerFunc {
 }
 
 func (s *Server) accountSquaresHandler(asType accountSquaresHandlerType) http.HandlerFunc {
-	tpl := s.loadTemplate("account-squares-table.html", "pagination.html")
+	tpl := s.loadTemplate("account-grid-table.html", "pagination.html")
 
 	var clFn collectionFn
 	var cnFn countFn
@@ -130,7 +130,7 @@ func (s *Server) accountSquaresHandler(asType accountSquaresHandlerType) http.Ha
 			return
 		}
 
-		s.ExecuteTemplateFragment(w, r, tpl, "squares", data)
+		s.ExecuteTemplateFragment(w, r, tpl, "grid", data)
 	}
 }
 

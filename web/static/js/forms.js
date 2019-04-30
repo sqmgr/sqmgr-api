@@ -67,7 +67,6 @@ window.addEventListener('load', function() {
 	})
 
 	document.querySelectorAll('input[type="time"]').forEach(function(input) {
-		console.log(typeof(input.type))
 		if (input.value === '') {
 			input.value = '00:00'
 		}

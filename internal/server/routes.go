@@ -51,17 +51,17 @@ func (s *Server) setupRoutes() {
 	s.Router.Path("/account/deleted").Methods(http.MethodGet).Handler(s.authHandler(s.accountDeletedHandler()))
 	s.Router.Path("/account/verify").Methods(http.MethodGet, http.MethodPost).Handler(s.authHandler(s.accountVerifyHandler()))
 
-	// squares
-	s.Router.Path("/squares/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodGet).Handler(s.squaresMemberHandler(true, false, s.squaresHandler()))
-	s.Router.Path("/squares/{token:[A-Za-z0-9_-]{8}}/join").Methods(http.MethodGet, http.MethodPost).Handler(s.squaresMemberHandler(false, false, s.squaresJoinHandler()))
-	s.Router.Path("/squares/{token:[A-Za-z0-9_-]{8}}/customize").Methods(http.MethodGet, http.MethodPost).Handler(s.squaresMemberHandler(true, true, s.squaresCustomizeHandler()))
+	// grids
+	s.Router.Path("/grid/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodGet).Handler(s.gridMemberHandler(true, false, s.gridHandler()))
+	s.Router.Path("/grid/{token:[A-Za-z0-9_-]{8}}/join").Methods(http.MethodGet, http.MethodPost).Handler(s.gridMemberHandler(false, false, s.gridJoinHandler()))
+	s.Router.Path("/grid/{token:[A-Za-z0-9_-]{8}}/customize").Methods(http.MethodGet, http.MethodPost).Handler(s.gridMemberHandler(true, true, s.gridCustomizeHandler()))
 
 	// signup
 	s.Router.Path("/signup").Methods(http.MethodGet, http.MethodPost).Handler(s.signupHandler())
 	s.Router.Path("/signup/complete").Methods(http.MethodGet).Handler(s.signupCompleteHandler())
 	s.Router.Path("/signup/verify/{token:[A-Za-z0-9_-]{64}}").Methods(http.MethodGet).Handler(s.signupVerifyHandler())
 
-	// square management
+	// grid management
 	s.Router.Path("/create").Methods(http.MethodGet, http.MethodPost).Handler(s.authHandler(s.createHandler()))
 
 	// temporary

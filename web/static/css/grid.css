@@ -138,7 +138,7 @@ div.notes {
 }
 
 @media (max-width: 800px) {
-	div#squares-container {
+	div#grid-container {
 		overflow: auto;
 		width: 100%;
 	}

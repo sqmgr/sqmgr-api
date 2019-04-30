@@ -16,22 +16,21 @@ limitations under the License.
 
 {{ define "title" }}{{.Local.Grid.Name}} - {{ end }}
 {{ define "header" }}
-<link href="/static/css/squares.css" rel="stylesheet">
-<link href="/static/css/form.css" rel="stylesheet">
+<link href="/static/css/grid.css" rel="stylesheet">
 {{ end }}
 {{ define "content" }}
-<section class="squares">
+<section class="grid">
 	<h3>{{.Local.Grid.Name}}</h3>
 
 	<div class="notes">{{.Local.Grid.Settings.Notes}}</div>
 
 	{{ if .Local.IsAdmin }}
-		<p><a href="/squares/{{.Local.Grid.Token}}/customize">Customize</a>
+		<p><a href="/grid/{{.Local.Grid.Token}}/customize">Customize</a>
 	{{ end }}
 
-	<div id="squares-container"></div>
+	<div id="grid-container"></div>
 
-	<div class="squares-metadata">
+	<div class="grid-metadata">
 		<table>
 			<tbody>
 				<tr>
@@ -64,5 +63,5 @@ limitations under the License.
 function SqMGR() { }
 SqMGR.grid = {{.Local.Grid}}
 </script>
-<script src="/static/js/squares.js"></script>
+<script src="/static/js/grid.js"></script>
 {{ end }}

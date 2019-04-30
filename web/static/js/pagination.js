@@ -25,8 +25,6 @@ window.addEventListener('load', function() {
 			return
 		}
 
-		console.log(parentNode)
-
 		nav.querySelectorAll('a').forEach(function(link) {
 			link.onclick = function() {
 				var request = new XMLHttpRequest()
