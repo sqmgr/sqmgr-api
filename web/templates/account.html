@@ -27,7 +27,7 @@ limitations under the License.
 			<h3>Actions</h3>
 
 			<ul>
-				<li><a href="/create">Create Squares</a>
+				<li><a href="/create">Create Squares Pool</a>
 			</ul>
 
 			<h3>Account Management</h3>
@@ -41,11 +41,11 @@ limitations under the License.
 		<div class="actions col-3">
 			<p>Welcome {{.Local.User.Email}}
 
-			<h3>Square Pools You Created</h3>
+			<h3>Squares Pools You Created</h3>
 
 			{{ template "grid" .Local.Owned }}
 
-			<h3>Square Pools You Joined</h3>
+			<h3>Squares Pools You Joined</h3>
 
 			{{ template "grid" .Local.Joined }}
 		</div>
