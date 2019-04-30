@@ -25,45 +25,49 @@ import (
 // NotesMaxLength is the maximum number of characters the notes can be
 const NotesMaxLength = 500
 
+// constants for default colors
+const (
+	DefaultHomeTeamName   = "Home Team"
+	DefaultHomeTeamColor1 = "#00338d"
+	DefaultHomeTeamColor2 = "#c60c30"
+	DefaultAwayTeamName   = "Away Team"
+	DefaultAwayTeamColor1 = "#f3d03e"
+	DefaultAwayTeamColor2 = "#003087"
+)
+
 // SquaresSettings will contain various user-defined settings
 type SquaresSettings struct {
-	SquaresID      int64   `json:"-"`
-	HomeTeamName   *string `json:"homeTeamName"`
-	HomeTeamColor1 *string `json:"homeTeamColor1"`
-	HomeTeamColor2 *string `json:"homeTeamColor2"`
-	HomeTeamColor3 *string `json:"homeTeamColor3"`
-	AwayTeamName   *string `json:"awayTeamName"`
-	AwayTeamColor1 *string `json:"awayTeamColor1"`
-	AwayTeamColor2 *string `json:"awayTeamColor2"`
-	AwayTeamColor3 *string `json:"awayTeamColor3"`
+	squaresID      int64
+	homeTeamName   *string
+	homeTeamColor1 *string
+	homeTeamColor2 *string
+	awayTeamName   *string
+	awayTeamColor1 *string
+	awayTeamColor2 *string
 	notes          *string
-	Modified       *time.Time `json:"-"`
+	modified       *time.Time
 }
 
 type squaresSettingsJSON struct {
-	HomeTeamName   *string `json:"homeTeamName"`
-	HomeTeamColor1 *string `json:"homeTeamColor1"`
-	HomeTeamColor2 *string `json:"homeTeamColor2"`
-	HomeTeamColor3 *string `json:"homeTeamColor3"`
-	AwayTeamName   *string `json:"awayTeamName"`
-	AwayTeamColor1 *string `json:"awayTeamColor1"`
-	AwayTeamColor2 *string `json:"awayTeamColor2"`
-	AwayTeamColor3 *string `json:"awayTeamColor3"`
-	Notes          *string `json:"notes"`
+	HomeTeamName   string `json:"homeTeamName"`
+	HomeTeamColor1 string `json:"homeTeamColor1"`
+	HomeTeamColor2 string `json:"homeTeamColor2"`
+	AwayTeamName   string `json:"awayTeamName"`
+	AwayTeamColor1 string `json:"awayTeamColor1"`
+	AwayTeamColor2 string `json:"awayTeamColor2"`
+	Notes          string `json:"notes"`
 }
 
 // MarshalJSON adds custom JSON marshalling support
-func (s *SquaresSettings) MarshalJSON() ([]byte, error) {
+func (s SquaresSettings) MarshalJSON() ([]byte, error) {
 	return json.Marshal(squaresSettingsJSON{
-		HomeTeamName:   s.HomeTeamName,
-		HomeTeamColor1: s.HomeTeamColor1,
-		HomeTeamColor2: s.HomeTeamColor2,
-		HomeTeamColor3: s.HomeTeamColor3,
-		AwayTeamName:   s.AwayTeamName,
-		AwayTeamColor1: s.AwayTeamColor1,
-		AwayTeamColor2: s.AwayTeamColor2,
-		AwayTeamColor3: s.AwayTeamColor3,
-		Notes:          s.notes,
+		HomeTeamName:   s.HomeTeamName(),
+		HomeTeamColor1: s.HomeTeamColor1(),
+		HomeTeamColor2: s.HomeTeamColor2(),
+		AwayTeamName:   s.AwayTeamName(),
+		AwayTeamColor1: s.AwayTeamColor1(),
+		AwayTeamColor2: s.AwayTeamColor2(),
+		Notes:          s.Notes(),
 	})
 }
 
@@ -74,25 +78,21 @@ func (s *SquaresSettings) Save(q executer) error {
 			home_team_name = $1,
 			home_team_color_1 = $2,
 			home_team_color_2 = $3,
-			home_team_color_3 = $4,
-			away_team_name = $5,
-			away_team_color_1 = $6,
-			away_team_color_2 = $7,
-			away_team_color_3 = $8,
-			notes = $9,
+			away_team_name = $4,
+			away_team_color_1 = $5,
+			away_team_color_2 = $6,
+			notes = $7,
 			modified = (NOW() AT TIME ZONE 'utc')
-		WHERE squares_id = $10
+		WHERE squares_id = $8
 	`,
-		s.HomeTeamName,
-		s.HomeTeamColor1,
-		s.HomeTeamColor2,
-		s.HomeTeamColor3,
-		s.AwayTeamName,
-		s.AwayTeamColor1,
-		s.AwayTeamColor2,
-		s.AwayTeamColor3,
+		s.homeTeamName,
+		s.homeTeamColor1,
+		s.homeTeamColor2,
+		s.awayTeamName,
+		s.awayTeamColor1,
+		s.awayTeamColor2,
 		s.notes,
-		s.SquaresID,
+		s.squaresID,
 	)
 
 	return err
@@ -121,4 +121,118 @@ func (s *SquaresSettings) Notes() string {
 	}
 
 	return *s.notes
+}
+
+// SetHomeTeamName is a setter for the home team name
+func (s *SquaresSettings) SetHomeTeamName(name string) {
+	if name == "" {
+		s.homeTeamName = nil
+		return
+	}
+
+	s.homeTeamName = &name
+}
+
+// SetHomeTeamColor1 is a setter for the home team primary color
+func (s *SquaresSettings) SetHomeTeamColor1(color string) {
+	if color == "" {
+		s.homeTeamColor1 = nil
+		return
+	}
+
+	s.homeTeamColor1 = &color
+}
+
+// SetHomeTeamColor2 is a setter for the home team secondary color
+func (s *SquaresSettings) SetHomeTeamColor2(color string) {
+	if color == "" {
+		s.homeTeamColor2 = nil
+		return
+	}
+
+	s.homeTeamColor2 = &color
+}
+
+// SetAwayTeamName is a setter for the home team name
+func (s *SquaresSettings) SetAwayTeamName(name string) {
+	if name == "" {
+		s.awayTeamName = nil
+		return
+	}
+
+	s.awayTeamName = &name
+}
+
+// SetAwayTeamColor1 is a setter for the away team primary color
+func (s *SquaresSettings) SetAwayTeamColor1(color string) {
+	if color == "" {
+		s.awayTeamColor1 = nil
+		return
+	}
+
+	s.awayTeamColor1 = &color
+}
+
+// SetAwayTeamColor2 is a setter for the away team secondary color
+func (s *SquaresSettings) SetAwayTeamColor2(color string) {
+	if color == "" {
+		s.awayTeamColor2 = nil
+		return
+	}
+
+	s.awayTeamColor2 = &color
+}
+
+// HomeTeamName is a getter for the home team name
+func (s *SquaresSettings) HomeTeamName() string {
+	if s.homeTeamName == nil {
+		return DefaultHomeTeamName
+	}
+
+	return *s.homeTeamName
+}
+
+// HomeTeamColor1 is a getter for the home team primary color
+func (s *SquaresSettings) HomeTeamColor1() string {
+	if s.homeTeamColor1 == nil {
+		return DefaultHomeTeamColor1
+	}
+
+	return *s.homeTeamColor1
+}
+
+// HomeTeamColor2 is a getter for the home team secondary color
+func (s *SquaresSettings) HomeTeamColor2() string {
+	if s.homeTeamColor2 == nil {
+		return DefaultHomeTeamColor2
+	}
+
+	return *s.homeTeamColor2
+}
+
+// AwayTeamName is a getter for the home team name
+func (s *SquaresSettings) AwayTeamName() string {
+	if s.awayTeamName == nil {
+		return DefaultAwayTeamName
+	}
+
+	return *s.awayTeamName
+}
+
+// AwayTeamColor1 is a getter for the away team primary color
+func (s *SquaresSettings) AwayTeamColor1() string {
+	if s.awayTeamColor1 == nil {
+		return DefaultAwayTeamColor1
+	}
+
+	return *s.awayTeamColor1
+}
+
+// AwayTeamColor2 is a getter for the away team secondary color
+func (s *SquaresSettings) AwayTeamColor2() string {
+	if s.awayTeamColor2 == nil {
+		return DefaultAwayTeamColor2
+	}
+
+	return *s.awayTeamColor2
 }

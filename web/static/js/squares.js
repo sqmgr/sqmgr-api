@@ -15,22 +15,6 @@ limitations under the License.
 */
 
 SqMGR.Config = {
-	Defaults: {
-		Teams: {
-			Away: {
-				Name: 'Away Team',
-				Color1: '#F3D03E',
-				Color2: '#003087',
-				Color3: 'transparent',
-			},
-			Home: {
-				Name: 'Home Team',
-				Color1: '#00338D',
-				Color2: '#C60C30',
-				Color3: 'transparent',
-			}
-		}
-	},
 	Types: {
 		'std100': 100,
 		'std25': 25
@@ -109,12 +93,7 @@ SqMGR.SquaresBuilder = function() {
 
 SqMGR.SquaresBuilder.prototype.getTeamValue = function(team, prop) {
 	var setting = team.toLowerCase() + "Team" + prop
-	var val = SqMGR.squares.settings[setting]
-	if (val) {
-		return val
-	}
-
-	return SqMGR.Config.Defaults.Teams[team][prop]
+	return SqMGR.squares.settings[setting]
 }
 
 window.addEventListener('load', SqMGR.buildSquares)

@@ -181,7 +181,7 @@ func (m *Model) NewSquares(userID int64, name string, squaresType SquaresType, p
 		return nil, err
 	}
 
-	s.Settings = SquaresSettings{SquaresID: s.ID}
+	s.Settings = SquaresSettings{squaresID: s.ID}
 	return s, nil
 }
 
@@ -200,25 +200,23 @@ func (s *Squares) SetPassword(password string) error {
 func (s *Squares) LoadSettings() error {
 	row := s.model.db.QueryRow(`
 		SELECT squares_id,
-			   home_team_name, home_team_color_1, home_team_color_2, home_team_color_3,
-			   away_team_name, away_team_color_1, away_team_color_2, away_team_color_3,
+			   home_team_name, home_team_color_1, home_team_color_2,
+			   away_team_name, away_team_color_1, away_team_color_2,
 			   notes, modified
 		FROM squares_settings
 		WHERE squares_id = $1
 	`, s.ID)
 
 	return row.Scan(
-		&s.Settings.SquaresID,
-		&s.Settings.HomeTeamName,
-		&s.Settings.HomeTeamColor1,
-		&s.Settings.HomeTeamColor2,
-		&s.Settings.HomeTeamColor3,
-		&s.Settings.AwayTeamName,
-		&s.Settings.AwayTeamColor1,
-		&s.Settings.AwayTeamColor2,
-		&s.Settings.AwayTeamColor3,
+		&s.Settings.squaresID,
+		&s.Settings.homeTeamName,
+		&s.Settings.homeTeamColor1,
+		&s.Settings.homeTeamColor2,
+		&s.Settings.awayTeamName,
+		&s.Settings.awayTeamColor1,
+		&s.Settings.awayTeamColor2,
 		&s.Settings.notes,
-		&s.Settings.Modified,
+		&s.Settings.modified,
 	)
 }
 

@@ -91,15 +91,13 @@ func TestSquares(t *testing.T) {
 	g.Expect(squares.passwordHash).ShouldNot(gomega.Equal(originalPasswordHash))
 
 	g.Expect(squares.Settings).Should(gomega.Equal(SquaresSettings{
-		SquaresID:      squares.ID,
-		HomeTeamName:   nil,
-		HomeTeamColor1: nil,
-		HomeTeamColor2: nil,
-		HomeTeamColor3: nil,
-		AwayTeamName:   nil,
-		AwayTeamColor1: nil,
-		AwayTeamColor2: nil,
-		AwayTeamColor3: nil,
+		squaresID:      squares.ID,
+		homeTeamName:   nil,
+		homeTeamColor1: nil,
+		homeTeamColor2: nil,
+		awayTeamName:   nil,
+		awayTeamColor1: nil,
+		awayTeamColor2: nil,
 		notes:          nil,
 	}))
 
@@ -109,7 +107,7 @@ func TestSquares(t *testing.T) {
 	squares.SquaresType = SquaresTypeStd25
 
 	awayTeamName := "Different Away Team"
-	squares.Settings.AwayTeamName = &awayTeamName
+	squares.Settings.SetAwayTeamName(awayTeamName)
 
 	err = squares.Save()
 	g.Expect(err).Should(gomega.Succeed())
@@ -121,8 +119,8 @@ func TestSquares(t *testing.T) {
 	g.Expect(squares2.Name).Should(gomega.Equal("Different Name"))
 	g.Expect(squares2.Locks.Unix()).Should(gomega.Equal(future.Unix()))
 	g.Expect(squares2.SquaresType).Should(gomega.Equal(SquaresTypeStd25))
-	g.Expect(squares2.Settings.HomeTeamName).Should(gomega.BeNil())
-	g.Expect(*squares2.Settings.AwayTeamName).Should(gomega.Equal("Different Away Team"))
+	g.Expect(squares2.Settings.HomeTeamName()).Should(gomega.Equal(DefaultHomeTeamName))
+	g.Expect(squares2.Settings.AwayTeamName()).Should(gomega.Equal("Different Away Team"))
 
 	squares3, err := m.SquaresByToken(context.Background(), squares2.Token)
 	g.Expect(err).Should(gomega.Succeed())
@@ -132,7 +130,7 @@ func TestSquares(t *testing.T) {
 	loadedSquares, err := m.SquaresByID(squares.ID)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(loadedSquares.LoadSettings()).Should(gomega.Succeed())
-	g.Expect(loadedSquares.Settings.SquaresID).Should(gomega.Equal(squares.ID))
+	g.Expect(loadedSquares.Settings.squaresID).Should(gomega.Equal(squares.ID))
 }
 
 func TestNewSquaresInvalidSquaresType(t *testing.T) {

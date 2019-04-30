@@ -117,14 +117,6 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 		NameMaxLength  int
 	}
 
-	str := func(s *string) string {
-		if s == nil {
-			return ""
-		}
-
-		return *s
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 		sqCtxData := r.Context().Value(ctxKeySquares).(*squaresContextData)
 		squares := sqCtxData.Squares
@@ -149,11 +141,9 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 			formValues["HomeTeamName"] = r.PostFormValue("home-team-name")
 			formValues["HomeTeamColor1"] = r.PostFormValue("home-team-color-1")
 			formValues["HomeTeamColor2"] = r.PostFormValue("home-team-color-2")
-			formValues["HomeTeamColor3"] = r.PostFormValue("home-team-color-3")
 			formValues["AwayTeamName"] = r.PostFormValue("away-team-name")
 			formValues["AwayTeamColor1"] = r.PostFormValue("away-team-color-1")
 			formValues["AwayTeamColor2"] = r.PostFormValue("away-team-color-2")
-			formValues["AwayTeamColor3"] = r.PostFormValue("away-team-color-3")
 			formValues["Notes"] = r.PostFormValue("notes")
 
 			name := v.Printable("name", r.PostFormValue("name"))
@@ -162,25 +152,21 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 			homeTeamName = v.MaxLength("home-team-name", homeTeamName, maxNameLen)
 			homeTeamColor1 := v.Color("home-team-color-1", r.PostFormValue("home-team-color-1"), true)
 			homeTeamColor2 := v.Color("home-team-color-2", r.PostFormValue("home-team-color-2"), true)
-			homeTeamColor3 := v.Color("home-team-color-3", r.PostFormValue("home-team-color-3"), true)
 			awayTeamName := v.Printable("away-team-name", r.PostFormValue("away-team-name"), true)
 			awayTeamName = v.MaxLength("away-team-name", awayTeamName, maxNameLen)
 			awayTeamColor1 := v.Color("away-team-color-1", r.PostFormValue("away-team-color-1"), true)
 			awayTeamColor2 := v.Color("away-team-color-2", r.PostFormValue("away-team-color-2"), true)
-			awayTeamColor3 := v.Color("away-team-color-3", r.PostFormValue("away-team-color-3"), true)
 			notes := v.PrintableWithNewline("notes", r.PostFormValue("notes"), true)
 			notes = v.MaxLength("notes", notes, model.NotesMaxLength)
 
 			if v.OK() {
 				squares.Name = name
-				squares.Settings.HomeTeamName = &homeTeamName
-				squares.Settings.HomeTeamColor1 = &homeTeamColor1
-				squares.Settings.HomeTeamColor2 = &homeTeamColor2
-				squares.Settings.HomeTeamColor3 = &homeTeamColor3
-				squares.Settings.AwayTeamName = &awayTeamName
-				squares.Settings.AwayTeamColor1 = &awayTeamColor1
-				squares.Settings.AwayTeamColor2 = &awayTeamColor2
-				squares.Settings.AwayTeamColor3 = &awayTeamColor3
+				squares.Settings.SetHomeTeamName(homeTeamName)
+				squares.Settings.SetHomeTeamColor1(homeTeamColor1)
+				squares.Settings.SetHomeTeamColor2(homeTeamColor2)
+				squares.Settings.SetAwayTeamName(awayTeamName)
+				squares.Settings.SetAwayTeamColor1(awayTeamColor1)
+				squares.Settings.SetAwayTeamColor2(awayTeamColor2)
 				squares.Settings.SetNotes(notes)
 
 				if err := squares.Save(); err != nil {
@@ -199,14 +185,12 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 			tplData.FormErrors = v.Errors
 		} else {
 			formValues["Name"] = squares.Name
-			formValues["HomeTeamName"] = str(squares.Settings.HomeTeamName)
-			formValues["HomeTeamColor1"] = str(squares.Settings.HomeTeamColor1)
-			formValues["HomeTeamColor2"] = str(squares.Settings.HomeTeamColor2)
-			formValues["HomeTeamColor3"] = str(squares.Settings.HomeTeamColor3)
-			formValues["AwayTeamName"] = str(squares.Settings.AwayTeamName)
-			formValues["AwayTeamColor1"] = str(squares.Settings.AwayTeamColor1)
-			formValues["AwayTeamColor2"] = str(squares.Settings.AwayTeamColor2)
-			formValues["AwayTeamColor3"] = str(squares.Settings.AwayTeamColor3)
+			formValues["HomeTeamName"] = squares.Settings.HomeTeamName()
+			formValues["HomeTeamColor1"] = squares.Settings.HomeTeamColor1()
+			formValues["HomeTeamColor2"] = squares.Settings.HomeTeamColor2()
+			formValues["AwayTeamName"] = squares.Settings.AwayTeamName()
+			formValues["AwayTeamColor1"] = squares.Settings.AwayTeamColor1()
+			formValues["AwayTeamColor2"] = squares.Settings.AwayTeamColor2()
 			formValues["Notes"] = squares.Settings.Notes()
 
 			session := s.Session(r)
