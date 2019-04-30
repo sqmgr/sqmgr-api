@@ -27,28 +27,28 @@ func TestSessionUser(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
 	theContext := context.Background()
-	theSquares := &Squares{}
+	theGrid := &Grid{}
 	called := false
 
-	joinFn := JoinSquares(func(ctx context.Context, squares *Squares) error {
+	joinFn := JoinGrid(func(ctx context.Context, grid *Grid) error {
 		g.Expect(ctx).Should(gomega.Equal(theContext))
-		g.Expect(squares).Should(gomega.Equal(theSquares))
+		g.Expect(grid).Should(gomega.Equal(theGrid))
 		called = true
 
 		return nil
 	})
 
 	u := NewSessionUser(map[int64]bool{1000: true, 2000: true}, joinFn)
-	ok, err := u.IsMemberOf(context.Background(), &Squares{id: 1000})
+	ok, err := u.IsMemberOf(context.Background(), &Grid{id: 1000})
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(ok).Should(gomega.BeTrue())
 
-	ok, err = u.IsMemberOf(context.Background(), &Squares{id: 3000})
+	ok, err = u.IsMemberOf(context.Background(), &Grid{id: 3000})
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(ok).Should(gomega.BeFalse())
 
-	g.Expect(u.IsAdminOf(context.Background(), &Squares{id: 1000})).Should(gomega.BeFalse())
+	g.Expect(u.IsAdminOf(context.Background(), &Grid{id: 1000})).Should(gomega.BeFalse())
 
-	g.Expect(u.JoinSquares(theContext, theSquares)).Should(gomega.Succeed())
+	g.Expect(u.JoinGrid(theContext, theGrid)).Should(gomega.Succeed())
 	g.Expect(called).Should(gomega.BeTrue())
 }

@@ -27,9 +27,9 @@ import (
 	"github.com/weters/sqmgr/internal/validator"
 )
 
-type squaresContextData struct {
+type gridContextData struct {
 	EffectiveUser model.EffectiveUser
-	Squares       *model.Squares
+	Grid          *model.Grid
 	IsMember      bool
 	IsAdmin       bool
 }
@@ -39,7 +39,7 @@ func (s *Server) squaresMemberHandler(mustBeMember, mustBeAdmin bool, nextHandle
 		vars := mux.Vars(r)
 		token := vars["token"]
 
-		squares, err := s.model.SquaresByToken(r.Context(), token)
+		grid, err := s.model.GridByToken(r.Context(), token)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				s.Error(w, r, http.StatusNotFound)
@@ -56,27 +56,27 @@ func (s *Server) squaresMemberHandler(mustBeMember, mustBeAdmin bool, nextHandle
 			return
 		}
 
-		isMember, err := user.IsMemberOf(r.Context(), squares)
+		isMember, err := user.IsMemberOf(r.Context(), grid)
 		if err != nil {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
 		if mustBeMember && !isMember {
-			http.Redirect(w, r, fmt.Sprintf("/squares/%s/join", squares.Token()), http.StatusSeeOther)
+			http.Redirect(w, r, fmt.Sprintf("/grid/%s/join", grid.Token()), http.StatusSeeOther)
 			return
 		}
 
-		isAdmin := user.IsAdminOf(r.Context(), squares)
+		isAdmin := user.IsAdminOf(r.Context(), grid)
 		if mustBeAdmin && !isAdmin {
 			s.Error(w, r, http.StatusUnauthorized)
 			return
 		}
 
 		// add value
-		r = r.WithContext(context.WithValue(r.Context(), ctxKeySquares, &squaresContextData{
+		r = r.WithContext(context.WithValue(r.Context(), ctxKeyGrid, &gridContextData{
 			EffectiveUser: user,
-			Squares:       squares,
+			Grid:          grid,
 			IsMember:      isMember,
 			IsAdmin:       isAdmin,
 		}))
@@ -90,15 +90,15 @@ func (s *Server) squaresHandler() http.HandlerFunc {
 
 	type data struct {
 		IsAdmin bool
-		Squares *model.Squares
+		Grid *model.Grid
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		sqCtxData := r.Context().Value(ctxKeySquares).(*squaresContextData)
+		gridCtxData := r.Context().Value(ctxKeyGrid).(*gridContextData)
 
 		s.ExecuteTemplate(w, r, tpl, data{
-			IsAdmin: sqCtxData.IsAdmin,
-			Squares: sqCtxData.Squares,
+			IsAdmin: gridCtxData.IsAdmin,
+			Grid: gridCtxData.Grid,
 		})
 	}
 }
@@ -111,7 +111,7 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 	type data struct {
 		FormValues        map[string]string
 		FormErrors        validator.Errors
-		Squares           *model.Squares
+		Grid              *model.Grid
 		DidUpdate         bool
 		NotesMaxLength    int
 		NameMaxLength     int
@@ -119,17 +119,17 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		sqCtxData := r.Context().Value(ctxKeySquares).(*squaresContextData)
-		squares := sqCtxData.Squares
+		gridCtxData := r.Context().Value(ctxKeyGrid).(*gridContextData)
+		grid := gridCtxData.Grid
 
-		if err := squares.LoadSettings(); err != nil {
+		if err := grid.LoadSettings(); err != nil {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
 		formValues := make(map[string]string)
 		tplData := data{
-			Squares:           squares,
+			Grid:              grid,
 			FormValues:        formValues,
 			NotesMaxLength:    model.NotesMaxLength,
 			NameMaxLength:     maxNameLen,
@@ -162,8 +162,8 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 			notes = v.MaxLength("notes", notes, model.NotesMaxLength)
 
 			if v.OK() {
-				squares.SetName(name)
-				settings := squares.Settings()
+				grid.SetName(name)
+				settings := grid.Settings()
 				settings.SetHomeTeamName(homeTeamName)
 				settings.SetHomeTeamColor1(homeTeamColor1)
 				settings.SetHomeTeamColor2(homeTeamColor2)
@@ -172,7 +172,7 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 				settings.SetAwayTeamColor2(awayTeamColor2)
 				settings.SetNotes(notes)
 
-				if err := squares.Save(); err != nil {
+				if err := grid.Save(); err != nil {
 					s.Error(w, r, http.StatusInternalServerError, err)
 					return
 				}
@@ -187,8 +187,8 @@ func (s *Server) squaresCustomizeHandler() http.HandlerFunc {
 
 			tplData.FormErrors = v.Errors
 		} else {
-			settings := squares.Settings()
-			formValues["Name"] = squares.Name()
+			settings := grid.Settings()
+			formValues["Name"] = grid.Name()
 			formValues["HomeTeamName"] = settings.HomeTeamName()
 			formValues["HomeTeamColor1"] = settings.HomeTeamColor1()
 			formValues["HomeTeamColor2"] = settings.HomeTeamColor2()
@@ -215,26 +215,26 @@ func (s *Server) squaresJoinHandler() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		sqCtxData := r.Context().Value(ctxKeySquares).(*squaresContextData)
-		squares := sqCtxData.Squares
+		sqCtxData := r.Context().Value(ctxKeyGrid).(*gridContextData)
+		grid := sqCtxData.Grid
 		user := sqCtxData.EffectiveUser
 
 		if sqCtxData.IsMember {
-			http.Redirect(w, r, fmt.Sprintf("/squares/%s", squares.Token()), http.StatusSeeOther)
+			http.Redirect(w, r, fmt.Sprintf("/grid/%s", grid.Token()), http.StatusSeeOther)
 			return
 		}
 
 		tplData := data{}
 		if r.Method == http.MethodPost {
 			password := r.PostFormValue("password")
-			if squares.PasswordIsValid(password) {
+			if grid.PasswordIsValid(password) {
 
-				if err := user.JoinSquares(r.Context(), squares); err != nil {
+				if err := user.JoinGrid(r.Context(), grid); err != nil {
 					s.Error(w, r, http.StatusInternalServerError, err)
 					return
 				}
 
-				http.Redirect(w, r, fmt.Sprintf("/squares/%s", squares.Token()), http.StatusSeeOther)
+				http.Redirect(w, r, fmt.Sprintf("/grid/%s", grid.Token()), http.StatusSeeOther)
 				return
 			}
 

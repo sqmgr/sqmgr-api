@@ -31,12 +31,12 @@ SqMGR.SquaresBuilder = function() {
 		i, elem, elem2, numSquares
 
 	// this shouldn't happen
-	if (typeof(SqMGR.squares) === "undefined") {
-		throw new Error("squares data not found")
+	if (typeof(SqMGR.grid) === "undefined") {
+		throw new Error("grid data not found")
 	}
 
 	parent.classList.add('squares')
-	parent.classList.add(SqMGR.squares.squaresType)
+	parent.classList.add(SqMGR.grid.gridType)
 
 	elem = document.createElement('div')
 	elem.classList.add('spacer')
@@ -69,7 +69,7 @@ SqMGR.SquaresBuilder = function() {
 	// FIXME
 	var names = [ "Alexandria", "Brett", "Charlie", "Danny", "Eliza", "Frank", "Gary", "Harper" ]
 
-	numSquares = SqMGR.Config.Types[SqMGR.squares.squaresType]
+	numSquares = SqMGR.Config.Types[SqMGR.grid.gridType]
 	for (i=0; i<numSquares; i++) {
 		elem = document.createElement('div')
 		elem.classList.add('square')
@@ -93,7 +93,7 @@ SqMGR.SquaresBuilder = function() {
 
 SqMGR.SquaresBuilder.prototype.getTeamValue = function(team, prop) {
 	var setting = team.toLowerCase() + "Team" + prop
-	return SqMGR.squares.settings[setting]
+	return SqMGR.grid.settings[setting]
 }
 
 window.addEventListener('load', SqMGR.buildSquares)

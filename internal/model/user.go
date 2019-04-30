@@ -238,14 +238,14 @@ func (u *User) Delete() error {
 	return nil
 }
 
-// JoinSquares will link a user to a squares game.
-func (u *User) JoinSquares(ctx context.Context, s *Squares) error {
+// JoinGrid will link a user to a grid game.
+func (u *User) JoinGrid(ctx context.Context, s *Grid) error {
 	_, err := u.db.ExecContext(ctx, "INSERT INTO squares_users (squares_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", s.id, u.ID)
 	return err
 }
 
-// IsMemberOf will return true if the user belongs to the squares
-func (u *User) IsMemberOf(ctx context.Context, s *Squares) (bool, error) {
+// IsMemberOf will return true if the user belongs to the grid
+func (u *User) IsMemberOf(ctx context.Context, s *Grid) (bool, error) {
 	// user is the admin
 	if u.ID == s.userID {
 		return true, nil
@@ -267,8 +267,8 @@ func (u *User) IsMemberOf(ctx context.Context, s *Squares) (bool, error) {
 	return ok, nil
 }
 
-// IsAdminOf will return true if the user is the admin of the squares
-func (u *User) IsAdminOf(ctx context.Context, s *Squares) bool {
+// IsAdminOf will return true if the user is the admin of the grid
+func (u *User) IsAdminOf(ctx context.Context, s *Grid) bool {
 	return u.ID == s.userID
 }
 

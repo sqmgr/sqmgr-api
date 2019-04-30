@@ -17,16 +17,15 @@ limitations under the License.
 package model
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/onsi/gomega"
 )
 
-func TestSquaresSettings(t *testing.T) {
+func TestGridSettings(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
-	s := SquaresSettings{}
+	s := GridSettings{}
 
 	testDefaultsAreUsed := func(msg string) {
 		g.Expect(s.HomeTeamName()).Should(gomega.Equal(DefaultHomeTeamName), msg)
@@ -64,15 +63,13 @@ func TestSquaresSettings(t *testing.T) {
 	s.SetAwayTeamColor2("")
 	s.SetNotes("")
 
-	fmt.Println(s.homeTeamName)
-
 	testDefaultsAreUsed("set back to nil")
 }
 
 func TestMaxLength(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
-	s := &SquaresSettings{}
+	s := &GridSettings{}
 
 	testMaxLength(g, s.Notes, s.SetNotes, NotesMaxLength, "notes")
 	testMaxLength(g, s.HomeTeamName, s.SetHomeTeamName, TeamNameMaxLength, "homeTeamName")

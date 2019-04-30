@@ -177,14 +177,14 @@ func (v *Validator) Datetime(key, datetime, timezoneOffset string) time.Time {
 	return dt.UTC()
 }
 
-// SquaresType will ensure that the string is a valid square type
-func (v *Validator) SquaresType(key, val string) model.SquaresType {
-	if err := model.IsValidSquaresType(val); err != nil {
+// GridType will ensure that the string is a valid grid type
+func (v *Validator) GridType(key, val string) model.GridType {
+	if err := model.IsValidGridType(val); err != nil {
 		v.AddError(key, "must be a valid squares type")
-		return model.SquaresType("")
+		return model.GridType("")
 	}
 
-	return model.SquaresType(val)
+	return model.GridType(val)
 }
 
 // OK will return true if no errors were found

@@ -20,30 +20,30 @@ import "context"
 
 // SessionUser represents a user who has not logged in
 type SessionUser struct {
-	squaresIDs map[int64]bool
-	joinFunc   JoinSquares
+	gridIDs  map[int64]bool
+	joinFunc JoinGrid
 }
 
 // NewSessionUser returns a new session user
-func NewSessionUser(ids map[int64]bool, joinFunc JoinSquares) *SessionUser {
+func NewSessionUser(ids map[int64]bool, joinFunc JoinGrid) *SessionUser {
 	return &SessionUser{ids, joinFunc}
 }
 
 // IsAdminOf will always return false for a session-based user
-func (u *SessionUser) IsAdminOf(ctx context.Context, s *Squares) bool {
+func (u *SessionUser) IsAdminOf(ctx context.Context, s *Grid) bool {
 	return false
 }
 
 // IsMemberOf will return true if the user is a member of the squares
-func (u *SessionUser) IsMemberOf(ctx context.Context, s *Squares) (bool, error) {
-	_, found := u.squaresIDs[s.id]
+func (u *SessionUser) IsMemberOf(ctx context.Context, s *Grid) (bool, error) {
+	_, found := u.gridIDs[s.id]
 	return found, nil
 }
 
-// JoinSquares will attempt to join the squares
-func (u *SessionUser) JoinSquares(ctx context.Context, s *Squares) error {
+// JoinGrid will attempt to join the grid
+func (u *SessionUser) JoinGrid(ctx context.Context, s *Grid) error {
 	return u.joinFunc(ctx, s)
 }
 
-// JoinSquares is a function which can be called to join squares
-type JoinSquares func(ctx context.Context, s *Squares) error
+// JoinGrid is a function which can be called to join grids
+type JoinGrid func(ctx context.Context, s *Grid) error

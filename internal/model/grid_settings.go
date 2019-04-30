@@ -40,10 +40,10 @@ const (
 	DefaultAwayTeamColor2 = "#003087"
 )
 
-// SquaresSettings will contain various user-defined settings
+// GridSettings will contain various user-defined settings
 // This object uses getters and setters to help guard against user input.
-type SquaresSettings struct {
-	squaresID      int64
+type GridSettings struct {
+	gridID         int64
 	homeTeamName   *string
 	homeTeamColor1 *string
 	homeTeamColor2 *string
@@ -54,8 +54,8 @@ type SquaresSettings struct {
 	modified       *time.Time
 }
 
-// squaresSettingsJSON is used for custom serialization
-type squaresSettingsJSON struct {
+// gridSettingsJSON is used for custom serialization
+type gridSettingsJSON struct {
 	HomeTeamName   string `json:"homeTeamName"`
 	HomeTeamColor1 string `json:"homeTeamColor1"`
 	HomeTeamColor2 string `json:"homeTeamColor2"`
@@ -66,20 +66,20 @@ type squaresSettingsJSON struct {
 }
 
 // MarshalJSON adds custom JSON marshalling support
-func (s SquaresSettings) MarshalJSON() ([]byte, error) {
-	return json.Marshal(squaresSettingsJSON{
-		HomeTeamName:   s.HomeTeamName(),
-		HomeTeamColor1: s.HomeTeamColor1(),
-		HomeTeamColor2: s.HomeTeamColor2(),
-		AwayTeamName:   s.AwayTeamName(),
-		AwayTeamColor1: s.AwayTeamColor1(),
-		AwayTeamColor2: s.AwayTeamColor2(),
-		Notes:          s.Notes(),
+func (g GridSettings) MarshalJSON() ([]byte, error) {
+	return json.Marshal(gridSettingsJSON{
+		HomeTeamName:   g.HomeTeamName(),
+		HomeTeamColor1: g.HomeTeamColor1(),
+		HomeTeamColor2: g.HomeTeamColor2(),
+		AwayTeamName:   g.AwayTeamName(),
+		AwayTeamColor1: g.AwayTeamColor1(),
+		AwayTeamColor2: g.AwayTeamColor2(),
+		Notes:          g.Notes(),
 	})
 }
 
 // Save will save the settings
-func (s *SquaresSettings) Save(q executer) error {
+func (g *GridSettings) Save(q executer) error {
 	_, err := q.Exec(`
 		UPDATE squares_settings SET
 			home_team_name = $1,
@@ -92,23 +92,23 @@ func (s *SquaresSettings) Save(q executer) error {
 			modified = (NOW() AT TIME ZONE 'utc')
 		WHERE squares_id = $8
 	`,
-		s.homeTeamName,
-		s.homeTeamColor1,
-		s.homeTeamColor2,
-		s.awayTeamName,
-		s.awayTeamColor1,
-		s.awayTeamColor2,
-		s.notes,
-		s.squaresID,
+		g.homeTeamName,
+		g.homeTeamColor1,
+		g.homeTeamColor2,
+		g.awayTeamName,
+		g.awayTeamColor1,
+		g.awayTeamColor2,
+		g.notes,
+		g.gridID,
 	)
 
 	return err
 }
 
-// SetNotes will set the notes of the squares
-func (s *SquaresSettings) SetNotes(str string) {
+// SetNotes will set the notes of the grid
+func (g *GridSettings) SetNotes(str string) {
 	if len(str) == 0 {
-		s.notes = nil
+		g.notes = nil
 		return
 	}
 
@@ -118,22 +118,22 @@ func (s *SquaresSettings) SetNotes(str string) {
 		str = string(strChars[0:NotesMaxLength])
 	}
 
-	s.notes = &str
+	g.notes = &str
 }
 
 // Notes returns the notes
-func (s *SquaresSettings) Notes() string {
-	if s.notes == nil {
+func (g *GridSettings) Notes() string {
+	if g.notes == nil {
 		return ""
 	}
 
-	return *s.notes
+	return *g.notes
 }
 
 // SetHomeTeamName is a setter for the home team name
-func (s *SquaresSettings) SetHomeTeamName(name string) {
+func (g *GridSettings) SetHomeTeamName(name string) {
 	if name == "" {
-		s.homeTeamName = nil
+		g.homeTeamName = nil
 		return
 	}
 
@@ -141,33 +141,33 @@ func (s *SquaresSettings) SetHomeTeamName(name string) {
 		name = string([]rune(name)[0:TeamNameMaxLength])
 	}
 
-	s.homeTeamName = &name
+	g.homeTeamName = &name
 }
 
 // SetHomeTeamColor1 is a setter for the home team primary color
-func (s *SquaresSettings) SetHomeTeamColor1(color string) {
+func (g *GridSettings) SetHomeTeamColor1(color string) {
 	if color == "" {
-		s.homeTeamColor1 = nil
+		g.homeTeamColor1 = nil
 		return
 	}
 
-	s.homeTeamColor1 = &color
+	g.homeTeamColor1 = &color
 }
 
 // SetHomeTeamColor2 is a setter for the home team secondary color
-func (s *SquaresSettings) SetHomeTeamColor2(color string) {
+func (g *GridSettings) SetHomeTeamColor2(color string) {
 	if color == "" {
-		s.homeTeamColor2 = nil
+		g.homeTeamColor2 = nil
 		return
 	}
 
-	s.homeTeamColor2 = &color
+	g.homeTeamColor2 = &color
 }
 
 // SetAwayTeamName is a setter for the home team name
-func (s *SquaresSettings) SetAwayTeamName(name string) {
+func (g *GridSettings) SetAwayTeamName(name string) {
 	if name == "" {
-		s.awayTeamName = nil
+		g.awayTeamName = nil
 		return
 	}
 
@@ -175,79 +175,79 @@ func (s *SquaresSettings) SetAwayTeamName(name string) {
 		name = string([]rune(name)[0:TeamNameMaxLength])
 	}
 
-	s.awayTeamName = &name
+	g.awayTeamName = &name
 }
 
 // SetAwayTeamColor1 is a setter for the away team primary color
-func (s *SquaresSettings) SetAwayTeamColor1(color string) {
+func (g *GridSettings) SetAwayTeamColor1(color string) {
 	if color == "" {
-		s.awayTeamColor1 = nil
+		g.awayTeamColor1 = nil
 		return
 	}
 
-	s.awayTeamColor1 = &color
+	g.awayTeamColor1 = &color
 }
 
 // SetAwayTeamColor2 is a setter for the away team secondary color
-func (s *SquaresSettings) SetAwayTeamColor2(color string) {
+func (g *GridSettings) SetAwayTeamColor2(color string) {
 	if color == "" {
-		s.awayTeamColor2 = nil
+		g.awayTeamColor2 = nil
 		return
 	}
 
-	s.awayTeamColor2 = &color
+	g.awayTeamColor2 = &color
 }
 
 // HomeTeamName is a getter for the home team name
-func (s *SquaresSettings) HomeTeamName() string {
-	if s.homeTeamName == nil {
+func (g *GridSettings) HomeTeamName() string {
+	if g.homeTeamName == nil {
 		return DefaultHomeTeamName
 	}
 
-	return *s.homeTeamName
+	return *g.homeTeamName
 }
 
 // HomeTeamColor1 is a getter for the home team primary color
-func (s *SquaresSettings) HomeTeamColor1() string {
-	if s.homeTeamColor1 == nil {
+func (g *GridSettings) HomeTeamColor1() string {
+	if g.homeTeamColor1 == nil {
 		return DefaultHomeTeamColor1
 	}
 
-	return *s.homeTeamColor1
+	return *g.homeTeamColor1
 }
 
 // HomeTeamColor2 is a getter for the home team secondary color
-func (s *SquaresSettings) HomeTeamColor2() string {
-	if s.homeTeamColor2 == nil {
+func (g *GridSettings) HomeTeamColor2() string {
+	if g.homeTeamColor2 == nil {
 		return DefaultHomeTeamColor2
 	}
 
-	return *s.homeTeamColor2
+	return *g.homeTeamColor2
 }
 
 // AwayTeamName is a getter for the home team name
-func (s *SquaresSettings) AwayTeamName() string {
-	if s.awayTeamName == nil {
+func (g *GridSettings) AwayTeamName() string {
+	if g.awayTeamName == nil {
 		return DefaultAwayTeamName
 	}
 
-	return *s.awayTeamName
+	return *g.awayTeamName
 }
 
 // AwayTeamColor1 is a getter for the away team primary color
-func (s *SquaresSettings) AwayTeamColor1() string {
-	if s.awayTeamColor1 == nil {
+func (g *GridSettings) AwayTeamColor1() string {
+	if g.awayTeamColor1 == nil {
 		return DefaultAwayTeamColor1
 	}
 
-	return *s.awayTeamColor1
+	return *g.awayTeamColor1
 }
 
 // AwayTeamColor2 is a getter for the away team secondary color
-func (s *SquaresSettings) AwayTeamColor2() string {
-	if s.awayTeamColor2 == nil {
+func (g *GridSettings) AwayTeamColor2() string {
+	if g.awayTeamColor2 == nil {
 		return DefaultAwayTeamColor2
 	}
 
-	return *s.awayTeamColor2
+	return *g.awayTeamColor2
 }

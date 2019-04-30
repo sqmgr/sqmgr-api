@@ -49,7 +49,7 @@ type TemplateData struct {
 const (
 	ctxKeySession ctxKey = iota
 	ctxKeyUser
-	ctxKeySquares
+	ctxKeyGrid
 )
 
 var store *sessions.CookieStore
@@ -251,21 +251,21 @@ func (s *Server) EffectiveUser(r *http.Request) (model.EffectiveUser, error) {
 		return user, nil
 	}
 
-	ids, ok := sess.Values[squaresIDsKey].(map[int64]bool)
+	ids, ok := sess.Values[gridIDKey].(map[int64]bool)
 	if !ok {
 		ids = make(map[int64]bool)
 	}
 
 	logrus.Trace("effective user is session user")
-	return model.NewSessionUser(ids, model.JoinSquares(func(ctx context.Context, squares *model.Squares) error {
-		ids, ok := sess.Values[squaresIDsKey].(map[int64]bool)
+	return model.NewSessionUser(ids, model.JoinGrid(func(ctx context.Context, grid *model.Grid) error {
+		ids, ok := sess.Values[gridIDKey].(map[int64]bool)
 		if !ok {
 			ids = make(map[int64]bool)
 		}
 
-		ids[squares.ID()] = true
+		ids[grid.ID()] = true
 
-		sess.Values[squaresIDsKey] = ids
+		sess.Values[gridIDKey] = ids
 		sess.Save()
 
 		return nil

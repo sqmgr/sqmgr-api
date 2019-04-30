@@ -20,7 +20,7 @@ import "context"
 
 // EffectiveUser provides common user functionality
 type EffectiveUser interface {
-	JoinSquares(ctx context.Context, s *Squares) error
-	IsMemberOf(ctx context.Context, s *Squares) (bool, error)
-	IsAdminOf(ctx context.Context, s *Squares) bool
+	JoinGrid(ctx context.Context, s *Grid) error
+	IsMemberOf(ctx context.Context, s *Grid) (bool, error)
+	IsAdminOf(ctx context.Context, s *Grid) bool
 }

@@ -22,7 +22,7 @@ limitations under the License.
 
 {{ define "content" }}
 <section class="create">
-	<h3>Create New Squares</h3>
+	<h3>Create New Squares Pool</h3>
 
 	<div class="columns">
 		<form method="post" action="/create" class="col-2">
@@ -31,16 +31,16 @@ limitations under the License.
 				<legend>Basic Settings</legend>
 
 				<div class="field">
-					<label for="squares-name">Squares Name</label>
-					<input type="name" id="squares-name" name="squares-name" placeholder="Squares Name" autocomplete="off" value="{{.Local.FormData.Name}}" maxlength="{{.Local.NameMaxLength}}" required>
+					<label for="grid-name">Squares Pool Name</label>
+					<input type="name" id="grid-name" name="grid-name" placeholder="Squares Pool Name" autocomplete="off" value="{{.Local.FormData.Name}}" maxlength="{{.Local.NameMaxLength}}" required>
 				</div>
 
 				<div class="field">
-					<label for="squares-type">Squares Configuration</label>
-					<select id="squares-type" name="squares-type">
-						{{ $squaresType := .Local.FormData.Type }}
-						{{ range .Local.SquaresTypes }}
-						<option value="{{.}}"{{ if eq . $squaresType }} selected="selected"{{ end }}>{{.Description}}
+					<label for="grid-type">Grid Configuration</label>
+					<select id="grid-type" name="grid-type">
+						{{ $gridType := .Local.FormData.Type }}
+						{{ range .Local.GridTypes }}
+						<option value="{{.}}"{{ if eq . $gridType }} selected="selected"{{ end }}>{{.Description}}
 						{{ end }}
 					</select>
 				</div>

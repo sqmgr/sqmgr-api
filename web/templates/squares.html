@@ -14,19 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 
-{{ define "title" }}{{.Local.Squares.Name}} - {{ end }}
+{{ define "title" }}{{.Local.Grid.Name}} - {{ end }}
 {{ define "header" }}
 <link href="/static/css/squares.css" rel="stylesheet">
 <link href="/static/css/form.css" rel="stylesheet">
 {{ end }}
 {{ define "content" }}
 <section class="squares">
-	<h3>{{.Local.Squares.Name}}</h3>
+	<h3>{{.Local.Grid.Name}}</h3>
 
-	<div class="notes">{{.Local.Squares.Settings.Notes}}</div>
+	<div class="notes">{{.Local.Grid.Settings.Notes}}</div>
 
 	{{ if .Local.IsAdmin }}
-		<p><a href="/squares/{{.Local.Squares.Token}}/customize">Customize</a>
+		<p><a href="/squares/{{.Local.Grid.Token}}/customize">Customize</a>
 	{{ end }}
 
 	<div id="squares-container"></div>
@@ -36,23 +36,23 @@ limitations under the License.
 			<tbody>
 				<tr>
 					<td>ID
-					<td>{{.Local.Squares.Token}}
+					<td>{{.Local.Grid.Token}}
 				</tr>
 				<tr>
 					<td>Type
-					<td>{{.Local.Squares.SquaresType.Description}}
+					<td>{{.Local.Grid.GridType.Description}}
 				</tr>
 				<tr>
 					<td>Locks
-					<td>{{ if .Local.Squares.Locks.IsZero }}&nbsp;{{ else }}{{.Local.Squares.Locks}}{{ end }}
+					<td>{{ if .Local.Grid.Locks.IsZero }}&nbsp;{{ else }}{{.Local.Grid.Locks}}{{ end }}
 				</tr>
 				<tr>
 					<td>Created
-					<td>{{ .Local.Squares.Created.Format "Mon, Jan 2 2006 at 3:04 PM" }}
+					<td>{{ .Local.Grid.Created.Format "Mon, Jan 2 2006 at 3:04 PM" }}
 				</tr>
 				<tr>
 					<td>Last Modified
-					<td>{{ .Local.Squares.Modified.Format "Mon, Jan 2 2006 at 3:04 PM" }}
+					<td>{{ .Local.Grid.Modified.Format "Mon, Jan 2 2006 at 3:04 PM" }}
 				</tr>
 			</tbody>
 		</table>
@@ -62,7 +62,7 @@ limitations under the License.
 {{ define "javascripts" }}
 <script>
 function SqMGR() { }
-SqMGR.squares = {{.Local.Squares}}
+SqMGR.grid = {{.Local.Grid}}
 </script>
 <script src="/static/js/squares.js"></script>
 {{ end }}

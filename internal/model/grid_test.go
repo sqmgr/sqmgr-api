@@ -64,7 +64,7 @@ func TestNewToken(t *testing.T) {
 	g.Expect(token2).ShouldNot(gomega.Equal(token1))
 }
 
-func TestSquares(t *testing.T) {
+func TestGrid(t *testing.T) {
 	if len(os.Getenv("INTEGRATION")) == 0 {
 		t.Skip("skipping. to run, use -integration flag")
 	}
@@ -75,23 +75,23 @@ func TestSquares(t *testing.T) {
 	user, err := m.NewUser(randString()+"@sqmgr.com", "my-unique-password")
 	g.Expect(err).Should(gomega.Succeed())
 
-	squares, err := m.NewSquares(user.ID, "My Squares", SquaresTypeStd100, "my-other-unique-password")
+	grid, err := m.NewGrid(user.ID, "My Grid", GridTypeStd100, "my-other-unique-password")
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(squares).ShouldNot(gomega.BeNil())
+	g.Expect(grid).ShouldNot(gomega.BeNil())
 
-	g.Expect(squares.id).Should(gomega.BeNumerically(">", 0))
-	g.Expect(squares.userID).Should(gomega.Equal(user.ID))
-	g.Expect(squares.token).Should(gomega.MatchRegexp(`^[A-Za-z0-9_-]{8}\z`))
-	g.Expect(squares.name).Should(gomega.Equal("My Squares"))
-	g.Expect(squares.passwordHash).ShouldNot(gomega.Equal("my-other-unique-password"))
-	g.Expect(argon2id.Compare(squares.passwordHash, "my-other-unique-password")).Should(gomega.Succeed())
+	g.Expect(grid.id).Should(gomega.BeNumerically(">", 0))
+	g.Expect(grid.userID).Should(gomega.Equal(user.ID))
+	g.Expect(grid.token).Should(gomega.MatchRegexp(`^[A-Za-z0-9_-]{8}\z`))
+	g.Expect(grid.name).Should(gomega.Equal("My Grid"))
+	g.Expect(grid.passwordHash).ShouldNot(gomega.Equal("my-other-unique-password"))
+	g.Expect(argon2id.Compare(grid.passwordHash, "my-other-unique-password")).Should(gomega.Succeed())
 
-	originalPasswordHash := squares.passwordHash
-	squares.SetPassword("my-other-unique-password")
-	g.Expect(squares.passwordHash).ShouldNot(gomega.Equal(originalPasswordHash))
+	originalPasswordHash := grid.passwordHash
+	grid.SetPassword("my-other-unique-password")
+	g.Expect(grid.passwordHash).ShouldNot(gomega.Equal(originalPasswordHash))
 
-	g.Expect(squares.settings).Should(gomega.Equal(SquaresSettings{
-		squaresID:      squares.id,
+	g.Expect(grid.settings).Should(gomega.Equal(GridSettings{
+		gridID:         grid.id,
 		homeTeamName:   nil,
 		homeTeamColor1: nil,
 		homeTeamColor2: nil,
@@ -102,47 +102,47 @@ func TestSquares(t *testing.T) {
 	}))
 
 	future := time.Now().UTC().Add(time.Hour)
-	squares.name = "Different Name"
-	squares.locks = future
-	squares.squaresType = SquaresTypeStd25
+	grid.name = "Different Name"
+	grid.locks = future
+	grid.gridType = GridTypeStd25
 
 	awayTeamName := "Different Away Team"
-	squares.settings.SetAwayTeamName(awayTeamName)
+	grid.settings.SetAwayTeamName(awayTeamName)
 
-	err = squares.Save()
+	err = grid.Save()
 	g.Expect(err).Should(gomega.Succeed())
 
-	squares2, err := m.SquaresByID(squares.id)
+	grid2, err := m.GridByID(grid.id)
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(squares2).ShouldNot(gomega.BeNil())
+	g.Expect(grid2).ShouldNot(gomega.BeNil())
 
-	g.Expect(squares2.name).Should(gomega.Equal("Different Name"))
-	g.Expect(squares2.locks.Unix()).Should(gomega.Equal(future.Unix()))
-	g.Expect(squares2.squaresType).Should(gomega.Equal(SquaresTypeStd25))
-	g.Expect(squares2.settings.HomeTeamName()).Should(gomega.Equal(DefaultHomeTeamName))
-	g.Expect(squares2.settings.AwayTeamName()).Should(gomega.Equal("Different Away Team"))
+	g.Expect(grid2.name).Should(gomega.Equal("Different Name"))
+	g.Expect(grid2.locks.Unix()).Should(gomega.Equal(future.Unix()))
+	g.Expect(grid2.gridType).Should(gomega.Equal(GridTypeStd25))
+	g.Expect(grid2.settings.HomeTeamName()).Should(gomega.Equal(DefaultHomeTeamName))
+	g.Expect(grid2.settings.AwayTeamName()).Should(gomega.Equal("Different Away Team"))
 
-	squares3, err := m.SquaresByToken(context.Background(), squares2.token)
+	grid3, err := m.GridByToken(context.Background(), grid2.token)
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(squares3).ShouldNot(gomega.BeNil())
-	g.Expect(squares3).Should(gomega.Equal(squares2))
+	g.Expect(grid3).ShouldNot(gomega.BeNil())
+	g.Expect(grid3).Should(gomega.Equal(grid2))
 
-	loadedSquares, err := m.SquaresByID(squares.id)
+	loadedGrid, err := m.GridByID(grid.id)
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(loadedSquares.LoadSettings()).Should(gomega.Succeed())
-	g.Expect(loadedSquares.settings.squaresID).Should(gomega.Equal(squares.id))
+	g.Expect(loadedGrid.LoadSettings()).Should(gomega.Succeed())
+	g.Expect(loadedGrid.settings.gridID).Should(gomega.Equal(grid.id))
 }
 
-func TestNewSquaresInvalidSquaresType(t *testing.T) {
+func TestNewGridInvalidGridType(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
 	m := New(nil)
-	s, err := m.NewSquares(1, "my name", SquaresType("invalid"), "my password")
+	s, err := m.NewGrid(1, "my name", GridType("invalid"), "my password")
 	g.Expect(s).Should(gomega.BeNil())
-	g.Expect(err).Should(gomega.MatchError(ErrInvalidSquaresType))
+	g.Expect(err).Should(gomega.MatchError(ErrInvalidGridType))
 }
 
-func TestSquaresCollection(t *testing.T) {
+func TestGridCollections(t *testing.T) {
 	if len(os.Getenv("INTEGRATION")) == 0 {
 		t.Skip("skipping. to run, use -integration flag")
 	}
@@ -153,36 +153,36 @@ func TestSquaresCollection(t *testing.T) {
 	user, err := m.NewUser(randString()+"@sqmgr.com", "my-unique-password")
 	g.Expect(err).Should(gomega.Succeed())
 
-	squares, err := m.NewSquares(user.ID, "Test for Collection", SquaresTypeStd100, "my-other-unique-password")
+	grid, err := m.NewGrid(user.ID, "Test for Collection", GridTypeStd100, "my-other-unique-password")
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(squares).ShouldNot(gomega.BeNil())
+	g.Expect(grid).ShouldNot(gomega.BeNil())
 
 	user2, err := m.NewUser(randString()+"@sqmgr.com", "my-unique-password-2")
 	g.Expect(err).Should(gomega.Succeed())
 
-	collection, err := m.SquaresCollectionJoinedByUser(context.Background(), user, 0, 10)
+	collection, err := m.GridsJoinedByUser(context.Background(), user, 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(0))
 
-	collection, err = m.SquaresCollectionJoinedByUser(context.Background(), user2, 0, 10)
+	collection, err = m.GridsJoinedByUser(context.Background(), user2, 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(0))
 
-	g.Expect(user2.JoinSquares(context.Background(), squares)).Should(gomega.Succeed())
-	collection, err = m.SquaresCollectionJoinedByUser(context.Background(), user2, 0, 10)
+	g.Expect(user2.JoinGrid(context.Background(), grid)).Should(gomega.Succeed())
+	collection, err = m.GridsJoinedByUser(context.Background(), user2, 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(1))
 
-	collection, err = m.SquaresCollectionOwnedByUser(context.Background(), user, 0, 10)
+	collection, err = m.GridsOwnedByUser(context.Background(), user, 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(1))
 
-	collection, err = m.SquaresCollectionOwnedByUser(context.Background(), user2, 0, 10)
+	collection, err = m.GridsOwnedByUser(context.Background(), user2, 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(0))
 }
 
-func TestSquaresCollectionPagination(t *testing.T) {
+func TestGridCollectionPagination(t *testing.T) {
 	if len(os.Getenv("INTEGRATION")) == 0 {
 		t.Skip("skipping. to run, use -integration flag")
 	}
@@ -197,27 +197,27 @@ func TestSquaresCollectionPagination(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	for i := 0; i < 30; i++ {
-		squares, err := m.NewSquares(user1.ID, randString(), SquaresTypeStd100, "my-other-unique-password")
+		grid, err := m.NewGrid(user1.ID, randString(), GridTypeStd100, "my-other-unique-password")
 		g.Expect(err).Should(gomega.Succeed())
 
 		if i < 20 {
-			g.Expect(user2.JoinSquares(context.Background(), squares)).Should(gomega.Succeed())
+			g.Expect(user2.JoinGrid(context.Background(), grid)).Should(gomega.Succeed())
 		}
 	}
 
-	count, err := m.SquaresCollectionOwnedByUserCount(context.Background(), user1)
+	count, err := m.GridsOwnedByUserCount(context.Background(), user1)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(30)))
 
-	count, err = m.SquaresCollectionOwnedByUserCount(context.Background(), user2)
+	count, err = m.GridsOwnedByUserCount(context.Background(), user2)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(0)))
 
-	count, err = m.SquaresCollectionJoinedByUserCount(context.Background(), user1)
+	count, err = m.GridsJoinedByUserCount(context.Background(), user1)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(0)))
 
-	count, err = m.SquaresCollectionJoinedByUserCount(context.Background(), user2)
+	count, err = m.GridsJoinedByUserCount(context.Background(), user2)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(20)))
 
@@ -230,7 +230,7 @@ func TestAccessors(t *testing.T) {
 	created := time.Now()
 	modified := time.Now()
 
-	s := &Squares{
+	s := &Grid{
 		locks:    locks,
 		created:  created,
 		modified: modified,
@@ -244,8 +244,8 @@ func TestAccessors(t *testing.T) {
 	s.token = "my-token"
 	g.Expect(s.Token()).Should(gomega.Equal("my-token"))
 
-	s.SetSquaresType(SquaresTypeStd25)
-	g.Expect(s.SquaresType()).Should(gomega.Equal(SquaresTypeStd25))
+	s.SetGridType(GridTypeStd25)
+	g.Expect(s.GridType()).Should(gomega.Equal(GridTypeStd25))
 	g.Expect(s.Locks()).Should(gomega.Equal(locks))
 	g.Expect(s.Created()).Should(gomega.Equal(created))
 	g.Expect(s.Modified()).Should(gomega.Equal(modified))

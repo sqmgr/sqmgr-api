@@ -60,16 +60,16 @@ func (s *Server) loginHandler() http.HandlerFunc {
 					return
 				}
 			} else {
-				ids, ok := session.Values[squaresIDsKey].(map[int64]bool)
+				ids, ok := session.Values[gridIDKey].(map[int64]bool)
 				if ok {
 					for id := range ids {
-						if err := user.JoinSquares(r.Context(), model.SquaresWithID(id)); err != nil {
+						if err := user.JoinGrid(r.Context(), model.GridWithID(id)); err != nil {
 							s.Error(w, r, http.StatusInternalServerError, err)
 							return
 						}
 					}
 
-					delete(session.Values, squaresIDsKey)
+					delete(session.Values, gridIDKey)
 				}
 
 				session.Login(user, len(rememberMe) > 0)

@@ -16,7 +16,7 @@ limitations under the License.
 
 {{ define "squares" }}
 	<div class="squares" data-pagination="parent-node">
-		{{ if .Squares }}
+		{{ if .Grids }}
 		<div class="table-container">
 			<table>
 				<thead>
@@ -28,11 +28,11 @@ limitations under the License.
 					</tr>
 				</thead>
 				<tbody>
-					{{ range .Squares }}
+					{{ range .Grids }}
 					<tr>
 						<td><a href="/squares/{{.Token}}">{{.Token}}</a>
 						<td>{{.Name}}
-						<td>{{.SquaresType.Description}}
+						<td>{{.GridType.Description}}
 						<td>{{.Created.Format "01/02/2006 at 15:04"}}
 					</tr>
 					{{ end }}

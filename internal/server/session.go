@@ -57,7 +57,7 @@ const (
 
 const (
 	rememberMeKey = "rememberMe"
-	squaresIDsKey = "squaresIDs"
+	gridIDKey     = "squaresIDs"
 )
 
 func init() {

@@ -41,13 +41,13 @@ limitations under the License.
 		<div class="actions col-3">
 			<p>Welcome {{.Local.User.Email}}
 
-			<h3>Squares You Created</h3>
+			<h3>Square Pools You Created</h3>
 
-			{{ template "squares" .Local.OwnedSquares }}
+			{{ template "squares" .Local.Owned }}
 
-			<h3>Squares You Joined</h3>
+			<h3>Square Pools You Joined</h3>
 
-			{{ template "squares" .Local.JoinedSquares }}
+			{{ template "squares" .Local.Joined }}
 		</div>
 	</div>
 </section>

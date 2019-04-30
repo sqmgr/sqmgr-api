@@ -37,18 +37,18 @@ const (
 	owned
 )
 
-type squaresTemplateData struct {
+type gridsTemplateData struct {
 	Pagination *Pagination
-	Squares    []*model.Squares
+	Grids      []*model.Grid
 }
 
-type collectionFn func(ctx context.Context, u *model.User, offset int, limit int) ([]*model.Squares, error)
+type collectionFn func(ctx context.Context, u *model.User, offset int, limit int) ([]*model.Grid, error)
 type countFn func(ctx context.Context, u *model.User) (int64, error)
 
 // page is index-1 based.
-func getSquaresData(ctx context.Context, user *model.User, link string, collFn collectionFn, cntFn countFn, page int) (*squaresTemplateData, error) {
+func getGrids(ctx context.Context, user *model.User, link string, collFn collectionFn, cntFn countFn, page int) (*gridsTemplateData, error) {
 	offset := (page - 1) * rowsPerTable // remember to adjust for page being index-1 based, not index 0
-	squares, err := collFn(ctx, user, offset, rowsPerTable)
+	grids, err := collFn(ctx, user, offset, rowsPerTable)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
@@ -61,17 +61,17 @@ func getSquaresData(ctx context.Context, user *model.User, link string, collFn c
 	p := NewPagination(count, rowsPerTable, page)
 	p.SetBaseURL(link)
 
-	return &squaresTemplateData{
+	return &gridsTemplateData{
 		Pagination: p,
-		Squares:    squares,
+		Grids:      grids,
 	}, nil
 }
 
 func (s *Server) accountHandler() http.HandlerFunc {
 	type data struct {
-		User          *model.User
-		OwnedSquares  *squaresTemplateData
-		JoinedSquares *squaresTemplateData
+		User   *model.User
+		Owned  *gridsTemplateData
+		Joined *gridsTemplateData
 	}
 
 	tpl := s.loadTemplate("account.html", "account-squares-table.html", "pagination.html")
@@ -79,22 +79,22 @@ func (s *Server) accountHandler() http.HandlerFunc {
 		user := s.AuthUser(r)
 		ctx := r.Context()
 
-		joinedData, err := getSquaresData(ctx, user, "/account/joined", s.model.SquaresCollectionJoinedByUser, s.model.SquaresCollectionJoinedByUserCount, 1)
+		joinedData, err := getGrids(ctx, user, "/account/joined", s.model.GridsJoinedByUser, s.model.GridsJoinedByUserCount, 1)
 		if err != nil && err != sql.ErrNoRows {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
-		ownedData, err := getSquaresData(ctx, user, "/account/owned", s.model.SquaresCollectionOwnedByUser, s.model.SquaresCollectionOwnedByUserCount, 1)
+		ownedData, err := getGrids(ctx, user, "/account/owned", s.model.GridsOwnedByUser, s.model.GridsOwnedByUserCount, 1)
 		if err != nil && err != sql.ErrNoRows {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
 		s.ExecuteTemplate(w, r, tpl, data{
-			User:          user,
-			OwnedSquares:  ownedData,
-			JoinedSquares: joinedData,
+			User:   user,
+			Owned:  ownedData,
+			Joined: joinedData,
 		})
 	}
 }
@@ -107,11 +107,11 @@ func (s *Server) accountSquaresHandler(asType accountSquaresHandlerType) http.Ha
 
 	switch asType {
 	case owned:
-		clFn = s.model.SquaresCollectionOwnedByUser
-		cnFn = s.model.SquaresCollectionOwnedByUserCount
+		clFn = s.model.GridsOwnedByUser
+		cnFn = s.model.GridsOwnedByUserCount
 	default:
-		clFn = s.model.SquaresCollectionJoinedByUser
-		cnFn = s.model.SquaresCollectionJoinedByUserCount
+		clFn = s.model.GridsJoinedByUser
+		cnFn = s.model.GridsJoinedByUserCount
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -124,7 +124,7 @@ func (s *Server) accountSquaresHandler(asType accountSquaresHandlerType) http.Ha
 
 		user := s.AuthUser(r)
 		ctx := r.Context()
-		data, err := getSquaresData(ctx, user, r.URL.Path, clFn, cnFn, pageInt)
+		data, err := getGrids(ctx, user, r.URL.Path, clFn, cnFn, pageInt)
 		if err != nil {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return

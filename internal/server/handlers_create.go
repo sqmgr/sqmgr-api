@@ -33,14 +33,14 @@ func (s *Server) createHandler() http.HandlerFunc {
 		MinJoinPasswordLen int
 		FormData           map[string]string
 		FormErrors         validator.Errors
-		SquaresTypes       []model.SquaresType
+		GridTypes          []model.GridType
 		NameMaxLength      int
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		tplData := data{
 			MinJoinPasswordLen: minJoinPasswordLen,
-			SquaresTypes:       model.SquaresTypes(),
+			GridTypes:          model.GridTypes(),
 			// need to explicitly include Type for "eq" operator in template
 			FormData:      map[string]string{"Type": ""},
 			NameMaxLength: maxNameLen,
@@ -51,29 +51,29 @@ func (s *Server) createHandler() http.HandlerFunc {
 		if r.Method == http.MethodPost {
 			v := validator.New()
 
-			squaresName := r.PostFormValue("squares-name")
-			squaresType := r.PostFormValue("squares-type")
+			gridName := r.PostFormValue("grid-name")
+			gridType := r.PostFormValue("grid-type")
 			password := r.PostFormValue("password")
 			confirmPassword := r.PostFormValue("confirm-password")
 
-			tplData.FormData["Name"] = squaresName
-			tplData.FormData["Type"] = squaresType
+			tplData.FormData["Name"] = gridName
+			tplData.FormData["Type"] = gridType
 
-			v.Printable("Squares Name", squaresName)
-			v.MaxLength("Squares Name", squaresName, maxNameLen)
+			v.Printable("Grid Name", gridName)
+			v.MaxLength("Grid Name", gridName, maxNameLen)
 			v.Password("Join Password", password, confirmPassword, minJoinPasswordLen)
-			if err := model.IsValidSquaresType(squaresType); err != nil {
-				v.AddError("Squares Configuration", "you must select a valid configuration option")
+			if err := model.IsValidGridType(gridType); err != nil {
+				v.AddError("Grid Configuration", "you must select a valid configuration option")
 			}
 
 			if v.OK() {
-				squares, err := s.model.NewSquares(user.ID, squaresName, model.SquaresType(squaresType), password)
+				grid, err := s.model.NewGrid(user.ID, gridName, model.GridType(gridType), password)
 				if err != nil {
 					s.Error(w, r, http.StatusInternalServerError, err)
 					return
 				}
 
-				http.Redirect(w, r, "/squares/"+squares.Token(), http.StatusSeeOther)
+				http.Redirect(w, r, "/squares/"+grid.Token(), http.StatusSeeOther)
 				return
 			}
 
