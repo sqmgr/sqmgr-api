@@ -47,6 +47,16 @@ func (g GridType) Description() string {
 	return string(g)
 }
 
+// Squares will return the number of squares in a grid
+func (g GridType) Squares() int {
+	switch g {
+	case GridTypeStd25:
+		return 25
+	default:
+		return 100
+	}
+}
+
 // IsValidGridType will check to see if the string is a valid grid type. If it's valid, nil is returned.
 func IsValidGridType(val string) error {
 	if _, ok := validGridTypes[GridType(val)]; !ok {

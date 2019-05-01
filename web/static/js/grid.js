@@ -75,7 +75,7 @@ SqMGR.SquaresBuilder = function() {
 		elem.classList.add('square')
 		elem.setAttribute('data-sqid', i)
 		elem2 = document.createElement('span')
-		elem2.textContent = i+1
+		elem2.textContent = i
 		elem2.classList.add('square-id')
 		elem.appendChild(elem2)
 		elem2 = document.createElement('span')

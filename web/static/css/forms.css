@@ -200,6 +200,7 @@ input[type="password"]:invalid {
 }
 
 p.message {
+	color: #2196f3;
 	font-weight: bold;
 	margin: 0 0 var(--spacing);
 }

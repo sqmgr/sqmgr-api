@@ -45,6 +45,7 @@ type Grid struct {
 	modified     time.Time
 
 	settings GridSettings
+	squares  map[int]*GridSquare
 }
 
 // GridWithID returns an empty grid object with only the ID set
@@ -257,7 +258,7 @@ func (m *Model) NewGrid(userID int64, name string, gridType GridType, password s
 	if err != nil {
 		return nil, err
 	}
-	row := m.db.QueryRow("SELECT * FROM new_grid($1, $2, $3, $4, $5)", token, userID, name, gridType, passwordHash)
+	row := m.db.QueryRow("SELECT * FROM new_grid($1, $2, $3, $4, $5, $6)", token, userID, name, gridType, passwordHash, gridType.Squares())
 
 	s, err := m.gridByRow(row.Scan, false)
 	if err != nil {
@@ -345,4 +346,38 @@ func (g *Grid) PasswordIsValid(password string) bool {
 	}
 
 	return true
+}
+
+// Squares will return the squares that belong to a grid. This method will lazily load the squares
+func (g *Grid) Squares() (map[int]*GridSquare, error) {
+	if g.squares == nil {
+		rows, err := g.model.db.Query("SELECT id, square_id, state, Claimant, modified FROM grid_squares WHERE grid_id = $1 ORDER BY square_id", g.id)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		squares := make(map[int]*GridSquare)
+		for rows.Next() {
+			gs := GridSquare{
+				Model:  g.model,
+				GridID: g.id,
+			}
+
+			var claimant *string
+			if err := rows.Scan(&gs.ID, &gs.SquareID, &gs.State, &claimant, &gs.Modified); err != nil {
+				return nil, err
+			}
+
+			if claimant != nil {
+				gs.Claimant = *claimant
+			}
+
+			squares[gs.SquareID] = &gs
+		}
+
+		g.squares = squares
+	}
+
+	return g.squares, nil
 }

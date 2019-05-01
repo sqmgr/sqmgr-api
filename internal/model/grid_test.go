@@ -258,3 +258,59 @@ func TestAccessors(t *testing.T) {
 	g.Expect(s.PasswordIsValid("test")).Should(gomega.BeTrue())
 	g.Expect(s.PasswordIsValid("no-match")).Should(gomega.BeFalse())
 }
+
+func TestGridSquares(t *testing.T) {
+	if len(os.Getenv("INTEGRATION")) == 0 {
+		t.Skip("skipping. to run, use -integration flag")
+	}
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+
+	user, err := m.NewUser(randString()+"@sqmgr.com", "password")
+	g.Expect(err).Should(gomega.Succeed())
+
+	grid, err := m.NewGrid(user.ID, "Test Grid", GridTypeStd25, "a password")
+	g.Expect(err).Should(gomega.Succeed())
+
+	squares, err := grid.Squares()
+	g.Expect(err).Should(gomega.Succeed())
+
+	g.Expect(len(squares)).Should(gomega.Equal(25))
+
+	square := squares[15]
+	g.Expect(square.SquareID).Should(gomega.Equal(15))
+	g.Expect(square.Claimant).Should(gomega.Equal(""))
+
+	square.Claimant = "Test User"
+	square.State = GridSquareStateClaimed
+	err = square.Save(GridSquareLog{
+		Note:       "Test Note",
+		RemoteAddr: "127.0.0.1",
+		UserID:     user.ID,
+	})
+	g.Expect(err).Should(gomega.Succeed())
+
+	grid.squares = nil // force a fresh fetch
+	squares, err = grid.Squares()
+	g.Expect(err).Should(gomega.Succeed())
+
+	square = squares[15]
+	g.Expect(square.Claimant).Should(gomega.Equal("Test User"))
+
+	err = square.Save(GridSquareLog{
+		Note: "A new note",
+	})
+	g.Expect(err).Should(gomega.Succeed())
+
+	logs, err := square.Logs()
+	g.Expect(err).Should(gomega.Succeed())
+
+	g.Expect(len(logs)).Should(gomega.Equal(2))
+	g.Expect(logs[0].Note).Should(gomega.Equal("A new note"))
+	g.Expect(logs[0].RemoteAddr).Should(gomega.Equal(""))
+	g.Expect(logs[0].UserID).Should(gomega.Equal(int64(0)))
+	g.Expect(logs[1].Note).Should(gomega.Equal("Test Note"))
+	g.Expect(logs[1].RemoteAddr).Should(gomega.Equal("127.0.0.1"))
+	g.Expect(logs[1].UserID).Should(gomega.Equal(user.ID))
+}
