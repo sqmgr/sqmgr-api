@@ -113,6 +113,41 @@ div.square {
 	position: relative;
 	overflow: hidden;
 }
+div.square:hover {
+    border-color: #000;
+	border-width: 2px;
+	box-shadow: 2px 2px 2px -2px #000;
+}
+div.square.unclaimed:hover {
+	border-color: var(--success);
+}
+div.square.paid-full {
+}
+div.square.paid-full::after {
+	content: '\2713';
+	position: absolute;
+	bottom: 2px;
+	right: 2px;
+	font-size: 0.8em;
+	color: var(--success);
+}
+div.square.paid-partial {
+    color: var(--gray);
+}
+div.square.paid-partial::after {
+	content: '$';
+	position: absolute;
+	bottom: 2px;
+	right: 2px;
+	font-size: 0.8em;
+	color: var(--gray);
+}
+div.square.claimed {
+	color: var(--gray);
+}
+div.square.unclaimed {
+    background: repeating-linear-gradient(135deg, #fff, #fff 5px, #f7f7f7 5px, #f7f7f7 10px);
+}
 div.square span.square-id {
 	position: absolute;
 	top: 2px;
@@ -135,6 +170,26 @@ div.notes {
 	margin-bottom: var(--spacing);
 	white-space: pre-wrap;
 	word-break: break-word;
+}
+
+div#grid-container.loading div.squares {
+	position: relative;
+}
+div#grid-container.loading div.squares::after {
+    content: 'Loading...';
+	font-weight: bold;
+    display: flex;
+    align-items: center;
+	justify-content: center;
+	color: #fff;
+	background-color: #000a;
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 0;
+	bottom: 0;
+	text-align: center;
+	z-index: 1;
 }
 
 @media (max-width: 800px) {

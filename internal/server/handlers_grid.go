@@ -19,8 +19,11 @@ package server
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/weters/sqmgr/internal/model"
@@ -100,6 +103,94 @@ func (s *Server) gridHandler() http.HandlerFunc {
 			IsAdmin: gridCtxData.IsAdmin,
 			Grid:    gridCtxData.Grid,
 		})
+	}
+}
+
+// ServeJSON will serve JSON to the user
+func (s *Server) ServeJSON(w http.ResponseWriter, statusCode int, content interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(content); err != nil {
+		logrus.WithError(err).Error("could not encode JSON")
+		return
+	}
+}
+
+type jsonResponse struct {
+	Status string      `json:"status"`
+	Error  string      `json:"error,omitempty"`
+	Result interface{} `json:"result,omitempty"`
+}
+
+// ServeJSONError will render a JSON error message
+func (s *Server) ServeJSONError(w http.ResponseWriter, statusCode int, userMessage string, err ...error) {
+	if userMessage == "" {
+		userMessage = http.StatusText(statusCode)
+	}
+
+	res := jsonResponse{
+		Status: "Error",
+		Error:  userMessage,
+	}
+
+	if len(err) > 0 {
+		logrus.WithError(err[0]).Error("could not serve request")
+	}
+
+	s.ServeJSON(w, statusCode, res)
+}
+
+func (s *Server) gridSquaresHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		grid := r.Context().Value(ctxKeyGrid).(*gridContextData).Grid
+		squares, err := grid.Squares()
+		if err != nil {
+			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+
+		res := jsonResponse{
+			Status: "OK",
+			Result: squares,
+		}
+
+		s.ServeJSON(w, http.StatusOK, res)
+	}
+}
+
+func (s *Server) gridSquaresSquareHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		squareIDStr := vars["square"]
+		squareID, err := strconv.Atoi(squareIDStr)
+		if err != nil {
+			s.ServeJSONError(w, http.StatusBadRequest, "invalid square ID", err)
+			return
+		}
+
+		grid := r.Context().Value(ctxKeyGrid).(*gridContextData).Grid
+		square, err := grid.SquareBySquareID(squareID)
+		if err != nil {
+			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+
+		isAdmin := r.Context().Value(ctxKeyGrid).(*gridContextData).IsAdmin
+		if isAdmin {
+			if err := square.LoadLogs(); err != nil {
+				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+				return
+			}
+		}
+
+		res := jsonResponse{
+			Status: "OK",
+			Result: square,
+		}
+
+		s.ServeJSON(w, http.StatusOK, res)
 	}
 }
 

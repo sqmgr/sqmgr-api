@@ -303,14 +303,17 @@ func TestGridSquares(t *testing.T) {
 	})
 	g.Expect(err).Should(gomega.Succeed())
 
-	logs, err := square.Logs()
+	squares2, err := grid.SquareBySquareID(15)
 	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(squares2.ID).Should(gomega.Equal(square.ID))
 
-	g.Expect(len(logs)).Should(gomega.Equal(2))
-	g.Expect(logs[0].Note).Should(gomega.Equal("A new note"))
-	g.Expect(logs[0].RemoteAddr).Should(gomega.Equal(""))
-	g.Expect(logs[0].UserID).Should(gomega.Equal(int64(0)))
-	g.Expect(logs[1].Note).Should(gomega.Equal("Test Note"))
-	g.Expect(logs[1].RemoteAddr).Should(gomega.Equal("127.0.0.1"))
-	g.Expect(logs[1].UserID).Should(gomega.Equal(user.ID))
+	g.Expect(square.LoadLogs()).Should(gomega.Succeed())
+
+	g.Expect(len(square.Logs)).Should(gomega.Equal(2))
+	g.Expect(square.Logs[0].Note).Should(gomega.Equal("A new note"))
+	g.Expect(square.Logs[0].RemoteAddr).Should(gomega.Equal(""))
+	g.Expect(square.Logs[0].UserID).Should(gomega.Equal(int64(0)))
+	g.Expect(square.Logs[1].Note).Should(gomega.Equal("Test Note"))
+	g.Expect(square.Logs[1].RemoteAddr).Should(gomega.Equal("127.0.0.1"))
+	g.Expect(square.Logs[1].UserID).Should(gomega.Equal(user.ID))
 }

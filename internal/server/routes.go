@@ -53,6 +53,8 @@ func (s *Server) setupRoutes() {
 
 	// grids
 	s.Router.Path("/grid/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodGet).Handler(s.gridMemberHandler(true, false, s.gridHandler()))
+	s.Router.Path("/grid/{token:[A-Za-z0-9_-]{8}}/squares").Methods(http.MethodGet).Handler(s.gridMemberHandler(true, false, s.gridSquaresHandler()))
+	s.Router.Path("/grid/{token:[A-Za-z0-9_-]{8}}/squares/{square:[0-9]{1,2}}").Methods(http.MethodGet).Handler(s.gridMemberHandler(true, false, s.gridSquaresSquareHandler()))
 	s.Router.Path("/grid/{token:[A-Za-z0-9_-]{8}}/join").Methods(http.MethodGet, http.MethodPost).Handler(s.gridMemberHandler(false, false, s.gridJoinHandler()))
 	s.Router.Path("/grid/{token:[A-Za-z0-9_-]{8}}/customize").Methods(http.MethodGet, http.MethodPost).Handler(s.gridMemberHandler(true, true, s.gridCustomizeHandler()))
 

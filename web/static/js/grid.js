@@ -22,21 +22,27 @@ SqMGR.Config = {
 }
 
 SqMGR.buildSquares = function() {
-	new SqMGR.SquaresBuilder()
+	var grid = SqMGR.grid
+
+	new SqMGR.GridBuilder(grid)
 }
 
-SqMGR.SquaresBuilder = function() {
-	var container = document.getElementById('grid-container'),
-		parent = document.createElement('div'),
-		i, elem, elem2, numSquares
+SqMGR.GridBuilder = function(grid) {
+	this.grid = grid
 
-	// this shouldn't happen
-	if (typeof(SqMGR.grid) === "undefined") {
-		throw new Error("grid data not found")
-	}
+	this.draw(null)
+	this.loadSquares()
+}
+
+
+SqMGR.GridBuilder.prototype.draw = function(squares) {
+	let container = document.getElementById('grid-container'),
+		parent = document.createElement('div'),
+		i, elem, elem2, numSquares,
+		square
 
 	parent.classList.add('squares')
-	parent.classList.add(SqMGR.grid.gridType)
+	parent.classList.add(this.grid.gridType)
 
 	elem = document.createElement('div')
 	elem.classList.add('spacer')
@@ -66,23 +72,32 @@ SqMGR.SquaresBuilder = function() {
 		}
 	}.bind(this))
 
-	// FIXME
-	var names = [ "Alexandria", "Brett", "Charlie", "Danny", "Eliza", "Frank", "Gary", "Harper" ]
-
-	numSquares = SqMGR.Config.Types[SqMGR.grid.gridType]
+	numSquares = SqMGR.Config.Types[this.grid.gridType]
 	for (i=0; i<numSquares; i++) {
+		square = squares ? squares[i] : null
+
 		elem = document.createElement('div')
+		elem.onclick = this.clickSquare.bind(this, i)
 		elem.classList.add('square')
+		if (square) {
+            elem.classList.add(square.state)
+        }
 		elem.setAttribute('data-sqid', i)
+
+		// add the square id
 		elem2 = document.createElement('span')
 		elem2.textContent = i
 		elem2.classList.add('square-id')
 		elem.appendChild(elem2)
+
+		// add the name
 		elem2 = document.createElement('span')
 		elem2.classList.add('name')
-		var r = Math.floor(Math.random() * names.length * 2) // FIXME
-		var n = r > names.length ? "" : names[r] // FIXME
-		elem2.textContent = n
+
+		if (square) {
+			elem2.textContent = square.claimant
+		}
+
 		elem.appendChild(elem2)
 		parent.appendChild(elem)
 	}
@@ -91,9 +106,47 @@ SqMGR.SquaresBuilder = function() {
 	container.appendChild(parent)
 }
 
-SqMGR.SquaresBuilder.prototype.getTeamValue = function(team, prop) {
-	var setting = team.toLowerCase() + "Team" + prop
-	return SqMGR.grid.settings[setting]
+SqMGR.GridBuilder.prototype.loadSquares = function() {
+	const container = document.getElementById('grid-container')
+	container.classList.add('loading')
+
+	SqMGR.get("/grid/" + this.grid.token + "/squares", function (data) {
+		this.draw(data)
+		container.classList.remove('loading')
+	}.bind(this))
+}
+
+SqMGR.GridBuilder.prototype.getTeamValue = function(team, prop) {
+	const setting = team.toLowerCase() + "Team" + prop
+	return this.grid.settings[setting]
+}
+
+SqMGR.GridBuilder.prototype.clickSquare = function(squareID) {
+    const path = "/grid/" + this.grid.token + "/squares/" + squareID
+	SqMGR.get(path, function(data) {
+		console.log(data)
+	}.bind(this))
+}
+
+SqMGR.get = function(path, callback, errorCallback) {
+	const xhr = new XMLHttpRequest()
+	xhr.open("GET", path)
+	xhr.onload = function() {
+	    let data
+		try {
+	   		data = JSON.parse(xhr.response)
+		} catch (err) {
+	    	console.log("could not parse JSON", err)
+			return
+		}
+
+		if (data.status === "OK") {
+			callback(data.result)
+		} else if (typeof(errorCallback) === "function") {
+			errorCallback(data)
+		}
+	}
+	xhr.send()
 }
 
 window.addEventListener('load', SqMGR.buildSquares)

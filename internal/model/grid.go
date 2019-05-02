@@ -351,7 +351,7 @@ func (g *Grid) PasswordIsValid(password string) bool {
 // Squares will return the squares that belong to a grid. This method will lazily load the squares
 func (g *Grid) Squares() (map[int]*GridSquare, error) {
 	if g.squares == nil {
-		rows, err := g.model.db.Query("SELECT id, square_id, state, Claimant, modified FROM grid_squares WHERE grid_id = $1 ORDER BY square_id", g.id)
+		rows, err := g.model.db.Query("SELECT id, square_id, state, claimant, modified FROM grid_squares WHERE grid_id = $1 ORDER BY square_id", g.id)
 		if err != nil {
 			return nil, err
 		}
@@ -359,25 +359,41 @@ func (g *Grid) Squares() (map[int]*GridSquare, error) {
 
 		squares := make(map[int]*GridSquare)
 		for rows.Next() {
-			gs := GridSquare{
-				Model:  g.model,
-				GridID: g.id,
-			}
-
-			var claimant *string
-			if err := rows.Scan(&gs.ID, &gs.SquareID, &gs.State, &claimant, &gs.Modified); err != nil {
+			gs, err := g.squareByRow(rows.Scan)
+			if err != nil {
 				return nil, err
 			}
-
-			if claimant != nil {
-				gs.Claimant = *claimant
-			}
-
-			squares[gs.SquareID] = &gs
+			squares[gs.SquareID] = gs
 		}
 
 		g.squares = squares
 	}
 
 	return g.squares, nil
+}
+
+// SquareBySquareID will return a single square based on the square ID
+func (g *Grid) SquareBySquareID(squareID int) (*GridSquare, error) {
+	row := g.model.db.QueryRow("SELECT id, square_id, state, claimant, modified FROM grid_squares WHERE grid_id = $1 AND square_id = $2", g.id, squareID)
+	return g.squareByRow(row.Scan)
+}
+
+func (g *Grid) squareByRow(scan scanFunc) (*GridSquare, error) {
+	gs := GridSquare{
+		Model:  g.model,
+		GridID: g.id,
+	}
+
+	var claimant *string
+	if err := scan(&gs.ID, &gs.SquareID, &gs.State, &claimant, &gs.Modified); err != nil {
+		return nil, err
+	}
+
+	if claimant != nil {
+		gs.Claimant = *claimant
+	}
+
+	gs.Modified = gs.Modified.In(locationNewYork)
+
+	return &gs, nil
 }

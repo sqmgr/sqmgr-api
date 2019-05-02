@@ -57,7 +57,7 @@ func main() {
 	m := model.New(db)
 
 	accounts := make([]*model.User, *numAccounts)
-	for i, _ := range accounts {
+	for i := range accounts {
 		email := fmt.Sprintf("user%d@sqmgr.com", i)
 		logrus.WithField("email", email).Info("creating user")
 		user, err := m.NewUser(email, "test-password")
@@ -85,14 +85,14 @@ func main() {
 	for i := 0; i < *numGrids; i++ {
 		user := accounts[rand.Intn(len(accounts))]
 
-		st := model.GridTypeStd100
+		gridType := model.GridTypeStd100
 		if rand.Intn(2) == 0 {
-			st = model.GridTypeStd25
+			gridType = model.GridTypeStd25
 		}
 
 		name := words.Create(2, " ")
 		logrus.WithFields(logrus.Fields{"name": name, "user": user.Email}).Info("creating grid")
-		grid, err := m.NewGrid(user.ID, name, st, "joinpw")
+		grid, err := m.NewGrid(user.ID, name, gridType, "joinpw")
 		if err != nil {
 			panic(err)
 		}
@@ -107,6 +107,40 @@ func main() {
 		grid.Settings().SetAwayTeamColor2(color())
 		if err := grid.Save(); err != nil {
 			panic(err)
+		}
+
+		squares, err := grid.Squares()
+		if err != nil {
+			panic(err)
+		}
+
+		unclaimed := rand.Intn(100)
+		claimed := rand.Intn(100-unclaimed) + unclaimed
+		paidParital := rand.Intn(100-claimed) + claimed
+
+		for _, square := range squares {
+			n := rand.Intn(100)
+
+			if n <= unclaimed {
+				continue
+			} else if n <= claimed {
+				square.State = model.GridSquareStateClaimed
+			} else if n <= paidParital {
+				square.State = model.GridSquareStatePaidPartial
+			} else {
+				square.State = model.GridSquareStatePaidFull
+			}
+
+			square.Claimant = nameList[rand.Intn(len(nameList))]
+
+			gsl := model.GridSquareLog{
+				RemoteAddr: "127.0.0.1",
+				Note:       "state changed",
+			}
+
+			if err := square.Save(gsl); err != nil {
+				panic(err)
+			}
 		}
 
 		for _, account := range accounts {
@@ -163,6 +197,20 @@ var colorList = []string{"000000", "002244", "002C5F", "00338D", "004953", "0053
 	"4B92DB", "4F2683", "565A5C", "5B2B2F", "69BE28", "773141", "97233F", "9E7C0C", "9F792C",
 	"9F8958", "A5ACAF", "A71930", "AA0000", "ACC0C6", "B0B7BC", "B1BABF", "B3995D",
 	"BFC0BF", "C60C30", "C83803", "D50A0A", "D7A22A", "E31837", "E9BF9B", "F58220", "FB4F14", "FF7900", "FFB612", "FFC62F",
+}
+
+var nameList = []string{
+	"Abigail", "Amelia", "Aria", "Ava", "Camila",
+	"Charlotte", "Chloe", "Elizabeth", "Ella", "Emily",
+	"Emma", "Evelyn", "Harper", "Isabella", "Layla",
+	"Madison", "Mia", "Olivia", "Penelope", "Scarlett",
+	"Skylar", "Sofia", "Sophia", "Victoria", "Zoey",
+
+	"Aiden", "Alexander", "Benjamin", "Carter", "Daniel",
+	"David", "Elijah", "Ethan", "Gabriel", "Jackson",
+	"Jacob", "James", "Jayden", "Joseph", "Julian",
+	"Liam", "Logan", "Lucas", "Mason", "Matthew",
+	"Michael", "Noah", "Oliver", "Sebastian", "William",
 }
 
 func color() string {

@@ -17,6 +17,7 @@ limitations under the License.
 package model
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -34,12 +35,13 @@ const (
 // GridSquare is an individual square within a grid
 type GridSquare struct {
 	*Model
-	ID       int64
-	GridID   int64
-	SquareID int
-	State    GridSquareState
-	Claimant string
-	Modified time.Time
+	ID       int64            `json:"-"`
+	GridID   int64            `json:"-"`
+	SquareID int              `json:"squareID"`
+	State    GridSquareState  `json:"state"`
+	Claimant string           `json:"claimant"`
+	Modified time.Time        `json:"modified"`
+	Logs     []*GridSquareLog `json:"logs,omitempty"`
 }
 
 // GridSquareLog represents an individual log entry for a grid square
@@ -51,6 +53,23 @@ type GridSquareLog struct {
 	RemoteAddr   string
 	Note         string
 	created      time.Time
+}
+
+type gridSquareLogJSON struct {
+	State      GridSquareState `json:"state"`
+	RemoteAddr string          `json:"remoteAddr"`
+	Note       string          `json:"note"`
+	Created    time.Time       `json:"created"`
+}
+
+// MarshalJSON will custom marshal the JSON
+func (g *GridSquareLog) MarshalJSON() ([]byte, error) {
+	return json.Marshal(gridSquareLogJSON{
+		State:      g.State(),
+		RemoteAddr: g.RemoteAddr,
+		Note:       g.Note,
+		Created:    g.Created(),
+	})
 }
 
 // Created is a getter for created
@@ -96,11 +115,12 @@ func (g *GridSquare) Save(gridSquareLog GridSquareLog) error {
 	return err
 }
 
-func (g *GridSquare) Logs() ([]*GridSquareLog, error) {
+// LoadLogs will load the logs for the given square
+func (g *GridSquare) LoadLogs() error {
 	const query = "SELECT id, grid_square_id, user_Id, state, remote_addr, note, created FROM grid_squares_logs WHERE grid_square_id = $1 ORDER BY id DESC"
 	rows, err := g.Model.db.Query(query, g.ID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
 
@@ -111,7 +131,7 @@ func (g *GridSquare) Logs() ([]*GridSquareLog, error) {
 		var userID *int64
 
 		if err := rows.Scan(&g.id, &g.gridSquareID, &userID, &g.state, &remoteAddr, &g.Note, &g.created); err != nil {
-			return nil, err
+			return err
 		}
 
 		if userID != nil {
@@ -122,8 +142,11 @@ func (g *GridSquare) Logs() ([]*GridSquareLog, error) {
 			g.RemoteAddr = *remoteAddr
 		}
 
+		g.created = g.created.In(locationNewYork)
+
 		logs = append(logs, &g)
 	}
 
-	return logs, nil
+	g.Logs = logs
+	return nil
 }
