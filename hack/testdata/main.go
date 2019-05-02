@@ -114,18 +114,18 @@ func main() {
 			panic(err)
 		}
 
-		unclaimed := rand.Intn(100)
-		claimed := rand.Intn(100-unclaimed) + unclaimed
-		paidParital := rand.Intn(100-claimed) + claimed
+		unclaimed := rand.Intn(101)
+		claimed := rand.Intn(101-unclaimed) + unclaimed
+		paidPartial := rand.Intn(101-claimed) + claimed
 
 		for _, square := range squares {
 			n := rand.Intn(100)
 
-			if n <= unclaimed {
+			if n < unclaimed {
 				continue
-			} else if n <= claimed {
+			} else if n < claimed {
 				square.State = model.GridSquareStateClaimed
-			} else if n <= paidParital {
+			} else if n < paidPartial {
 				square.State = model.GridSquareStatePaidPartial
 			} else {
 				square.State = model.GridSquareStatePaidFull

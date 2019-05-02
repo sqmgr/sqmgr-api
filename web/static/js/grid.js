@@ -66,7 +66,8 @@ SqMGR.GridBuilder.prototype.draw = function(squares) {
 			elem.classList.add(team.toLowerCase() + '-score')
 			elem.classList.add(team.toLowerCase() + '-score-'+i)
 			elem2 = document.createElement('span')
-			elem2.textContent = i
+			// FIXME: will need to figure out how to handle scores
+			elem2.textContent = ''
 			elem.appendChild(elem2)
 			parent.appendChild(elem)
 		}
