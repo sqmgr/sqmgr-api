@@ -116,6 +116,11 @@ div.square {
 div.square:hover {
     border-color: #000;
 	box-shadow: 2px 2px 2px -2px #000;
+	cursor: pointer;
+	user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+	-moz-user-select: none;
 }
 div.square.unclaimed:hover {
 	border-color: var(--success);
@@ -208,6 +213,14 @@ div#grid-container.loading div.squares::after {
 	z-index: 1;
 }
 
+section.templates {
+	display: none;
+}
+
+section.audit-log {
+	margin-top: var(--spacing);
+}
+
 @media (max-width: 800px) {
 	div#grid-container {
 		overflow: auto;
@@ -223,3 +236,4 @@ div#grid-container.loading div.squares::after {
 		font-size: 1.0em;
 	}
 }
+

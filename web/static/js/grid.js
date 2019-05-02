@@ -22,13 +22,16 @@ SqMGR.Config = {
 }
 
 SqMGR.buildSquares = function() {
-	var grid = SqMGR.grid
+	const grid = SqMGR.grid
 
 	new SqMGR.GridBuilder(grid)
 }
 
 SqMGR.GridBuilder = function(grid) {
+	this.modal = new SqMGR.Modal()
 	this.grid = grid
+	this.templates = document.querySelector('section.templates')
+	this.templates.remove()
 
 	this.draw(null)
 	this.loadSquares()
@@ -125,7 +128,35 @@ SqMGR.GridBuilder.prototype.getTeamValue = function(team, prop) {
 SqMGR.GridBuilder.prototype.clickSquare = function(squareID) {
     const path = "/grid/" + this.grid.token + "/squares/" + squareID
 	SqMGR.get(path, function(data) {
-		console.log(data)
+		const squareDetails = this.templates.querySelector('div.square-details').cloneNode(true)
+        squareDetails.querySelector('td.square-id').textContent = data.squareID
+		squareDetails.querySelector('td.claimant').textContent = data.claimant
+		squareDetails.querySelector('td.state').textContent = data.state
+		squareDetails.querySelector('td.modified').setAttribute('data-datetime', data.modified)
+
+		const auditLog = squareDetails.querySelector('section.audit-log')
+
+        if (data.logs) {
+			const auditLogTbody = auditLog.querySelector('tbody')
+			const auditLogRowTpl = auditLog.querySelector('tr.template')
+			auditLogRowTpl.remove()
+
+			data.logs.forEach(function (log) {
+				const row = auditLogRowTpl.cloneNode(true)
+				row.querySelector('td.created').setAttribute('data-datetime', log.created)
+				row.querySelector('td.state').textContent = log.state
+				row.querySelector('td.remote-addr').textContent = log.remoteAddr
+				row.querySelector('td.note').textContent = log.note
+
+				auditLogTbody.appendChild(row)
+			}.bind(this))
+		} else {
+        	auditLog.remove()
+		}
+
+		SqMGR.DateTime.format(squareDetails)
+
+		this.modal.show(squareDetails)
 	}.bind(this))
 }
 

@@ -15,9 +15,12 @@ limitations under the License.
 */}}
 
 {{ define "title" }}{{.Local.Grid.Name}} - {{ end }}
+
 {{ define "header" }}
+<link href="/static/css/modal.css" rel="stylesheet">
 <link href="/static/css/grid.css" rel="stylesheet">
 {{ end }}
+
 {{ define "content" }}
 <section class="grid">
 	<h3>{{.Local.Grid.Name}}</h3>
@@ -57,11 +60,64 @@ limitations under the License.
 		</table>
 	</div>
 </section>
+
+	<section class="templates">
+		<div class="square-details">
+			<h4>Square Details</h4>
+
+			<table>
+				<tbody>
+					<tr>
+						<td>Square ID</td>
+						<td class="square-id"></td>
+					</tr>
+					<tr>
+						<td>Claimant</td>
+						<td class="claimant"></td>
+					</tr>
+					<tr>
+						<td>State</td>
+						<td class="state"></td>
+					</tr>
+					<tr>
+						<td>Last Modified</td>
+						<td class="modified"></td>
+					</tr>
+				</tbody>
+			</table>
+
+            <section class="audit-log">
+                <h4>Audit Log</h4>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>State</th>
+                            <th>Remote Addr</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="template">
+                            <td class="created"></td>
+                            <td class="state"></td>
+                            <td class="remote-addr"></td>
+                            <td class="note"></td>
+                        </tr>
+                    </tbody>
+                </table>
+			</section>
+		</div>
+	</section>
 {{ end }}
+
 {{ define "javascripts" }}
 <script>
 function SqMGR() { }
 SqMGR.grid = {{.Local.Grid}}
 </script>
+<script src="/static/js/modal.js"></script>
+<script src="/static/js/datetime.js"></script>
 <script src="/static/js/grid.js"></script>
 {{ end }}
