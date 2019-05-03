@@ -17,6 +17,7 @@ limitations under the License.
 package model
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 )
@@ -139,15 +140,42 @@ func (g *GridSquare) Save(gridSquareLog GridSquareLog) error {
 	return err
 }
 
+func gridSquareLogByRow(scan scanFunc) (*GridSquareLog, error) {
+	var l GridSquareLog
+	var remoteAddr *string
+	var userID *int64
+	var claimant *string
+
+	if err := scan(&l.id, &l.gridSquareID, &l.squareID, &userID, &l.state, &claimant, &remoteAddr, &l.Note, &l.created); err != nil {
+		return nil, err
+	}
+
+	if userID != nil {
+		l.UserID = *userID
+	}
+
+	if remoteAddr != nil {
+		l.RemoteAddr = *remoteAddr
+	}
+
+	if claimant != nil {
+		l.claimant = *claimant
+	}
+
+	l.created = l.created.In(locationNewYork)
+
+	return &l, nil
+}
+
 // LoadLogs will load the logs for the given square
-func (g *GridSquare) LoadLogs() error {
+func (g *GridSquare) LoadLogs(ctx context.Context) error {
 	const query = `
-		SELECT grid_Squares_logs.id, grid_square_id, square_id, user_id, grid_squares_logs.state, grid_squares_logs.claimant, remote_addr, note, grid_squares_logs.created
+		SELECT grid_squares_logs.id, grid_square_id, square_id, user_id, grid_squares_logs.state, grid_squares_logs.claimant, remote_addr, note, grid_squares_logs.created
 		FROM grid_squares_logs
 		INNER JOIN grid_squares ON grid_squares_logs.grid_square_id = grid_squares.id
 		WHERE grid_square_id = $1 
 		ORDER BY id DESC`
-	rows, err := g.Model.db.Query(query, g.ID)
+	rows, err := g.Model.db.QueryContext(ctx, query, g.ID)
 	if err != nil {
 		return err
 	}
@@ -155,30 +183,12 @@ func (g *GridSquare) LoadLogs() error {
 
 	logs := make([]*GridSquareLog, 0)
 	for rows.Next() {
-		var l GridSquareLog
-		var remoteAddr *string
-		var userID *int64
-		var claimant *string
-
-		if err := rows.Scan(&l.id, &l.gridSquareID, &l.squareID, &userID, &l.state, &claimant, &remoteAddr, &l.Note, &l.created); err != nil {
+		l, err := gridSquareLogByRow(rows.Scan)
+		if err != nil {
 			return err
 		}
 
-		if userID != nil {
-			l.UserID = *userID
-		}
-
-		if remoteAddr != nil {
-			l.RemoteAddr = *remoteAddr
-		}
-
-		if claimant != nil {
-			l.claimant = *claimant
-		}
-
-		l.created = l.created.In(locationNewYork)
-
-		logs = append(logs, &l)
+		logs = append(logs, l)
 	}
 
 	g.Logs = logs

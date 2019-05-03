@@ -208,7 +208,7 @@ func (s *Server) gridSquaresSquareHandler() http.HandlerFunc {
 				})
 			}
 
-			if err := square.LoadLogs(); err != nil {
+			if err := square.LoadLogs(r.Context()); err != nil {
 				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 				return
 			}

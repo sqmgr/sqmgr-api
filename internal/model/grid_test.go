@@ -307,7 +307,7 @@ func TestGridSquares(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(squares2.ID).Should(gomega.Equal(square.ID))
 
-	g.Expect(square.LoadLogs()).Should(gomega.Succeed())
+	g.Expect(square.LoadLogs(context.Background())).Should(gomega.Succeed())
 
 	g.Expect(len(square.Logs)).Should(gomega.Equal(2))
 	g.Expect(square.Logs[0].SquareID()).Should(gomega.Equal(15))
@@ -319,4 +319,12 @@ func TestGridSquares(t *testing.T) {
 	g.Expect(square.Logs[1].RemoteAddr).Should(gomega.Equal("127.0.0.1"))
 	g.Expect(square.Logs[1].UserID).Should(gomega.Equal(user.ID))
 	g.Expect(square.Logs[1].Claimant()).Should(gomega.Equal("Test User"))
+
+	logs, err := grid.Logs(context.Background(), 0, 1000)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(logs)).Should(gomega.BeNumerically(">", 0))
+
+	count, err := grid.LogsCount(context.Background())
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(len(logs))))
 }

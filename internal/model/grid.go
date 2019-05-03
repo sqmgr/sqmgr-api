@@ -397,3 +397,49 @@ func (g *Grid) squareByRow(scan scanFunc) (*GridSquare, error) {
 
 	return &gs, nil
 }
+
+// Logs will return all grid square logs for the grid
+func (g *Grid) Logs(ctx context.Context, offset, limit int) ([]*GridSquareLog, error) {
+	const query = `
+		SELECT grid_squares_logs.id, grid_square_id, square_id, user_id, grid_squares_logs.state, grid_squares_logs.claimant, remote_addr, note, grid_squares_logs.created
+		FROM grid_squares_logs
+		INNER JOIN grid_squares ON grid_squares_logs.grid_square_id = grid_squares.id
+		WHERE grid_squares.grid_id = $1
+		ORDER BY grid_squares_logs.id DESC
+		OFFSET $2
+		LIMIT $3`
+	rows, err := g.model.db.QueryContext(ctx, query, g.id, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	logs := make([]*GridSquareLog, 0)
+	for rows.Next() {
+		l, err := gridSquareLogByRow(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+
+		logs = append(logs, l)
+	}
+
+	return logs, nil
+}
+
+// LogsCount will return how many logs exist for the given grid
+func (g *Grid) LogsCount(ctx context.Context) (int64, error) {
+	const query = `
+		SELECT COUNT(grid_squares_logs.*)
+		FROM grid_squares_logs
+		INNER JOIN grid_squares ON grid_squares_logs.grid_square_id = grid_squares.id
+		WHERE grid_squares.grid_id = $1`
+	row := g.model.db.QueryRowContext(ctx, query, g.id)
+
+	var count int64
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
