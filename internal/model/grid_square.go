@@ -41,6 +41,21 @@ var GridSquareStates = []GridSquareState{
 	GridSquareStateUnclaimed,
 }
 
+// ValidGridSquareStates contains a map of valid states.
+var ValidGridSquareStates = map[GridSquareState]bool{}
+
+func init() {
+	for _, state := range GridSquareStates {
+		ValidGridSquareStates[state] = true
+	}
+}
+
+// IsValid will ensure that it's a valid state
+func (g GridSquareState) IsValid() bool {
+	_, ok := ValidGridSquareStates[g]
+	return ok
+}
+
 // GridSquare is an individual square within a grid
 type GridSquare struct {
 	*Model

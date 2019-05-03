@@ -221,12 +221,18 @@ func (s *Server) gridSquaresSquareHandler() http.HandlerFunc {
 					square.Claimant = ""
 				}
 
-				square.State = payload.State
-				square.Save(model.GridSquareLog{
+				if payload.State.IsValid() {
+					square.State = payload.State
+				}
+
+				if err := square.Save(model.GridSquareLog{
 					UserID:     data.EffectiveUser.UserID(r.Context()),
 					RemoteAddr: r.RemoteAddr,
 					Note:       payload.Note,
-				})
+				}); err != nil {
+					s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+					return
+				}
 			}
 
 			if err := square.LoadLogs(r.Context()); err != nil {

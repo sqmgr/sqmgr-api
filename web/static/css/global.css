@@ -63,11 +63,11 @@ main ol ol {
 	margin-bottom: 0;
 }
 
-main a {
+a {
 	color: var(--primary);
 	text-decoration: none;
 }
-main a:hover {
+a:hover {
 	text-decoration: underline;
 }
 

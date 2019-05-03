@@ -125,6 +125,8 @@ SqMGR.GridBuilder.prototype.loadLogs = function() {
 		let section
 	    const auditLog = this.templates.querySelector('section.audit-log').cloneNode(true)
 		const gridMetadata = document.querySelector('div.grid-metadata')
+        auditLog.querySelector('p.add-note').remove() // not needed for all logs
+
         this.buildLogs(auditLog, data)
 
 		if (section = gridMetadata.querySelector('section.audit-log')) {
@@ -167,7 +169,7 @@ SqMGR.GridBuilder.prototype.clickSquare = function(squareID) {
             })
 
             select.onchange = function () {
-                this.changeSquareState(squareID, select.value)
+            	this.promptAndSubmitSquareData(squareID, { state: select.value })
             }.bind(this)
 
 			squareDetails.querySelector('td.state').appendChild(select)
@@ -181,7 +183,7 @@ SqMGR.GridBuilder.prototype.clickSquare = function(squareID) {
 		const auditLog = squareDetails.querySelector('section.audit-log')
 
 		if (data.logs) {
-		    this.buildLogs(auditLog, data.logs)
+		    this.buildLogs(auditLog, data.logs, squareID)
 		} else {
 			auditLog.remove()
 		}
@@ -196,7 +198,7 @@ SqMGR.GridBuilder.prototype.clickSquare = function(squareID) {
 	SqMGR.get(path, drawDetails)
 }
 
-SqMGR.GridBuilder.prototype.buildLogs = function(auditLog, logs) {
+SqMGR.GridBuilder.prototype.buildLogs = function(auditLog, logs, squareID) {
 	const auditLogTbody = auditLog.querySelector('tbody')
 	const auditLogRowTpl = auditLog.querySelector('tr.template')
 	auditLogRowTpl.remove()
@@ -212,9 +214,17 @@ SqMGR.GridBuilder.prototype.buildLogs = function(auditLog, logs) {
 
 		auditLogTbody.appendChild(row)
 	}.bind(this))
+
+	const addNote = auditLog.querySelector('a.add-note')
+	if (addNote) {
+		addNote.onclick = function() {
+			this.promptAndSubmitSquareData(squareID)
+			return false
+		}.bind(this)
+	}
 }
 
-SqMGR.GridBuilder.prototype.changeSquareState = function(squareID, newState) {
+SqMGR.GridBuilder.prototype.promptAndSubmitSquareData = function(squareID, options) {
 	const form = document.createElement('form'),
 		field = document.createElement('div'),
 		label = document.createElement('label'),
@@ -259,10 +269,9 @@ SqMGR.GridBuilder.prototype.changeSquareState = function(squareID, newState) {
 
 	form.onsubmit = function() {
 		const path = "/grid/" + this.grid.token + "/squares/" + squareID
-		const body = JSON.stringify({
+		const body = JSON.stringify(Object.assign({
 			note: note.value,
-			state: newState,
-		})
+		}, options))
 		const success = function(data) {
 		    modal.close()
 		}.bind(this)

@@ -201,6 +201,12 @@ section.audit-log {
 	margin-top: var(--spacing);
 }
 
+p.add-note {
+	font-size: 0.8em;
+	margin-bottom: var(--minimal-spacing);
+	text-align: right;
+}
+
 @media (max-width: 800px) {
 	div#grid-container {
 		overflow: auto;
