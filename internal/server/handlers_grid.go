@@ -30,6 +30,8 @@ import (
 	"github.com/weters/sqmgr/internal/validator"
 )
 
+const responseOK = "OK"
+
 type gridContextData struct {
 	EffectiveUser model.EffectiveUser
 	Grid          *model.Grid
@@ -144,6 +146,25 @@ func (s *Server) ServeJSONError(w http.ResponseWriter, statusCode int, userMessa
 	s.ServeJSON(w, statusCode, res)
 }
 
+func (s *Server) gridLogsHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		contextData := r.Context().Value(ctxKeyGrid).(*gridContextData)
+		grid, err := contextData.Grid.Logs(r.Context(), 0, 1000) // TODO: pagination???
+		if err != nil {
+			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+
+		res := jsonResponse{
+			Status: responseOK,
+			Result: grid,
+		}
+
+		s.ServeJSON(w, http.StatusOK, res)
+		return
+	}
+}
+
 func (s *Server) gridSquaresHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		grid := r.Context().Value(ctxKeyGrid).(*gridContextData).Grid
@@ -154,7 +175,7 @@ func (s *Server) gridSquaresHandler() http.HandlerFunc {
 		}
 
 		res := jsonResponse{
-			Status: "OK",
+			Status: responseOK,
 			Result: squares,
 		}
 

@@ -87,13 +87,15 @@ limitations under the License.
 				</tbody>
 			</table>
 
+			{{ if .Local.IsAdmin }}
             <section class="audit-log">
                 <h4>Audit Log</h4>
 
                 <table>
                     <thead>
                         <tr>
-                            <th>Time</th>
+                            <th>ID</th>
+							<th>Time</th>
                             <th>State</th>
 							<th>Claimant</th>
                             <th>Remote Addr</th>
@@ -102,6 +104,7 @@ limitations under the License.
                     </thead>
                     <tbody>
                         <tr class="template">
+							<td class="square-id"></td>
                             <td class="created"></td>
                             <td class="state"></td>
 							<td class="claimant"></td>
@@ -111,6 +114,7 @@ limitations under the License.
                     </tbody>
                 </table>
 			</section>
+			{{ end }}
 		</div>
 	</section>
 {{ end }}
@@ -124,5 +128,6 @@ SqMGR.gridSquareStates = {{.Local.GridSquareStates}}
 </script>
 <script src="/static/js/modal.js"></script>
 <script src="/static/js/datetime.js"></script>
+<script src="/static/js/loading.js"></script>
 <script src="/static/js/grid.js"></script>
 {{ end }}
