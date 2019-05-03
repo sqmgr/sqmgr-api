@@ -193,26 +193,6 @@ div.notes {
 	word-break: break-word;
 }
 
-div#grid-container.loading div.squares {
-	position: relative;
-}
-div#grid-container.loading div.squares::after {
-    content: 'Loading...';
-	font-weight: bold;
-    display: flex;
-    align-items: center;
-	justify-content: center;
-	color: #fff;
-	background-color: #000a;
-	position: absolute;
-	top: 0;
-	right: 0;
-	left: 0;
-	bottom: 0;
-	text-align: center;
-	z-index: 1;
-}
-
 section.templates {
 	display: none;
 }

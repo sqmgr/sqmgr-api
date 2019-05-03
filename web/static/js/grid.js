@@ -112,11 +112,9 @@ SqMGR.GridBuilder.prototype.draw = function(squares) {
 
 SqMGR.GridBuilder.prototype.loadSquares = function() {
 	const container = document.getElementById('grid-container')
-	container.classList.add('loading')
 
 	SqMGR.get( "/grid/" + this.grid.token + "/squares", function (data) {
 		this.draw(data)
-		container.classList.remove('loading')
 	}.bind(this))
 
 	this.loadLogs()
