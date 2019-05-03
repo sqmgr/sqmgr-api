@@ -58,13 +58,20 @@ type GridSquareLog struct {
 	gridSquareID int64
 	UserID       int64
 	state        GridSquareState
+	claimant     string
 	RemoteAddr   string
 	Note         string
 	created      time.Time
 }
 
+// Claimant is a getter for the claimant
+func (g *GridSquareLog) Claimant() string {
+	return g.claimant
+}
+
 type gridSquareLogJSON struct {
 	State      GridSquareState `json:"state"`
+	Claimant   string          `json:"claimant"`
 	RemoteAddr string          `json:"remoteAddr"`
 	Note       string          `json:"note"`
 	Created    time.Time       `json:"created"`
@@ -74,6 +81,7 @@ type gridSquareLogJSON struct {
 func (g *GridSquareLog) MarshalJSON() ([]byte, error) {
 	return json.Marshal(gridSquareLogJSON{
 		State:      g.State(),
+		Claimant:   g.Claimant(),
 		RemoteAddr: g.RemoteAddr,
 		Note:       g.Note,
 		Created:    g.Created(),
@@ -125,7 +133,7 @@ func (g *GridSquare) Save(gridSquareLog GridSquareLog) error {
 
 // LoadLogs will load the logs for the given square
 func (g *GridSquare) LoadLogs() error {
-	const query = "SELECT id, grid_square_id, user_Id, state, remote_addr, note, created FROM grid_squares_logs WHERE grid_square_id = $1 ORDER BY id DESC"
+	const query = "SELECT id, grid_square_id, user_id, state, claimant, remote_addr, note, created FROM grid_squares_logs WHERE grid_square_id = $1 ORDER BY id DESC"
 	rows, err := g.Model.db.Query(query, g.ID)
 	if err != nil {
 		return err
@@ -134,25 +142,30 @@ func (g *GridSquare) LoadLogs() error {
 
 	logs := make([]*GridSquareLog, 0)
 	for rows.Next() {
-		var g GridSquareLog
+		var l GridSquareLog
 		var remoteAddr *string
 		var userID *int64
+		var claimant *string
 
-		if err := rows.Scan(&g.id, &g.gridSquareID, &userID, &g.state, &remoteAddr, &g.Note, &g.created); err != nil {
+		if err := rows.Scan(&l.id, &l.gridSquareID, &userID, &l.state, &claimant, &remoteAddr, &l.Note, &l.created); err != nil {
 			return err
 		}
 
 		if userID != nil {
-			g.UserID = *userID
+			l.UserID = *userID
 		}
 
 		if remoteAddr != nil {
-			g.RemoteAddr = *remoteAddr
+			l.RemoteAddr = *remoteAddr
 		}
 
-		g.created = g.created.In(locationNewYork)
+		if claimant != nil {
+			l.claimant = *claimant
+		}
 
-		logs = append(logs, &g)
+		l.created = l.created.In(locationNewYork)
+
+		logs = append(logs, &l)
 	}
 
 	g.Logs = logs

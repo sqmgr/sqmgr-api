@@ -106,6 +106,7 @@ CREATE TABLE grid_squares_logs (
     grid_square_id bigint not null references grid_squares (id),
     user_id bigint references users (id),
     state text not null default 'unclaimed' references grid_square_states (state),
+    claimant text,
     remote_addr text,
     note text not null,
     created timestamp not null default (now() at time zone 'utc')
@@ -220,8 +221,8 @@ BEGIN
 
     UPDATE grid_squares SET state = _state, claimant = _claimant, modified = (now() at time zone 'utc') WHERE id = _id;
 
-    INSERT INTO grid_squares_logs (grid_square_id, user_id, state, note, remote_addr) VALUES
-    (_id, _user_id, _state, _note, _remote_addr);
+    INSERT INTO grid_squares_logs (grid_square_id, user_id, state, claimant, note, remote_addr) VALUES
+    (_id, _user_id, _state, _claimant, _note, _remote_addr);
 
     RETURN TRUE;
 END;

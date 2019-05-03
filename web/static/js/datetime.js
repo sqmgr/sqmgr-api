@@ -21,6 +21,14 @@ SqMGR.DateTime.format = function(node) {
        node.removeAttribute("data-datetime")
 
        const datetime = new Date(datetimeStr)
-        node.textContent = datetime.toLocaleString()
+       if (isNaN(datetime.getTime())) {
+           return
+       }
+
+       node.textContent = datetime.toLocaleDateString('default', {year: '2-digit', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric'})
     })
 }
+
+window.addEventListener('load', function() {
+    SqMGR.DateTime.format(document.body)
+})

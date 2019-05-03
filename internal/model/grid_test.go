@@ -313,7 +313,9 @@ func TestGridSquares(t *testing.T) {
 	g.Expect(square.Logs[0].Note).Should(gomega.Equal("A new note"))
 	g.Expect(square.Logs[0].RemoteAddr).Should(gomega.Equal(""))
 	g.Expect(square.Logs[0].UserID).Should(gomega.Equal(int64(0)))
+	g.Expect(square.Logs[0].Claimant()).Should(gomega.Equal("Test User"))
 	g.Expect(square.Logs[1].Note).Should(gomega.Equal("Test Note"))
 	g.Expect(square.Logs[1].RemoteAddr).Should(gomega.Equal("127.0.0.1"))
 	g.Expect(square.Logs[1].UserID).Should(gomega.Equal(user.ID))
+	g.Expect(square.Logs[1].Claimant()).Should(gomega.Equal("Test User"))
 }

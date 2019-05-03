@@ -170,6 +170,7 @@ SqMGR.GridBuilder.prototype.clickSquare = function(squareID) {
 				const row = auditLogRowTpl.cloneNode(true)
 				row.querySelector('td.created').setAttribute('data-datetime', log.created)
 				row.querySelector('td.state').textContent = log.state
+				row.querySelector('td.claimant').textContent = log.claimant
 				row.querySelector('td.remote-addr').textContent = log.remoteAddr
 				row.querySelector('td.note').textContent = log.note
 
