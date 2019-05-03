@@ -225,7 +225,7 @@ func (s *Server) gridSquaresSquareHandler() http.HandlerFunc {
 					square.State = payload.State
 				}
 
-				if err := square.Save(model.GridSquareLog{
+				if err := square.Save(r.Context(), true, model.GridSquareLog{
 					UserID:     data.EffectiveUser.UserID(r.Context()),
 					RemoteAddr: r.RemoteAddr,
 					Note:       payload.Note,

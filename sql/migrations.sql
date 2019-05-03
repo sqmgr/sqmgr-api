@@ -213,11 +213,19 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION update_grid_square(_id bigint, _state text, _claimant text, _user_id bigint, _remote_addr text, _note text) RETURNS boolean
+CREATE FUNCTION update_grid_square(_id bigint, _state text, _claimant text, _user_id bigint, _remote_addr text, _note text, _is_admin boolean) RETURNS boolean
     LANGUAGE plpgsql
     AS $$
+DECLARE
+    _row grid_squares;
 BEGIN
-    PERFORM FROM grid_squares WHERE id = _id FOR SHARE;
+    SELECT INTO _row * FROM grid_squares WHERE id = _id FOR SHARE;
+
+    IF NOT _is_admin AND
+       (_row.claimant IS NOT NULL OR _row.state != 'unclaimed')
+    THEN
+        RETURN FALSE;
+    END IF;
 
     UPDATE grid_squares SET state = _state, claimant = _claimant, modified = (now() at time zone 'utc') WHERE id = _id;
 
@@ -228,7 +236,7 @@ BEGIN
 END;
 $$;
 
---rollback DROP FUNCTION update_grid_square(bigint, text, text, bigint, text, text);
+--rollback DROP FUNCTION update_grid_square(bigint, text, text, bigint, text, text, boolean);
 --rollback DROP FUNCTION new_user(text, text);
 --rollback DROP FUNCTION set_user_confirmation(bigint, text);
 --rollback DROP FUNCTION new_token(text);

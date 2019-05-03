@@ -19,6 +19,7 @@ package model
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 )
 
@@ -40,6 +41,9 @@ var GridSquareStates = []GridSquareState{
 	GridSquareStatePaidFull,
 	GridSquareStateUnclaimed,
 }
+
+// ErrSquareAlreadyClaimed is an error when a user tries to claim a square that has already been claimed.
+var ErrSquareAlreadyClaimed = errors.New("square has already been claimed")
 
 // ValidGridSquareStates contains a map of valid states.
 var ValidGridSquareStates = map[GridSquareState]bool{}
@@ -133,7 +137,7 @@ func (g *GridSquareLog) ID() int64 {
 }
 
 // Save will save the grid square and the associated log data to the database
-func (g *GridSquare) Save(gridSquareLog GridSquareLog) error {
+func (g *GridSquare) Save(ctx context.Context, isAdmin bool, gridSquareLog GridSquareLog) error {
 	var claimant *string
 	if g.Claimant != "" {
 		claimant = &g.Claimant
@@ -150,9 +154,19 @@ func (g *GridSquare) Save(gridSquareLog GridSquareLog) error {
 		remoteAddr = &gridSquareLog.RemoteAddr
 	}
 
-	const query = "SELECT * FROM update_grid_square($1, $2, $3, $4, $5, $6)"
-	_, err := g.Model.db.Exec(query, g.ID, g.State, claimant, userID, remoteAddr, gridSquareLog.Note)
-	return err
+	const query = "SELECT * FROM update_grid_square($1, $2, $3, $4, $5, $6, $7)"
+	row := g.Model.db.QueryRowContext(ctx, query, g.ID, g.State, claimant, userID, remoteAddr, gridSquareLog.Note, isAdmin)
+
+	var ok bool
+	if err := row.Scan(&ok); err != nil {
+		return err
+	}
+
+	if !ok {
+		return ErrSquareAlreadyClaimed
+	}
+
+	return nil
 }
 
 func gridSquareLogByRow(scan scanFunc) (*GridSquareLog, error) {
