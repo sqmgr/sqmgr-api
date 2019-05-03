@@ -26,11 +26,9 @@ limitations under the License.
     }
 
     loading.prototype.show = function() {
-        if (this.calls === 0) {
+        if (this.calls++ === 0) {
             document.body.appendChild(this.loadingDiv)
         }
-
-        this.calls++
     }
 
     loading.prototype.hide = function() {
@@ -38,9 +36,7 @@ limitations under the License.
             throw new Error('hide() called too many times')
         }
 
-        this.calls--
-
-        if (this.calls === 0) {
+        if (--this.calls === 0) {
             this.loadingDiv.remove()
         }
     }
