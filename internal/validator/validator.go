@@ -22,6 +22,7 @@ import (
 	"net/mail"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -35,6 +36,7 @@ var nonPrintableRx = regexp.MustCompile(`\p{C}`)
 // \r\n (\x0d \x0a) is included in \p{C} (specifically \p{Cc}, so we need to work around it
 var nonPrintableExcludeNewlineRx = regexp.MustCompile(`[\p{Cf}\p{Co}\p{Cs}\x00-\x09\x0b\x0c\x0e-\x1f\x7f-\x9f]`)
 var colorRx = regexp.MustCompile(`^#[a-fA-F0-9]{6}\z`)
+var wordCharRx = regexp.MustCompile(`[\p{L}\p{N}]`)
 
 // Errors is a mapping of fields to a list of errors
 type Errors map[string][]string
@@ -69,6 +71,20 @@ func (v *Validator) InverseRegexp(key, val string, rx *regexp.Regexp, isOptional
 
 	if len(val) == 0 || rx.MatchString(val) {
 		v.AddError(key, "must be a valid string")
+		return ""
+	}
+
+	return val
+}
+
+// ContainsWordChar will ensure that the string has at least a letter or number
+func (v *Validator) ContainsWordChar(key, val string, isOptional ...bool) string {
+	if len(isOptional) > 0 && isOptional[0] && len(val) == 0 {
+		return ""
+	}
+
+	if !wordCharRx.MatchString(val) {
+		v.AddError(key, "must contain at least a letter or number")
 		return ""
 	}
 
@@ -201,4 +217,14 @@ func (v *Validator) AddError(key string, format string, args ...interface{}) {
 
 	slice = append(slice, fmt.Sprintf(format, args...))
 	v.Errors[key] = slice
+}
+
+// String will returned a concatenated string of error messages (excluding the field name)
+func (v *Validator) String() string {
+	errors := make([]string, 0)
+	for _, err := range v.Errors {
+		errors = append(errors, err...)
+	}
+
+	return strings.Join(errors, "; ")
 }

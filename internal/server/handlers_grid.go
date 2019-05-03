@@ -185,8 +185,9 @@ func (s *Server) gridSquaresHandler() http.HandlerFunc {
 
 func (s *Server) gridSquaresSquareHandler() http.HandlerFunc {
 	type postPayload struct {
-		State model.GridSquareState `json:"state"`
-		Note  string                `json:"note"`
+		Claimant string                `json:"claimant"`
+		State    model.GridSquareState `json:"state"`
+		Note     string                `json:"note"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -207,16 +208,36 @@ func (s *Server) gridSquaresSquareHandler() http.HandlerFunc {
 			return
 		}
 
-		isAdmin := data.IsAdmin
-		if isAdmin {
-			if r.Method == http.MethodPost {
-				dec := json.NewDecoder(r.Body)
-				var payload postPayload
-				if err := dec.Decode(&payload); err != nil {
-					s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+		if r.Method == http.MethodPost {
+			dec := json.NewDecoder(r.Body)
+			var payload postPayload
+			if err := dec.Decode(&payload); err != nil {
+				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+				return
+			}
+
+			if len(payload.Claimant) > 0 {
+				v := validator.New()
+				claimant := v.Printable("name", payload.Claimant)
+				claimant = v.ContainsWordChar("name", claimant)
+
+				if !v.OK() {
+					s.ServeJSONError(w, http.StatusBadRequest, v.String())
 					return
 				}
 
+				square.Claimant = claimant
+				square.State = model.GridSquareStateClaimed
+
+				logrus.WithField("claimant", payload.Claimant).Info("claiming square")
+				if err := square.Save(r.Context(), false, model.GridSquareLog{
+					RemoteAddr: r.RemoteAddr,
+					Note:       "Initial claim",
+				}); err != nil {
+					s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+					return
+				}
+			} else if data.IsAdmin {
 				if payload.State == model.GridSquareStateUnclaimed {
 					square.Claimant = ""
 				}
@@ -233,16 +254,18 @@ func (s *Server) gridSquaresSquareHandler() http.HandlerFunc {
 					s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 					return
 				}
+			} else {
+				logrus.WithField("remoteAddr", r.RemoteAddr).Warn("non-admin tried to administer squares")
+				s.ServeJSONError(w, http.StatusForbidden, "")
+				return
 			}
+		}
 
+		if data.IsAdmin {
 			if err := square.LoadLogs(r.Context()); err != nil {
 				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 				return
 			}
-		} else if r.Method == http.MethodPost {
-			logrus.WithField("remoteAddr", r.RemoteAddr).Warn("non-admin tried to administer")
-			s.ServeJSONError(w, http.StatusForbidden, "")
-			return
 		}
 
 		res := jsonResponse{

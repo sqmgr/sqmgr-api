@@ -63,8 +63,32 @@ limitations under the License.
 </section>
 
 	<section class="templates">
+		<form class="add-note">
+			<div class="field">
+                <label for="note">Note</label>
+				<input type="text" id="note" name="note" placeholder="Reason for change">
+			</div>
+
+			<div class="buttons">
+				<input type="submit" name="submit" value="Claim">
+				<a href="#" class="cancel">Cancel</a>
+			</div>
+		</form>
+        <form class="claim-square">
+			<div class="field">
+				<label for="name">Name</label>
+				<input type="text" id="name" name="name" placeholder="Your name">
+			</div>
+
+			<div class="buttons">
+				<input type="submit" name="submit" value="Claim">
+				<a href="#" class="cancel">Cancel</a>
+			</div>
+		</form>
 		<div class="square-details">
 			<h4>Square Details</h4>
+
+            <p class="claim"><a href="#">Claim this square!</a></p>
 
 			<table>
 				<tbody>

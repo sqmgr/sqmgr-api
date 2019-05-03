@@ -81,7 +81,7 @@ SqMGR.GridBuilder.prototype.draw = function(squares) {
 		square = squares ? squares[i] : null
 
 		elem = document.createElement('div')
-		elem.onclick = this.clickSquare.bind(this, i)
+		elem.onclick = this.showSquareDetails.bind(this, i)
 		elem.classList.add('square')
 		if (square) {
             elem.classList.add(square.state)
@@ -146,7 +146,7 @@ SqMGR.GridBuilder.prototype.getTeamValue = function(team, prop) {
 	return this.grid.settings[setting]
 }
 
-SqMGR.GridBuilder.prototype.clickSquare = function(squareID) {
+SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
     const path = "/grid/" + this.grid.token + "/squares/" + squareID
     const drawDetails = function(data) {
 		const squareDetails = this.templates.querySelector('div.square-details').cloneNode(true)
@@ -179,6 +179,16 @@ SqMGR.GridBuilder.prototype.clickSquare = function(squareID) {
 		squareDetails.querySelector('td.square-id').textContent = '#' + data.squareID
 		squareDetails.querySelector('td.claimant').textContent = data.claimant
 		squareDetails.querySelector('td.modified').setAttribute('data-datetime', data.modified)
+
+		const claimP = squareDetails.querySelector('p.claim')
+		if (data.state !== 'unclaimed') {
+		    claimP.remove()
+		} else {
+			claimP.querySelector('a').onclick = function() {
+				this.claimSquare(squareID)
+				return false
+			}.bind(this)
+		}
 
 		const auditLog = squareDetails.querySelector('section.audit-log')
 
@@ -225,47 +235,13 @@ SqMGR.GridBuilder.prototype.buildLogs = function(auditLog, logs, squareID) {
 }
 
 SqMGR.GridBuilder.prototype.promptAndSubmitSquareData = function(squareID, options) {
-	const form = document.createElement('form'),
-		field = document.createElement('div'),
-		label = document.createElement('label'),
-		note = document.createElement('input'),
-        buttons = document.createElement('div'),
-		button = document.createElement('input'),
-		cancelLink = document.createElement('a'),
+	const form = this.templates.querySelector('form.add-note').cloneNode(true),
 		modal = this.modal.nest()
 
-	field.classList.add('field')
-	
-	label.setAttribute('for', 'note')
-	label.textContent = 'Reason for change'
-	
-	note.id = 'note'
-    note.type = 'text'
-	note.placeholder = 'Reason for change'
-    note.name = 'note'
-    
-	field.appendChild(label)
-	field.appendChild(note)
-	
-	buttons.classList.add('buttons')
-    
-	button.type = 'submit'
-	button.name = 'submit'
-	button.value = 'Save'
-    
-	cancelLink.setAttribute('href', '#')
-    cancelLink.classList.add('cancel')
-	cancelLink.textContent = 'Cancel'
-	cancelLink.onclick = function() {
+	form.querySelector('a.cancel').onclick = function() {
 		modal.close()
 		return false
 	}
-	
-	buttons.appendChild(button)
-	buttons.appendChild(cancelLink)
-	
-	form.appendChild(field)
-	form.appendChild(buttons)
 
 	form.onsubmit = function() {
 		const path = "/grid/" + this.grid.token + "/squares/" + squareID
@@ -283,10 +259,43 @@ SqMGR.GridBuilder.prototype.promptAndSubmitSquareData = function(squareID, optio
 	}.bind(this)
 
 	modal.show(form).addEventListener('modalclose', function() {
-        this.clickSquare(squareID)
+        this.showSquareDetails(squareID)
 	}.bind(this))
 
-	note.select()
+	form.querySelector('input').select()
+}
+
+SqMGR.GridBuilder.prototype.claimSquare = function(squareID) {
+	const modal = this.modal.nest(),
+        form = this.templates.querySelector('form.claim-square').cloneNode(true),
+		input = form.querySelector('input')
+
+	form.onsubmit = function() {
+	    if (input.value === '') {
+	    	return	false
+		}
+
+	    const path = "/grid/"+this.grid.token+"/squares/"+squareID
+		const body = JSON.stringify({"claimant": input.value})
+
+	    const success = function(data) {
+	    	modal.close()
+		}.bind(this)
+
+		const failure = function(data) {
+	    	modal.nest().showError(data.error)
+		}.bind(this)
+
+		SqMGR.request("POST", path, body, success, failure)
+
+	    return false
+	}.bind(this)
+
+    modal.show(form).addEventListener('modalclose', function() {
+    	this.showSquareDetails(squareID)
+	}.bind(this))
+
+	input.select()
 }
 
 SqMGR.get = function(path, callback, errorCallback) {
