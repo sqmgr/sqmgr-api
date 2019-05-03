@@ -23,4 +23,5 @@ type EffectiveUser interface {
 	JoinGrid(ctx context.Context, s *Grid) error
 	IsMemberOf(ctx context.Context, s *Grid) (bool, error)
 	IsAdminOf(ctx context.Context, s *Grid) bool
+	UserID(ctx context.Context) int64
 }

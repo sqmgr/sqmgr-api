@@ -146,7 +146,7 @@ div.square.paid-partial::after {
 	position: absolute;
 	left: 2px;
 	height: 4px;
-	background-color: #FFC107;
+    background: linear-gradient(90deg, #ffc107, #ffc107 50%, var(--gray) 50%);
 	bottom: 2px;
 	right: 2px;
 	font-size: 0.8em;

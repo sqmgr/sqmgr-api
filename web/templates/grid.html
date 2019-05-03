@@ -18,6 +18,7 @@ limitations under the License.
 
 {{ define "header" }}
 <link href="/static/css/modal.css" rel="stylesheet">
+<link href="/static/css/forms.css" rel="stylesheet">
 <link href="/static/css/grid.css" rel="stylesheet">
 {{ end }}
 
@@ -116,6 +117,8 @@ limitations under the License.
 <script>
 function SqMGR() { }
 SqMGR.grid = {{.Local.Grid}}
+SqMGR.isAdmin = {{.Local.IsAdmin}}
+SqMGR.gridSquareStates = {{.Local.GridSquareStates}}
 </script>
 <script src="/static/js/modal.js"></script>
 <script src="/static/js/datetime.js"></script>

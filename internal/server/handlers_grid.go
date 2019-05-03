@@ -92,16 +92,18 @@ func (s *Server) gridHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("grid.html")
 
 	type data struct {
-		IsAdmin bool
-		Grid    *model.Grid
+		IsAdmin          bool
+		Grid             *model.Grid
+		GridSquareStates []model.GridSquareState
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		gridCtxData := r.Context().Value(ctxKeyGrid).(*gridContextData)
 
 		s.ExecuteTemplate(w, r, tpl, data{
-			IsAdmin: gridCtxData.IsAdmin,
-			Grid:    gridCtxData.Grid,
+			IsAdmin:          gridCtxData.IsAdmin,
+			Grid:             gridCtxData.Grid,
+			GridSquareStates: model.GridSquareStates,
 		})
 	}
 }
@@ -161,6 +163,11 @@ func (s *Server) gridSquaresHandler() http.HandlerFunc {
 }
 
 func (s *Server) gridSquaresSquareHandler() http.HandlerFunc {
+	type postPayload struct {
+		State model.GridSquareState `json:"state"`
+		Note  string                `json:"note"`
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		squareIDStr := vars["square"]
@@ -170,19 +177,45 @@ func (s *Server) gridSquaresSquareHandler() http.HandlerFunc {
 			return
 		}
 
-		grid := r.Context().Value(ctxKeyGrid).(*gridContextData).Grid
+		data := r.Context().Value(ctxKeyGrid).(*gridContextData)
+
+		grid := data.Grid
 		square, err := grid.SquareBySquareID(squareID)
 		if err != nil {
 			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 			return
 		}
 
-		isAdmin := r.Context().Value(ctxKeyGrid).(*gridContextData).IsAdmin
+		isAdmin := data.IsAdmin
 		if isAdmin {
+			if r.Method == http.MethodPost {
+				dec := json.NewDecoder(r.Body)
+				var payload postPayload
+				if err := dec.Decode(&payload); err != nil {
+					s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+					return
+				}
+
+				if payload.State == model.GridSquareStateUnclaimed {
+					square.Claimant = ""
+				}
+
+				square.State = payload.State
+				square.Save(model.GridSquareLog{
+					UserID:     data.EffectiveUser.UserID(r.Context()),
+					RemoteAddr: r.RemoteAddr,
+					Note:       payload.Note,
+				})
+			}
+
 			if err := square.LoadLogs(); err != nil {
 				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 				return
 			}
+		} else if r.Method == http.MethodPost {
+			logrus.WithField("remoteAddr", r.RemoteAddr).Warn("non-admin tried to administer")
+			s.ServeJSONError(w, http.StatusForbidden, "")
+			return
 		}
 
 		res := jsonResponse{

@@ -32,6 +32,14 @@ const (
 	GridSquareStatePaidFull    GridSquareState = "paid-full"
 )
 
+// GridSquareStates are the valid states of a GridSquare
+var GridSquareStates = []GridSquareState{
+	GridSquareStateClaimed,
+	GridSquareStatePaidPartial,
+	GridSquareStatePaidFull,
+	GridSquareStateUnclaimed,
+}
+
 // GridSquare is an individual square within a grid
 type GridSquare struct {
 	*Model

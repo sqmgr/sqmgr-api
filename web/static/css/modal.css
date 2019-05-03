@@ -31,6 +31,8 @@ div.modal div.container {
     background-color: #fff;
     position: relative;
     padding: var(--spacing);
+    max-height: calc( 100vh - ( 2 * var(--spacing) ) );
+    overflow: auto;
     box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.4);
 }
 
@@ -49,4 +51,18 @@ div.modal a.close::after {
 }
 div.modal a.close span {
     display: none;
+}
+
+div.modal div.error {
+    color: var(--red);
+    font-weight: bold;
+}
+div.modal div.error::before {
+    content: 'Error: ';
+}
+
+div.modal form {
+    padding: 0;
+    border-width: 0;
+    background-color: transparent;
 }

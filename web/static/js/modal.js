@@ -14,23 +14,44 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-SqMGR.Modal = function() {
-    this.modal = null
+SqMGR.Modal = function(optionalParent) {
+    this.parent = optionalParent // the parent modal (optional)
+    this.node = null
+    this.nestedModal = null
     this._keyup = this.keyup.bind(this)
+}
+
+SqMGR.Modal.prototype.nest = function() {
+    if (this.nestedModal) {
+        this.nestedModal.close()
+    }
+
+    this.nestedModal = new SqMGR.Modal(this)
+    return this.nestedModal
+}
+
+SqMGR.Modal.prototype.nestedDidClose = function() {
+    this.nestedModal = null
 }
 
 SqMGR.Modal.prototype.close = function() {
     window.removeEventListener('keyup', this._keyup)
 
-    if (this.modal) {
-        this.modal.remove()
-        this.modal = null
+    if (this.node) {
+        this.node.dispatchEvent(new Event('modalclose'))
+
+        this.node.remove()
+        this.node = null
+    }
+
+    if (this.parent) {
+        this.parent.nestedDidClose()
     }
 }
 
-SqMGR.Modal.prototype.show = function(node) {
-    const modal = document.createElement('div')
-    modal.classList.add('modal')
+SqMGR.Modal.prototype.show = function(childNode) {
+    const node = document.createElement('div')
+    node.classList.add('modal')
 
     const closeLink = document.createElement('a')
     closeLink.setAttribute('href', '#')
@@ -44,29 +65,44 @@ SqMGR.Modal.prototype.show = function(node) {
 
     closeLink.appendChild(closeText)
     container.appendChild(closeLink)
-    container.appendChild(node)
-    modal.appendChild(container)
+    container.appendChild(childNode)
+    node.appendChild(container)
 
     container.onclick = function(event) {
         event.cancelBubble = true
     }
 
-    if (this.modal) {
-        this.modal.close()
+    if (this.node) {
+        this.close()
     }
 
-    this.modal = modal
+    this.node = node
 
-    this.modal.onclick = closeLink.onclick = this.close.bind(this)
+    this.node.onclick = closeLink.onclick = this.close.bind(this)
 
-    document.body.appendChild(modal)
+    document.body.appendChild(node)
 
     window.addEventListener('keyup', this._keyup)
+
+    return node
+}
+
+SqMGR.Modal.prototype.showError = function(errorMsg) {
+    const div = document.createElement('div')
+    div.classList.add('error')
+    div.textContent = errorMsg
+
+    this.show(div)
 }
 
 
 SqMGR.Modal.prototype.keyup = function(event) {
+    if (this.nestedModal) {
+        return
+    }
+
     if (event.key === 'Escape') {
+        event.stopPropagation()
         this.close()
         return
     }

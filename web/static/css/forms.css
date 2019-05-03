@@ -220,3 +220,13 @@ div.remaining {
 	font-size: 0.8em;
 	font-weight: bold;
 }
+
+div.buttons a.cancel {
+	color: var(--dark-gray);
+	font-size: 0.8em;
+	margin-left: var(--minimal-spacing);
+	text-decoration: none;
+}
+div.buttons a.cancel:hover {
+	color: var(--primary);
+}

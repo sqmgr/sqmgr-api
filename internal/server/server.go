@@ -139,7 +139,7 @@ func (s *Server) ExecuteTemplate(w http.ResponseWriter, r *http.Request, t *temp
 	session := s.Session(r)
 	user, err := session.LoggedInUser()
 	if err != nil && err != ErrNotLoggedIn {
-		logrus.WithError(err).Errorln("could not get user")
+		logrus.WithError(err).Errorln("could not request user")
 	}
 
 	tplData := TemplateData{

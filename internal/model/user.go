@@ -97,6 +97,11 @@ func (m *Model) NewUser(email, password string) (*User, error) {
 	return user, nil
 }
 
+// UserID is a getter for the ID
+func (u *User) UserID(ctx context.Context) int64 {
+	return u.ID
+}
+
 // RequiresReauthentication will return true if the user needs to re-enter their credentials
 func (u *User) RequiresReauthentication() bool {
 	return time.Now().Sub(u.Metadata.LastCredentialCheck) > durationBeforeReauth

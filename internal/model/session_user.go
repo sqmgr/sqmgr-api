@@ -45,5 +45,10 @@ func (u *SessionUser) JoinGrid(ctx context.Context, s *Grid) error {
 	return u.joinFunc(ctx, s)
 }
 
+// UserID will always return 0
+func (u *SessionUser) UserID(ctx context.Context) int64 {
+	return 0
+}
+
 // JoinGrid is a function which can be called to join grids
 type JoinGrid func(ctx context.Context, s *Grid) error

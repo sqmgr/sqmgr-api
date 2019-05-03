@@ -114,7 +114,7 @@ SqMGR.GridBuilder.prototype.loadSquares = function() {
 	const container = document.getElementById('grid-container')
 	container.classList.add('loading')
 
-	SqMGR.get("/grid/" + this.grid.token + "/squares", function (data) {
+	SqMGR.get( "/grid/" + this.grid.token + "/squares", function (data) {
 		this.draw(data)
 		container.classList.remove('loading')
 	}.bind(this))
@@ -127,16 +127,41 @@ SqMGR.GridBuilder.prototype.getTeamValue = function(team, prop) {
 
 SqMGR.GridBuilder.prototype.clickSquare = function(squareID) {
     const path = "/grid/" + this.grid.token + "/squares/" + squareID
-	SqMGR.get(path, function(data) {
+    const drawDetails = function(data) {
 		const squareDetails = this.templates.querySelector('div.square-details').cloneNode(true)
-        squareDetails.querySelector('td.square-id').textContent = data.squareID
+
+		if (data.state === 'unclaimed' || !SqMGR.isAdmin) {
+			squareDetails.querySelector('td.state').textContent = data.state
+		} else {
+            const select = document.createElement('select')
+            let option
+            SqMGR.gridSquareStates.forEach(function (state) {
+                option = document.createElement('option')
+                option.value = state
+                option.textContent = state
+
+                if (state === data.state) {
+                    option.setAttribute('selected', 'selected')
+                }
+
+                select.appendChild(option)
+            })
+
+            select.onchange = function () {
+                this.changeSquareState(squareID, select.value)
+            }.bind(this)
+
+			squareDetails.querySelector('td.state').appendChild(select)
+		}
+
+		squareDetails.classList.add(data.state)
+		squareDetails.querySelector('td.square-id').textContent = data.squareID
 		squareDetails.querySelector('td.claimant').textContent = data.claimant
-		squareDetails.querySelector('td.state').textContent = data.state
 		squareDetails.querySelector('td.modified').setAttribute('data-datetime', data.modified)
 
 		const auditLog = squareDetails.querySelector('section.audit-log')
 
-        if (data.logs) {
+		if (data.logs) {
 			const auditLogTbody = auditLog.querySelector('tbody')
 			const auditLogRowTpl = auditLog.querySelector('tr.template')
 			auditLogRowTpl.remove()
@@ -151,18 +176,92 @@ SqMGR.GridBuilder.prototype.clickSquare = function(squareID) {
 				auditLogTbody.appendChild(row)
 			}.bind(this))
 		} else {
-        	auditLog.remove()
+			auditLog.remove()
 		}
 
 		SqMGR.DateTime.format(squareDetails)
 
-		this.modal.show(squareDetails)
+		this.modal.show(squareDetails).addEventListener('modalclose', function() {
+			this.loadSquares()
+		}.bind(this))
+	}.bind(this)
+
+	SqMGR.get(path, drawDetails)
+}
+
+SqMGR.GridBuilder.prototype.changeSquareState = function(squareID, newState) {
+	const form = document.createElement('form'),
+		field = document.createElement('div'),
+		label = document.createElement('label'),
+		note = document.createElement('input'),
+        buttons = document.createElement('div'),
+		button = document.createElement('input'),
+		cancelLink = document.createElement('a'),
+		modal = this.modal.nest()
+
+	field.classList.add('field')
+	
+	label.setAttribute('for', 'note')
+	label.textContent = 'Reason for change'
+	
+	note.id = 'note'
+    note.type = 'text'
+	note.placeholder = 'Reason for change'
+    note.name = 'note'
+    
+	field.appendChild(label)
+	field.appendChild(note)
+	
+	buttons.classList.add('buttons')
+    
+	button.type = 'submit'
+	button.name = 'submit'
+	button.value = 'Save'
+    
+	cancelLink.setAttribute('href', '#')
+    cancelLink.classList.add('cancel')
+	cancelLink.textContent = 'Cancel'
+	cancelLink.onclick = function() {
+		modal.close()
+		return false
+	}
+	
+	buttons.appendChild(button)
+	buttons.appendChild(cancelLink)
+	
+	form.appendChild(field)
+	form.appendChild(buttons)
+
+	form.onsubmit = function() {
+		const path = "/grid/" + this.grid.token + "/squares/" + squareID
+		const body = JSON.stringify({
+			note: note.value,
+			state: newState,
+		})
+		const success = function(data) {
+		    modal.close()
+		}.bind(this)
+		const error = function(data) {
+		    modal.nest().showError(data.error)
+		}.bind(this)
+	    SqMGR.request("POST", path, body, success, error)
+		return false
+	}.bind(this)
+
+	modal.show(form).addEventListener('modalclose', function() {
+        this.clickSquare(squareID)
 	}.bind(this))
+
+	note.select()
 }
 
 SqMGR.get = function(path, callback, errorCallback) {
+	SqMGR.request("GET", path, null, callback, errorCallback)
+}
+
+SqMGR.request = function(method, path, body, callback, errorCallback) {
 	const xhr = new XMLHttpRequest()
-	xhr.open("GET", path)
+	xhr.open(method, path)
 	xhr.onload = function() {
 	    let data
 		try {
@@ -178,7 +277,9 @@ SqMGR.get = function(path, callback, errorCallback) {
 			errorCallback(data)
 		}
 	}
-	xhr.send()
+
+	xhr.setRequestHeader("Content-Type", "application/json")
+	xhr.send(body)
 }
 
 window.addEventListener('load', SqMGR.buildSquares)

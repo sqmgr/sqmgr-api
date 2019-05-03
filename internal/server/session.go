@@ -30,7 +30,7 @@ import (
 // ErrNotLoggedIn is an error when the user is not logged in
 var ErrNotLoggedIn = errors.New("not logged in")
 
-// Session is a wrapper around gorilla sessions that makes it easier to get and save sessions.
+// Session is a wrapper around gorilla sessions that makes it easier to request and save sessions.
 type Session struct {
 	*sessions.Session
 	server *Server
@@ -68,7 +68,7 @@ func init() {
 func newSession(w http.ResponseWriter, r *http.Request, s *Server) *Session {
 	session, err := store.Get(r, sessionNameLT)
 	if err != nil {
-		logrus.WithError(err).Errorln("could not get session")
+		logrus.WithError(err).Errorln("could not request session")
 	}
 
 	if rememberMe, _ := session.Values[rememberMeKey].(bool); !rememberMe {
