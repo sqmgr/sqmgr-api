@@ -75,6 +75,31 @@ type GridSquare struct {
 	Logs          []*GridSquareLog `json:"logs,omitempty"`
 }
 
+type gridSquareJSON struct {
+	OpaqueUserID string           `json:"opaqueUserID"`
+	SquareID     int              `json:"squareID"`
+	State        GridSquareState  `json:"state"`
+	Claimant     string           `json:"claimant"`
+	Modified     time.Time        `json:"modified"`
+	Logs         []*GridSquareLog `json:"logs,omitempty"`
+}
+
+func (g *GridSquare) MarshalJSON() ([]byte, error) {
+	oid, err := opaqueID(g.UserIdentifier())
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(gridSquareJSON{
+		OpaqueUserID: oid,
+		SquareID:     g.SquareID,
+		State:        g.State,
+		Claimant:     g.Claimant,
+		Modified:     g.Modified,
+		Logs:         g.Logs,
+	})
+}
+
 // GridSquareLog represents an individual log entry for a grid square
 type GridSquareLog struct {
 	id            int64
@@ -99,6 +124,15 @@ func (g *GridSquare) SetUserIdentifier(uid interface{}) {
 	default:
 		panic(fmt.Sprintf("invalid userID type %T", uid))
 	}
+}
+
+// UserIdentifier will return the appropriate ID
+func (g *GridSquare) UserIdentifier() interface{} {
+	if g.userID > 0 {
+		return g.userID
+	}
+
+	return g.sessionUserID
 }
 
 // SquareID is a getter for the square ID

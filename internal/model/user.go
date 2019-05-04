@@ -277,6 +277,11 @@ func (u *User) IsAdminOf(ctx context.Context, g *Grid) bool {
 	return u.ID == g.userID
 }
 
+// OpaqueUserID will return a hashed user identifier
+func (u *User) OpaqueUserID(ctx context.Context) (string, error) {
+	return opaqueID(u.ID)
+}
+
 func (m *Model) userByRow(row *sql.Row) (*User, error) {
 	u := &User{Model: m}
 

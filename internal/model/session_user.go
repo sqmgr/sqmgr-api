@@ -57,5 +57,10 @@ func (u *SessionUser) UserID(ctx context.Context) interface{} {
 	return u.userID
 }
 
+// OpaqueUserID returns an opaque user ID
+func (u *SessionUser) OpaqueUserID(ctx context.Context) (string, error) {
+	return opaqueID(u.userID)
+}
+
 // JoinGrid is a function which can be called to join grids
 type JoinGrid func(ctx context.Context, s *Grid) error

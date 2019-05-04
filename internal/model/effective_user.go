@@ -16,7 +16,24 @@ limitations under the License.
 
 package model
 
-import "context"
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"github.com/sirupsen/logrus"
+	"os"
+	"strconv"
+)
+
+var opaqueSalt = os.Getenv("OPAQUE_SALT")
+
+func init() {
+	if len(opaqueSalt) == 0 {
+		opaqueSalt = "SqMGR-salt"
+		logrus.WithField("salt", opaqueSalt).Warn("no OPAQUE_SALT specified, using default")
+	}
+}
 
 // EffectiveUser provides common user functionality
 type EffectiveUser interface {
@@ -24,4 +41,26 @@ type EffectiveUser interface {
 	IsMemberOf(ctx context.Context, s *Grid) (bool, error)
 	IsAdminOf(ctx context.Context, s *Grid) bool
 	UserID(ctx context.Context) interface{}
+	OpaqueUserID(ctx context.Context) (string, error)
+}
+
+func opaqueID(userIdentifier interface{}) (string, error) {
+	var id string
+	switch val := userIdentifier.(type) {
+	case int64:
+		id = strconv.FormatInt(val, 10)
+	case string:
+		id = val
+	default:
+		panic(fmt.Sprintf("error: invalid type passed to OpaqueID: %T", userIdentifier))
+	}
+
+	hasher := sha256.New()
+	_, err := hasher.Write([]byte(opaqueSalt + id))
+	if err != nil {
+		return "", err
+	}
+	sum := hasher.Sum(nil)
+
+	return hex.EncodeToString(sum[:]), nil
 }

@@ -113,6 +113,14 @@ div.square {
 	position: relative;
 	overflow: hidden;
 }
+div.square span.owned::after {
+    content: '\2605';
+    color: var(--midnight-gray);
+	font-size: 0.9em;
+	position: absolute;
+	top: 2px;
+	left: 2px;
+}
 div.square:hover {
     border-color: #000;
 	box-shadow: 2px 2px 2px -2px #000;

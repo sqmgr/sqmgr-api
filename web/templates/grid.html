@@ -89,6 +89,7 @@ limitations under the License.
 			<h4>Square Details</h4>
 
             <p class="claim"><a href="#">Claim this square!</a></p>
+			<p class="unclaim"><a href="#">Relinquish claim</a></p>
 
 			<table>
 				<tbody>
@@ -149,6 +150,7 @@ limitations under the License.
 function SqMGR() { }
 SqMGR.grid = {{.Local.Grid}}
 SqMGR.isAdmin = {{.Local.IsAdmin}}
+SqMGR.ouid = {{.Local.OpaqueUserID}}
 SqMGR.gridSquareStates = {{.Local.GridSquareStates}}
 </script>
 <script src="/static/js/modal.js"></script>

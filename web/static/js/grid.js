@@ -80,30 +80,36 @@ SqMGR.GridBuilder.prototype.draw = function(squares) {
 	for (i=0; i<numSquares; i++) {
 		square = squares ? squares[i] : null
 
-		elem = document.createElement('div')
-		elem.onclick = this.showSquareDetails.bind(this, i)
-		elem.classList.add('square')
+		const squareDiv = document.createElement('div')
+		squareDiv.onclick = this.showSquareDetails.bind(this, i)
+		squareDiv.classList.add('square')
 		if (square) {
-            elem.classList.add(square.state)
+            squareDiv.classList.add(square.state)
         }
-		elem.setAttribute('data-sqid', i)
+		squareDiv.setAttribute('data-sqid', i)
 
 		// add the square id
-		elem2 = document.createElement('span')
-		elem2.textContent = i
-		elem2.classList.add('square-id')
-		elem.appendChild(elem2)
+		const squareIDSpan = document.createElement('span')
+		squareIDSpan.textContent = i
+		squareIDSpan.classList.add('square-id')
+		squareDiv.appendChild(squareIDSpan)
 
 		// add the name
-		elem2 = document.createElement('span')
-		elem2.classList.add('name')
+		const nameSpan = document.createElement('span')
+		nameSpan.classList.add('name')
+		squareDiv.appendChild(nameSpan)
 
 		if (square) {
-			elem2.textContent = square.claimant
+			nameSpan.textContent = square.claimant
+
+			if (square.opaqueUserID === SqMGR.ouid) {
+			    const ownedSpan = document.createElement('span')
+				ownedSpan.classList.add('owned')
+                squareDiv.appendChild(ownedSpan)
+			}
 		}
 
-		elem.appendChild(elem2)
-		parent.appendChild(elem)
+		parent.appendChild(squareDiv)
 	}
 
 	container.innerHTML = ''
@@ -194,6 +200,16 @@ SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
 			}.bind(this)
 		}
 
+		const unclaimP = squareDetails.querySelector('p.unclaim')
+		if (data.state === 'claimed' && data.opaqueUserID === SqMGR.ouid) {
+			unclaimP.querySelector('a').onclick = function() {
+				this.unclaimSquare(squareID)
+				return false
+			}.bind(this)
+		} else {
+			unclaimP.remove()
+		}
+
 		const auditLog = squareDetails.querySelector('section.audit-log')
 
 		if (data.logs) {
@@ -265,6 +281,21 @@ SqMGR.GridBuilder.prototype.promptAndSubmitSquareData = function(squareID, optio
 	}.bind(this))
 
 	form.querySelector('input').select()
+}
+
+SqMGR.GridBuilder.prototype.unclaimSquare = function(squareID) {
+	const path = "/grid/"+this.grid.token+"/squares/"+squareID
+	const body = JSON.stringify({"unclaim": true})
+
+	const success = function() {
+		this.modal.close()
+	}.bind(this)
+
+	const failure = function(data) {
+		this.modal.nest().showError(data.error)
+	}.bind(this)
+
+	SqMGR.request("POST", path, body, success, failure)
 }
 
 SqMGR.GridBuilder.prototype.claimSquare = function(squareID) {

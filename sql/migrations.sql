@@ -221,13 +221,27 @@ CREATE FUNCTION update_grid_square(_id bigint, _state text, _claimant text, _use
     AS $$
 DECLARE
     _row grid_squares;
+    _initial_claim boolean;
+    _same_user boolean;
+    _user_unclaim boolean;
 BEGIN
     SELECT INTO _row * FROM grid_squares WHERE id = _id FOR SHARE;
 
-    IF NOT _is_admin AND
-       (_row.claimant IS NOT NULL OR _row.state != 'unclaimed')
+    _initial_claim := _row.claimant IS NULL AND _row.state = 'unclaimed';
+    _same_user := coalesce(_row.user_id, 0) = coalesce(_user_id, 0) AND coalesce(_row.session_user_id, '') = coalesce(_session_user_id, '');
+    _user_unclaim := _same_user AND _row.state = 'claimed' AND _state = 'unclaimed';
+
+    IF NOT _is_admin
+        AND NOT _initial_claim
+        AND NOT _user_unclaim
     THEN
         RETURN FALSE;
+    END IF;
+
+    IF _state = 'unclaimed' THEN
+        _claimant := NULL;
+        _user_id := NULL;
+        _session_user_id := NULL;
     END IF;
 
     UPDATE grid_squares
