@@ -11,6 +11,7 @@ EXPOSE 8080
 WORKDIR /app
 COPY --from=build /build/sqmgrserver /bin/sqmgrserver
 COPY --from=build /usr/share/zoneinfo/America/New_York /usr/share/zoneinfo/America/New_York
+COPY --from=build /etc/ssl/certs/ /etc/ssl/certs/
 COPY web/ web/
 ARG BUILD_NUMBER
 ENV BUILD_NUMBER=${BUILD_NUMBER}
