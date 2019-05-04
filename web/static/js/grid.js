@@ -77,7 +77,7 @@ SqMGR.GridBuilder.prototype.draw = function(squares) {
 	}.bind(this))
 
 	numSquares = SqMGR.Config.Types[this.grid.gridType]
-	for (i=0; i<numSquares; i++) {
+	for (i=1; i<=numSquares; i++) {
 		square = squares ? squares[i] : null
 
 		const squareDiv = document.createElement('div')

@@ -206,8 +206,9 @@ BEGIN
     LOOP
        EXIT WHEN _counter = _squares;
 
+       -- +1 because the square IDs are 1-based not 0-based
        INSERT INTO grid_squares (grid_id, square_id) VALUES
-       (_row.id, _counter);
+       (_row.id, _counter + 1);
 
        _counter := _counter + 1;
     END LOOP;
