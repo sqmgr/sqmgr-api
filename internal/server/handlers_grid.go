@@ -245,7 +245,7 @@ func (s *Server) gridSquaresSquareHandler() http.HandlerFunc {
 				logrus.WithField("claimant", payload.Claimant).Info("claiming square")
 				if err := square.Save(r.Context(), false, model.GridSquareLog{
 					RemoteAddr: r.RemoteAddr,
-					Note:       "Initial claim",
+					Note:       "user: initial claim",
 				}); err != nil {
 					s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 					return
@@ -256,7 +256,7 @@ func (s *Server) gridSquaresSquareHandler() http.HandlerFunc {
 
 				if err := square.Save(r.Context(), false, model.GridSquareLog{
 					RemoteAddr: r.RemoteAddr,
-					Note:       payload.Note,
+					Note:       fmt.Sprintf("user: `%s` unclaimed", square.Claimant),
 				}); err != nil {
 					s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 					return
