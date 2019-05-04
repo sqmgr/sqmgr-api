@@ -12,8 +12,28 @@ spec:
       labels:
         app: sqmgr-dev
     spec:
+      initContainers:
+        - name: liquibase
+          image: reg.taproom.us/weters/sqmgr-lb
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: sqmgr-config
+          args:
+            - '--url'
+            - 'jdbc:postgresql://$(PG_HOST):$(PG_PORT)/$(PG_DBNAME)'
+            - '--username'
+            - '$(PG_USER)'
+            - '--password'
+            - '$(PG_PASSWORD)'
+            - '--changeLogFile'
+            - 'sql/migrations.sql'
+            - 'update'
       containers:
       - name: sqmgr
+        envFrom:
+          - secretRef:
+              name: sqmgr-config
         env:
         - name: SMTP
           value: 10.1.1.1:25
@@ -21,9 +41,8 @@ spec:
           value: no-reply@sqmgr.com
         - name: URL
           value: https://sqmgr.com
-        envFrom:
-        - secretRef:
-            name: sqmgr-config
+        - name: DSN
+          value: 'dbname=$(PG_DBNAME) host=$(PG_HOST) port=$(PG_PORT) user=$(PG_USER) password=$(PG_PASSWORD) sslmode=$(PG_SSLMODE)'
         image: reg.taproom.us/weters/sqmgrserver:latest
         imagePullPolicy: Always
       imagePullSecrets:

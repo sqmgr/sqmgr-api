@@ -1,4 +1,5 @@
 IMG ?= "reg.taproom.us/weters/sqmgrserver:latest"
+LB_IMG ?= "reg.taproom.us/weters/sqmgr-lb"
 BUILD_NUMBER ?= `date "+%y%m%d%H%M%S"`
 PG_HOST ?= "localhost"
 PG_PORT ?= "5432"
@@ -16,9 +17,11 @@ run:
 
 docker-build:
 	docker build -t ${IMG} --build-arg BUILD_NUMBER=${BUILD_NUMBER} .
+	docker build -t ${LB_IMG} -f Dockerfile-liquibase .
 
 docker-push: docker-build
 	docker push ${IMG}
+	docker push ${LB_IMG}
 
 test:
 	golint ./...

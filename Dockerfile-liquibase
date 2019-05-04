@@ -1,0 +1,2 @@
+FROM reg.taproom.us/pg-liquibase
+COPY sql/ sql/
