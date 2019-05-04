@@ -3,4 +3,3 @@
 *.swo
 coverage.out
 .idea/
-k8s/

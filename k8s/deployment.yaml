@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sqmgr-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sqmgr-dev
+  template:
+    metadata:
+      labels:
+        app: sqmgr-dev
+    spec:
+      containers:
+      - name: sqmgr
+        env:
+        - name: SMTP
+          value: 10.1.1.1:25
+        - name: FROM_ADDRESS
+          value: no-reply@sqmgr.com
+        - name: URL
+          value: https://sqmgr.com
+        envFrom:
+        - secretRef:
+            name: sqmgr-config
+        image: reg.taproom.us/weters/sqmgrserver:latest
+        imagePullPolicy: Always
+      imagePullSecrets:
+      - name: taproom.us
