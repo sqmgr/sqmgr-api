@@ -16,6 +16,8 @@ limitations under the License.
 
 package config
 
+import "os"
+
 type config struct {
 	url         string
 	smtp        string
@@ -35,19 +37,32 @@ func Load() error {
 
 // GetURL will get the URL to the site
 func GetURL(optionalPath ...string) string {
-	if len(optionalPath) > 0 {
-		return conf.url + optionalPath[0]
+	url := os.Getenv("URL")
+	if len(url) == 0 {
+		url = conf.url
 	}
 
-	return conf.url + "/"
+	if len(optionalPath) > 0 {
+		return url + optionalPath[0]
+	}
+
+	return url + "/"
 }
 
 // GetSMTP will load the SMTP configuration
 func GetSMTP() string {
+	if smtp := os.Getenv("SMTP"); len(smtp) > 0 {
+		return smtp
+	}
+
 	return conf.smtp
 }
 
 // GetFromAddress will get the address emails should appear from
 func GetFromAddress() string {
+	if from := os.Getenv("FROM_ADDRESS"); len(from) > 0 {
+		return from
+	}
+
 	return conf.fromAddress
 }

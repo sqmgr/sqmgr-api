@@ -6,7 +6,7 @@ COPY internal/ internal/
 COPY pkg/ pkg/
 RUN CGO_ENABLED=0 GOOS=linux go build -a -o sqmgrserver github.com/weters/sqmgr/cmd/sqmgrserver
 
-FROM busybox:latest
+FROM alpine:latest
 EXPOSE 8080
 WORKDIR /app
 COPY --from=build /build/sqmgrserver /bin/sqmgrserver
