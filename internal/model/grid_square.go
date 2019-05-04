@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -63,26 +64,41 @@ func (g GridSquareState) IsValid() bool {
 // GridSquare is an individual square within a grid
 type GridSquare struct {
 	*Model
-	ID       int64            `json:"-"`
-	GridID   int64            `json:"-"`
-	SquareID int              `json:"squareID"`
-	State    GridSquareState  `json:"state"`
-	Claimant string           `json:"claimant"`
-	Modified time.Time        `json:"modified"`
-	Logs     []*GridSquareLog `json:"logs,omitempty"`
+	ID            int64 `json:"-"`
+	GridID        int64 `json:"-"`
+	userID        int64
+	sessionUserID string
+	SquareID      int              `json:"squareID"`
+	State         GridSquareState  `json:"state"`
+	Claimant      string           `json:"claimant"`
+	Modified      time.Time        `json:"modified"`
+	Logs          []*GridSquareLog `json:"logs,omitempty"`
 }
 
 // GridSquareLog represents an individual log entry for a grid square
 type GridSquareLog struct {
-	id           int64
-	gridSquareID int64
-	squareID     int
-	UserID       int64
-	state        GridSquareState
-	claimant     string
-	RemoteAddr   string
-	Note         string
-	created      time.Time
+	id            int64
+	gridSquareID  int64
+	squareID      int
+	userID        int64
+	sessionUserID string
+	state         GridSquareState
+	claimant      string
+	RemoteAddr    string
+	Note          string
+	created       time.Time
+}
+
+// SetUserIdentifier will allow you to set either the userID (int64) or the sessionUserID (string)
+func (g *GridSquare) SetUserIdentifier(uid interface{}) {
+	switch val := uid.(type) {
+	case int64:
+		g.userID = val
+	case string:
+		g.sessionUserID = val
+	default:
+		panic(fmt.Sprintf("invalid userID type %T", uid))
+	}
 }
 
 // SquareID is a getter for the square ID
@@ -144,18 +160,23 @@ func (g *GridSquare) Save(ctx context.Context, isAdmin bool, gridSquareLog GridS
 	}
 
 	var userID *int64
+	var sessionUserID *string
 	var remoteAddr *string
 
-	if gridSquareLog.UserID > 0 {
-		userID = &gridSquareLog.UserID
+	if g.userID > 0 {
+		userID = &g.userID
+	}
+
+	if g.sessionUserID != "" {
+		sessionUserID = &g.sessionUserID
 	}
 
 	if gridSquareLog.RemoteAddr != "" {
 		remoteAddr = &gridSquareLog.RemoteAddr
 	}
 
-	const query = "SELECT * FROM update_grid_square($1, $2, $3, $4, $5, $6, $7)"
-	row := g.Model.db.QueryRowContext(ctx, query, g.ID, g.State, claimant, userID, remoteAddr, gridSquareLog.Note, isAdmin)
+	const query = "SELECT * FROM update_grid_square($1, $2, $3, $4, $5, $6, $7, $8)"
+	row := g.Model.db.QueryRowContext(ctx, query, g.ID, g.State, claimant, userID, sessionUserID, remoteAddr, gridSquareLog.Note, isAdmin)
 
 	var ok bool
 	if err := row.Scan(&ok); err != nil {
@@ -173,14 +194,19 @@ func gridSquareLogByRow(scan scanFunc) (*GridSquareLog, error) {
 	var l GridSquareLog
 	var remoteAddr *string
 	var userID *int64
+	var sessionUserID *string
 	var claimant *string
 
-	if err := scan(&l.id, &l.gridSquareID, &l.squareID, &userID, &l.state, &claimant, &remoteAddr, &l.Note, &l.created); err != nil {
+	if err := scan(&l.id, &l.gridSquareID, &l.squareID, &userID, &sessionUserID, &l.state, &claimant, &remoteAddr, &l.Note, &l.created); err != nil {
 		return nil, err
 	}
 
 	if userID != nil {
-		l.UserID = *userID
+		l.userID = *userID
+	}
+
+	if sessionUserID != nil {
+		l.sessionUserID = *sessionUserID
 	}
 
 	if remoteAddr != nil {
@@ -199,7 +225,7 @@ func gridSquareLogByRow(scan scanFunc) (*GridSquareLog, error) {
 // LoadLogs will load the logs for the given square
 func (g *GridSquare) LoadLogs(ctx context.Context) error {
 	const query = `
-		SELECT grid_squares_logs.id, grid_square_id, square_id, user_id, grid_squares_logs.state, grid_squares_logs.claimant, remote_addr, note, grid_squares_logs.created
+		SELECT grid_squares_logs.id, grid_square_id, square_id, grid_squares_logs.user_id, grid_squares_logs.session_user_id, grid_squares_logs.state, grid_squares_logs.claimant, remote_addr, note, grid_squares_logs.created
 		FROM grid_squares_logs
 		INNER JOIN grid_squares ON grid_squares_logs.grid_square_id = grid_squares.id
 		WHERE grid_square_id = $1 

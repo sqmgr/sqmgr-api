@@ -98,7 +98,7 @@ func (m *Model) NewUser(email, password string) (*User, error) {
 }
 
 // UserID is a getter for the ID
-func (u *User) UserID(ctx context.Context) int64 {
+func (u *User) UserID(ctx context.Context) interface{} {
 	return u.ID
 }
 

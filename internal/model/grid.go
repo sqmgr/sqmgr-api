@@ -401,7 +401,7 @@ func (g *Grid) squareByRow(scan scanFunc) (*GridSquare, error) {
 // Logs will return all grid square logs for the grid
 func (g *Grid) Logs(ctx context.Context, offset, limit int) ([]*GridSquareLog, error) {
 	const query = `
-		SELECT grid_squares_logs.id, grid_square_id, square_id, user_id, grid_squares_logs.state, grid_squares_logs.claimant, remote_addr, note, grid_squares_logs.created
+		SELECT grid_squares_logs.id, grid_square_id, square_id, grid_squares_logs.user_id, grid_squares_logs.session_user_id, grid_squares_logs.state, grid_squares_logs.claimant, remote_addr, note, grid_squares_logs.created
 		FROM grid_squares_logs
 		INNER JOIN grid_squares ON grid_squares_logs.grid_square_id = grid_squares.id
 		WHERE grid_squares.grid_id = $1

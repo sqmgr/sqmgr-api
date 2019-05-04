@@ -121,6 +121,10 @@ SqMGR.GridBuilder.prototype.loadSquares = function() {
 }
 
 SqMGR.GridBuilder.prototype.loadLogs = function() {
+    if (!SqMGR.isAdmin) {
+    	return
+	}
+
 	SqMGR.get("/grid/" + this.grid.token + "/logs", function(data) {
 		let section
 	    const auditLog = this.templates.querySelector('section.audit-log').cloneNode(true)
@@ -194,8 +198,6 @@ SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
 
 		if (data.logs) {
 		    this.buildLogs(auditLog, data.logs, squareID)
-		} else {
-			auditLog.remove()
 		}
 
 		SqMGR.DateTime.format(squareDetails)

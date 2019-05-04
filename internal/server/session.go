@@ -58,6 +58,7 @@ const (
 const (
 	rememberMeKey = "rememberMe"
 	gridIDKey     = "gridIDs"
+	userIDKey     = "userID"
 )
 
 func init() {

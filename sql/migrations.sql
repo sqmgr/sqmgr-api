@@ -97,6 +97,8 @@ CREATE TABLE grid_squares (
     square_id int not null default 0,
     state text not null default 'unclaimed' references grid_square_states (state),
     claimant text,
+    user_id bigint references users (id), -- registered users
+    session_user_id text, -- non-registered, session-based users
     modified timestamp not null default (now() at time zone 'utc'),
     UNIQUE (grid_id, square_id)
 );
@@ -105,6 +107,7 @@ CREATE TABLE grid_squares_logs (
     id bigserial not null primary key,
     grid_square_id bigint not null references grid_squares (id),
     user_id bigint references users (id),
+    session_user_id text, -- non-registered, session-based users
     state text not null default 'unclaimed' references grid_square_states (state),
     claimant text,
     remote_addr text,
@@ -213,7 +216,7 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION update_grid_square(_id bigint, _state text, _claimant text, _user_id bigint, _remote_addr text, _note text, _is_admin boolean) RETURNS boolean
+CREATE FUNCTION update_grid_square(_id bigint, _state text, _claimant text, _user_id bigint, _session_user_id text, _remote_addr text, _note text, _is_admin boolean) RETURNS boolean
     LANGUAGE plpgsql
     AS $$
 DECLARE
@@ -227,16 +230,22 @@ BEGIN
         RETURN FALSE;
     END IF;
 
-    UPDATE grid_squares SET state = _state, claimant = _claimant, modified = (now() at time zone 'utc') WHERE id = _id;
+    UPDATE grid_squares
+    SET state = _state,
+        claimant = _claimant,
+        user_id = _user_id,
+        session_user_id = _session_user_id,
+        modified = (now() at time zone 'utc')
+    WHERE id = _id;
 
-    INSERT INTO grid_squares_logs (grid_square_id, user_id, state, claimant, note, remote_addr) VALUES
-    (_id, _user_id, _state, _claimant, _note, _remote_addr);
+    INSERT INTO grid_squares_logs (grid_square_id, user_id, session_user_id, state, claimant, note, remote_addr) VALUES
+    (_id, _user_id, _session_user_id, _state, _claimant, _note, _remote_addr);
 
     RETURN TRUE;
 END;
 $$;
 
---rollback DROP FUNCTION update_grid_square(bigint, text, text, bigint, text, text, boolean);
+--rollback DROP FUNCTION update_grid_square(bigint, text, text, bigint, text, text, text, boolean);
 --rollback DROP FUNCTION new_user(text, text);
 --rollback DROP FUNCTION set_user_confirmation(bigint, text);
 --rollback DROP FUNCTION new_token(text);

@@ -16,17 +16,24 @@ limitations under the License.
 
 package model
 
-import "context"
+import (
+	"context"
+	"github.com/google/uuid"
+)
 
 // SessionUser represents a user who has not logged in
 type SessionUser struct {
+	userID   string
 	gridIDs  map[int64]bool
 	joinFunc JoinGrid
 }
 
 // NewSessionUser returns a new session user
-func NewSessionUser(ids map[int64]bool, joinFunc JoinGrid) *SessionUser {
-	return &SessionUser{ids, joinFunc}
+func NewSessionUser(userID string, ids map[int64]bool, joinFunc JoinGrid) *SessionUser {
+	if userID == "" {
+		userID = uuid.New().String()
+	}
+	return &SessionUser{userID, ids, joinFunc}
 }
 
 // IsAdminOf will always return false for a session-based user
@@ -46,8 +53,8 @@ func (u *SessionUser) JoinGrid(ctx context.Context, s *Grid) error {
 }
 
 // UserID will always return 0
-func (u *SessionUser) UserID(ctx context.Context) int64 {
-	return 0
+func (u *SessionUser) UserID(ctx context.Context) interface{} {
+	return u.userID
 }
 
 // JoinGrid is a function which can be called to join grids

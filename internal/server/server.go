@@ -256,8 +256,9 @@ func (s *Server) EffectiveUser(r *http.Request) (model.EffectiveUser, error) {
 		ids = make(map[int64]bool)
 	}
 
-	logrus.Trace("effective user is session user")
-	return model.NewSessionUser(ids, model.JoinGrid(func(ctx context.Context, grid *model.Grid) error {
+	userID, _ := sess.Values[userIDKey].(string)
+	logrus.WithField("userID", userID).Trace("effective user is session user")
+	eu := model.NewSessionUser(userID, ids, model.JoinGrid(func(ctx context.Context, grid *model.Grid) error {
 		ids, ok := sess.Values[gridIDKey].(map[int64]bool)
 		if !ok {
 			ids = make(map[int64]bool)
@@ -266,10 +267,15 @@ func (s *Server) EffectiveUser(r *http.Request) (model.EffectiveUser, error) {
 		ids[grid.ID()] = true
 
 		sess.Values[gridIDKey] = ids
+		sess.Values[userIDKey] = userID
 		sess.Save()
 
 		return nil
-	})), nil
+	}))
+
+	userID = eu.UserID(r.Context()).(string)
+
+	return eu, nil
 }
 
 // AuthUser will return the currently authenticated user. This MUST only be called the calling handler has been

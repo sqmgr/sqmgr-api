@@ -138,7 +138,7 @@ func main() {
 				Note:       "state changed",
 			}
 
-			if err := square.Save(gsl); err != nil {
+			if err := square.Save(context.Background(), true, gsl); err != nil {
 				panic(err)
 			}
 		}

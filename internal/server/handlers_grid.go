@@ -228,6 +228,7 @@ func (s *Server) gridSquaresSquareHandler() http.HandlerFunc {
 
 				square.Claimant = claimant
 				square.State = model.GridSquareStateClaimed
+				square.SetUserIdentifier(data.EffectiveUser.UserID(r.Context()))
 
 				logrus.WithField("claimant", payload.Claimant).Info("claiming square")
 				if err := square.Save(r.Context(), false, model.GridSquareLog{
@@ -246,8 +247,9 @@ func (s *Server) gridSquaresSquareHandler() http.HandlerFunc {
 					square.State = payload.State
 				}
 
+				square.SetUserIdentifier(data.EffectiveUser.UserID(r.Context()))
+
 				if err := square.Save(r.Context(), true, model.GridSquareLog{
-					UserID:     data.EffectiveUser.UserID(r.Context()),
 					RemoteAddr: r.RemoteAddr,
 					Note:       payload.Note,
 				}); err != nil {

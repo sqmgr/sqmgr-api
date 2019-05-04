@@ -38,10 +38,11 @@ func TestSessionUser(t *testing.T) {
 		return nil
 	})
 
-	u := NewSessionUser(map[int64]bool{1000: true, 2000: true}, joinFn)
+	u := NewSessionUser("", map[int64]bool{1000: true, 2000: true}, joinFn)
 	ok, err := u.IsMemberOf(context.Background(), &Grid{id: 1000})
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(ok).Should(gomega.BeTrue())
+	g.Expect(u.UserID(context.Background())).ShouldNot(gomega.BeEmpty())
 
 	ok, err = u.IsMemberOf(context.Background(), &Grid{id: 3000})
 	g.Expect(err).Should(gomega.Succeed())
@@ -51,4 +52,11 @@ func TestSessionUser(t *testing.T) {
 
 	g.Expect(u.JoinGrid(theContext, theGrid)).Should(gomega.Succeed())
 	g.Expect(called).Should(gomega.BeTrue())
+
+	u2 := NewSessionUser("", nil, joinFn)
+	g.Expect(u2.UserID(context.Background())).ShouldNot(gomega.Equal(u.UserID(context.Background())))
+
+	u3 := NewSessionUser(u2.UserID(context.Background()).(string), nil, joinFn)
+	g.Expect(u3.UserID(context.Background())).Should(gomega.Equal(u2.UserID(context.Background())))
+
 }
