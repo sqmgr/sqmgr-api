@@ -27,7 +27,7 @@ spec:
             - '--password'
             - '$(PG_PASSWORD)'
             - '--changeLogFile'
-            - 'sql/migrations.sql'
+            - './sql/migrations.sql'
             - 'update'
       containers:
       - name: sqmgr
@@ -42,7 +42,7 @@ spec:
         - name: URL
           value: https://sqmgr.com
         - name: DSN
-          value: 'dbname=$(PG_DBNAME) host=$(PG_HOST) port=$(PG_PORT) user=$(PG_USER) password=$(PG_PASSWORD) sslmode=$(PG_SSLMODE)'
+          value: 'dbname=$(PG_DBNAME) host=$(PG_HOST) port=$(PG_PORT) user=$(PG_USER) sslmode=$(PG_SSLMODE) password=$(PG_PASSWORD)'
         image: reg.taproom.us/weters/sqmgrserver:latest
         imagePullPolicy: Always
       imagePullSecrets:

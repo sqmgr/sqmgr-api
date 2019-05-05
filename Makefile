@@ -1,4 +1,4 @@
-IMG ?= "reg.taproom.us/weters/sqmgrserver:latest"
+IMG ?= "reg.taproom.us/weters/sqmgrserver"
 LB_IMG ?= "reg.taproom.us/weters/sqmgr-lb"
 BUILD_NUMBER ?= `date "+%y%m%d%H%M%S"`
 PG_HOST ?= "localhost"
@@ -7,6 +7,7 @@ PG_USERNAME ?= "postgres"
 PG_DATABASE ?= "postgres"
 PG_PASSWORD ?= ""
 ROLLBACK_COUNT ?= "1"
+DEPLOY_NAME ?= "sqmgr-dev"
 
 run:
 	# these keys MUST never be used outside of a dev environment
@@ -22,6 +23,9 @@ docker-build:
 docker-push: docker-build
 	docker push ${IMG}
 	docker push ${LB_IMG}
+
+k8s-deploy: docker-push
+	kubectl set image deploy ${DEPLOY_NAME} sqmgr=$(shell docker inspect --format='{{index .RepoDigests 0}}' reg.taproom.us/weters/sqmgrserver:latest) --record
 
 test:
 	golint ./...
@@ -85,4 +89,4 @@ wait:
 
 dev-db-reset: dev-db-delete dev-db wait migrations
 
-.PHONY: run docker-build docker-push test clean-integration test-integration cover cover-integration dev-db integration-db git-hooks migrations migrations-down wait dev-db-delete dev-db-reset testdata
+.PHONY: run docker-build docker-push test clean-integration test-integration cover cover-integration dev-db integration-db git-hooks migrations migrations-down wait dev-db-delete dev-db-reset testdata k8s-deploy
