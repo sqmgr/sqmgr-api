@@ -226,7 +226,7 @@ func (s *Server) authHandler(nextHandler http.Handler) http.Handler {
 
 			u, _ := url.Parse("/login")
 			query := url.Values{}
-			query.Set("bounce-to", r.URL.String())
+			query.Set("bounce-to", bounceToURL(r.URL))
 			u.RawQuery = query.Encode()
 
 			http.Redirect(w, r, u.String(), http.StatusSeeOther)
