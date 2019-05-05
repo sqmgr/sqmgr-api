@@ -28,6 +28,9 @@ func TestBounceTo(t *testing.T) {
 	u, _ := url.Parse("https://myurl.com/foo%2fbar?one=two+three")
 	g.Expect(bounceToURL(u)).Should(gomega.Equal("/foo%2fbar?one=two+three"))
 
+	u = &url.URL{Path: "/foo"}
+	g.Expect(bounceToURL(u)).Should(gomega.Equal("/foo"))
+
 	u, _ = url.Parse("")
 	g.Expect(bounceToURL(u)).Should(gomega.Equal("/"))
 }

@@ -26,10 +26,10 @@ import (
 func bounceToURL(u *url.URL) string {
 	var buf strings.Builder
 
-	path := u.RawPath
-	if path == "" {
+	path := u.EscapedPath()
+	if len(path) == 0 || path[0] != '/' {
 		// this shouldn't happen in our context, but just in case
-		path = "/"
+		buf.WriteByte('/')
 	}
 
 	buf.WriteString(path)
