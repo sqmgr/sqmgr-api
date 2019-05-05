@@ -68,7 +68,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         *addr,
-		Handler:      handlers.CombinedLoggingHandler(os.Stdout, handlers.ProxyHeaders(s)),
+		Handler:      noCacheHanlder(*dev, handlers.CombinedLoggingHandler(os.Stdout, handlers.ProxyHeaders(s))),
 		ReadTimeout:  readTimeout,
 		WriteTimeout: writeTimeout,
 	}
@@ -93,4 +93,15 @@ func main() {
 		logrus.WithError(err).Fatalln("could not shut down server")
 	}
 	logrus.Infoln("shutdown complete")
+}
+
+// noCacheHandler will set a "Cache-ControL: no-cache" header for all request when this is run with the -dev flag
+func noCacheHanlder(inDev bool, next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if inDev {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
+
+		next.ServeHTTP(w, r)
+	}
 }

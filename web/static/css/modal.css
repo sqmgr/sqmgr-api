@@ -30,10 +30,16 @@ div.modal {
 div.modal div.container {
     background-color: #fff;
     position: relative;
-    padding: var(--spacing);
-    max-height: calc( 100vh - ( 2 * var(--spacing) ) );
-    overflow: auto;
     box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.4);
+    padding: var(--spacing);
+}
+
+div.container-content {
+    max-height: calc( 90vh - ( 4 * var(--spacing) ) );
+    max-width: calc( 100vw - ( 4 * var(--spacing) ) );
+    position: relative;
+    scroll-padding-right: 100px;
+    overflow: auto;
 }
 
 div.modal a.close {
@@ -41,6 +47,7 @@ div.modal a.close {
     top: var(--minimal-spacing);
     right: var(--minimal-spacing);
     text-decoration: none;
+    z-index: 1;
 }
 div.modal a.close::after {
     color: var(--gray);

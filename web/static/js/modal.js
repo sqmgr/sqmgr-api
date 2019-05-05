@@ -47,6 +47,8 @@ SqMGR.Modal.prototype.close = function() {
     if (this.parent) {
         this.parent.nestedDidClose()
     }
+
+    return false
 }
 
 SqMGR.Modal.prototype.show = function(childNode) {
@@ -63,9 +65,13 @@ SqMGR.Modal.prototype.show = function(childNode) {
     const container = document.createElement('div')
     container.classList.add('container')
 
+    const content = document.createElement('div')
+    content.classList.add('container-content')
+
     closeLink.appendChild(closeText)
     container.appendChild(closeLink)
-    container.appendChild(childNode)
+    content.appendChild(childNode)
+    container.appendChild(content)
     node.appendChild(container)
 
     container.onclick = function(event) {
