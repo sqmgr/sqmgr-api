@@ -39,6 +39,7 @@ SqMGR.GridBuilder = function(grid) {
 
 
 SqMGR.GridBuilder.prototype.draw = function(squares) {
+	// XXX refactor this!!!
 	let container = document.getElementById('grid-container'),
 		parent = document.createElement('div'),
 		i, elem, elem2, numSquares,
@@ -84,8 +85,8 @@ SqMGR.GridBuilder.prototype.draw = function(squares) {
 		squareDiv.onclick = this.showSquareDetails.bind(this, i)
 		squareDiv.classList.add('square')
 		if (square) {
-            squareDiv.classList.add(square.state)
-        }
+			squareDiv.classList.add(square.state)
+		}
 		squareDiv.setAttribute('data-sqid', i)
 
 		// add the square id
@@ -103,9 +104,9 @@ SqMGR.GridBuilder.prototype.draw = function(squares) {
 			nameSpan.textContent = square.claimant
 
 			if (square.opaqueUserID === SqMGR.ouid) {
-			    const ownedSpan = document.createElement('span')
+				const ownedSpan = document.createElement('span')
 				ownedSpan.classList.add('owned')
-                squareDiv.appendChild(ownedSpan)
+				squareDiv.appendChild(ownedSpan)
 			}
 		}
 
@@ -117,8 +118,6 @@ SqMGR.GridBuilder.prototype.draw = function(squares) {
 }
 
 SqMGR.GridBuilder.prototype.loadSquares = function() {
-	const container = document.getElementById('grid-container')
-
 	SqMGR.get( "/grid/" + this.grid.token + "/squares", function (data) {
 		this.draw(data)
 	}.bind(this))
@@ -127,17 +126,17 @@ SqMGR.GridBuilder.prototype.loadSquares = function() {
 }
 
 SqMGR.GridBuilder.prototype.loadLogs = function() {
-    if (!SqMGR.isAdmin) {
-    	return
+	if (!SqMGR.isAdmin) {
+		return
 	}
 
 	SqMGR.get("/grid/" + this.grid.token + "/logs", function(data) {
 		let section
-	    const auditLog = this.templates.querySelector('section.audit-log').cloneNode(true)
+		const auditLog = this.templates.querySelector('section.audit-log').cloneNode(true)
 		const gridMetadata = document.querySelector('div.grid-metadata')
-        auditLog.querySelector('p.add-note').remove() // not needed for all logs
+		auditLog.querySelector('p.add-note').remove() // not needed for all logs
 
-        this.buildLogs(auditLog, data)
+		this.buildLogs(auditLog, data)
 
 		if (section = gridMetadata.querySelector('section.audit-log')) {
 			section.replaceWith(auditLog)
@@ -157,30 +156,30 @@ SqMGR.GridBuilder.prototype.getTeamValue = function(team, prop) {
 }
 
 SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
-    const path = "/grid/" + this.grid.token + "/squares/" + squareID
-    const drawDetails = function(data) {
+	const path = "/grid/" + this.grid.token + "/squares/" + squareID
+	const drawDetails = function(data) {
 		const squareDetails = this.templates.querySelector('div.square-details').cloneNode(true)
 
 		if (data.state === 'unclaimed' || !SqMGR.isAdmin) {
 			squareDetails.querySelector('td.state').textContent = data.state
 		} else {
-            const select = document.createElement('select')
-            let option
-            SqMGR.gridSquareStates.forEach(function (state) {
-                option = document.createElement('option')
-                option.value = state
-                option.textContent = state
+			const select = document.createElement('select')
+			let option
+			SqMGR.gridSquareStates.forEach(function (state) {
+				option = document.createElement('option')
+				option.value = state
+				option.textContent = state
 
-                if (state === data.state) {
-                    option.setAttribute('selected', 'selected')
-                }
+				if (state === data.state) {
+					option.setAttribute('selected', 'selected')
+				}
 
-                select.appendChild(option)
-            })
+				select.appendChild(option)
+			})
 
-            select.onchange = function () {
-            	this.promptAndSubmitSquareData(squareID, { state: select.value })
-            }.bind(this)
+			select.onchange = function () {
+				this.promptAndSubmitSquareData(squareID, { state: select.value })
+			}.bind(this)
 
 			squareDetails.querySelector('td.state').appendChild(select)
 		}
@@ -192,7 +191,7 @@ SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
 
 		const claimP = squareDetails.querySelector('p.claim')
 		if (data.state !== 'unclaimed') {
-		    claimP.remove()
+			claimP.remove()
 		} else {
 			claimP.querySelector('a').onclick = function() {
 				this.claimSquare(squareID)
@@ -213,7 +212,7 @@ SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
 		const auditLog = squareDetails.querySelector('section.audit-log')
 
 		if (data.logs) {
-		    this.buildLogs(auditLog, data.logs, squareID)
+			this.buildLogs(auditLog, data.logs, squareID)
 		}
 
 		SqMGR.DateTime.format(squareDetails)
@@ -267,17 +266,17 @@ SqMGR.GridBuilder.prototype.promptAndSubmitSquareData = function(squareID, optio
 			note: note.value,
 		}, options))
 		const success = function(data) {
-		    modal.close()
+			modal.close()
 		}.bind(this)
 		const error = function(data) {
-		    modal.nest().showError(data.error)
+			modal.nest().showError(data.error)
 		}.bind(this)
-	    SqMGR.request("POST", path, body, success, error)
+		SqMGR.request("POST", path, body, success, error)
 		return false
 	}.bind(this)
 
 	modal.show(form).addEventListener('modalclose', function() {
-        this.showSquareDetails(squareID)
+		this.showSquareDetails(squareID)
 	}.bind(this))
 
 	form.querySelector('input').select()
@@ -300,32 +299,44 @@ SqMGR.GridBuilder.prototype.unclaimSquare = function(squareID) {
 
 SqMGR.GridBuilder.prototype.claimSquare = function(squareID) {
 	const modal = this.modal.nest(),
-        form = this.templates.querySelector('form.claim-square').cloneNode(true),
-		input = form.querySelector('input')
+		form = this.templates.querySelector('form.claim-square').cloneNode(true),
+		input = form.querySelector('input'),
+		storageKey = "name"
+
+	if (window.localStorage) {
+		const name = localStorage.getItem(storageKey)
+		if (name) {
+			input.value = name
+		}
+	}
 
 	form.onsubmit = function() {
-	    if (input.value === '') {
-	    	return	false
+		if (input.value === '') {
+			return	false
 		}
 
-	    const path = "/grid/"+this.grid.token+"/squares/"+squareID
+		if (window.localStorage) {
+			localStorage.setItem(storageKey, input.value)
+		}
+
+		const path = "/grid/"+this.grid.token+"/squares/"+squareID
 		const body = JSON.stringify({"claimant": input.value})
 
-	    const success = function(data) {
-	    	modal.close()
+		const success = function(data) {
+			modal.close()
 		}.bind(this)
 
 		const failure = function(data) {
-	    	modal.nest().showError(data.error)
+			modal.nest().showError(data.error)
 		}.bind(this)
 
 		SqMGR.request("POST", path, body, success, failure)
 
-	    return false
+		return false
 	}.bind(this)
 
-    modal.show(form).addEventListener('modalclose', function() {
-    	this.showSquareDetails(squareID)
+	modal.show(form).addEventListener('modalclose', function() {
+		this.showSquareDetails(squareID)
 	}.bind(this))
 
 	input.select()
@@ -338,15 +349,15 @@ SqMGR.get = function(path, callback, errorCallback) {
 SqMGR.request = function(method, path, body, callback, errorCallback) {
 	const xhr = new XMLHttpRequest()
 	xhr.open(method, path)
-    xhr.onloadend = function() {
-	    SqMGR.Loading.hide()
+	xhr.onloadend = function() {
+		SqMGR.Loading.hide()
 	}
 	xhr.onload = function() {
-	    let data
+		let data
 		try {
-	   		data = JSON.parse(xhr.response)
+			data = JSON.parse(xhr.response)
 		} catch (err) {
-	    	console.log("could not parse JSON", err)
+			console.log("could not parse JSON", err)
 			return
 		}
 
