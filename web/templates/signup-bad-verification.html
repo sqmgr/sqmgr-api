@@ -14,18 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 
-{{ define "title" }}Account Verification - {{ end }}
-
-{{ define "content" }}
-<section class="signup-verified">
-	{{ if .Local }}
-        <h3>Account Verified</h3>
-
-        <p>Thank you {{.Local.Email}}! Your account has been verified. You may <a href="/login">login</a> now.
-    {{ else }}
-        <h3>Account Verification Failed</h3>
-
-        <p>The verification code is not valid. Please check your email again.</p>
-    {{ end }}
-</section>
-{{ end }}
+{{ define "title" }}Account Verification - {{}}

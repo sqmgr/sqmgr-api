@@ -14,15 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 
-{{ define "title" }}Account Verification Required - {{ end }}
+{{ define "title" }}Verification Email Sent - {{ end }}
 
 {{ define "content" }}
-<section class="signup-complete">
-	<h3>Account Verification Required</h3>
+    <h3>Verification Email Sent</h3>
 
-	<form id="resend" method="post" action="/signup/resend">
-        <p>Thank you for signing up. An email has been sent to {{.Local.Email}}. Please click the link in the email to verify your account. If you haven't received your email, please check your spam folder or click <a href="#" onclick="javascript:resend.submit()">here</a> to resend it.</p>
-        <input type="hidden" name="email" value="{{.Local.Email}}">
-	</form>
-</section>
+    <p>A verification email has been resent to {{.Local}}. Please check your spam folder if you haven't received it.</p>
 {{ end }}

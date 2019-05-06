@@ -62,6 +62,8 @@ func (s *Server) setupRoutes() {
 	// signup
 	s.Router.Path("/signup").Methods(http.MethodGet, http.MethodPost).Handler(s.signupHandler())
 	s.Router.Path("/signup/complete").Methods(http.MethodGet).Handler(s.signupCompleteHandler())
+	s.Router.Path("/signup/resend").Methods(http.MethodPost).Handler(s.signupResendPostHandler())
+	s.Router.Path("/signup/resend").Methods(http.MethodGet).Handler(s.signupResendGetHandler())
 	s.Router.Path("/signup/verify/{token:[A-Za-z0-9_-]{64}}").Methods(http.MethodGet).Handler(s.signupVerifyHandler())
 
 	// grid management

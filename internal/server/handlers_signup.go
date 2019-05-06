@@ -30,6 +30,8 @@ import (
 
 const minPasswordLen = 8
 
+var emailTpl = template.Must(template.ParseFiles(filepath.Join(templatesDir, "email", "verification.html")))
+
 func (s *Server) signupHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("signup.html", "form-errors.html")
 
@@ -93,9 +95,68 @@ func (s *Server) signupHandler() http.HandlerFunc {
 	}
 }
 
+func (s *Server) signupResendGetHandler() http.HandlerFunc {
+	tpl := s.loadTemplate("signup-resend.html")
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		sess := s.Session(r)
+		msgs := sess.Flashes("email")
+		sess.Save()
+
+		if len(msgs) > 0 {
+			if email, _ := msgs[0].(string); email != "" {
+				s.ExecuteTemplate(w, r, tpl, email)
+			}
+		}
+
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+}
+
+func (s *Server) signupResendPostHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		email := r.PostFormValue("email")
+		if len(email) == 0 {
+			s.Error(w, r, http.StatusBadRequest)
+			return
+		}
+
+		user, err := s.model.UserByEmail(email, true)
+		if err != nil {
+			if err != sql.ErrNoRows {
+				s.Error(w, r, http.StatusInternalServerError, err)
+				return
+			}
+
+			logrus.WithField("email", email).Warn("resend called with non-existent user")
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
+
+		if user.State == model.Active {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		} else if user.State != model.Pending {
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
+
+		if err := user.SendVerificationEmail(emailTpl); err != nil {
+			logrus.WithError(err).Errorf("could not send verification email to %s", err)
+		}
+
+		sess := s.Session(r)
+		sess.AddFlash(email, "email")
+		sess.Save()
+
+		http.Redirect(w, r, "/signup/resend", http.StatusSeeOther)
+		return
+	}
+}
+
 func (s *Server) signupCompleteHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("signup-complete.html")
-	emailTpl := template.Must(template.ParseFiles(filepath.Join(templatesDir, "email", "verification.html")))
 
 	type data struct {
 		Email string
@@ -149,6 +210,10 @@ func (s *Server) signupCompleteHandler() http.HandlerFunc {
 func (s *Server) signupVerifyHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("signup-verified.html")
 
+	type data struct {
+		User *model.User
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := mux.Vars(r)["token"]
 		user, err := s.model.UserByVerifyToken(token)
@@ -159,7 +224,7 @@ func (s *Server) signupVerifyHandler() http.HandlerFunc {
 			}
 
 			// user not found
-			http.Redirect(w, r, "/", http.StatusSeeOther)
+			s.ExecuteTemplate(w, r, tpl, nil)
 			return
 		}
 
