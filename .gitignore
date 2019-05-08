@@ -3,3 +3,4 @@
 *.swo
 coverage.out
 .idea/
+.keys/

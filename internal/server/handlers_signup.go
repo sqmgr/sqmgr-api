@@ -18,19 +18,14 @@ package server
 
 import (
 	"database/sql"
-	"html/template"
-	"net/http"
-	"path/filepath"
-
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"github.com/weters/sqmgr/internal/model"
 	"github.com/weters/sqmgr/internal/validator"
+	"net/http"
 )
 
 const minPasswordLen = 8
-
-var emailTpl = template.Must(template.ParseFiles(filepath.Join(templatesDir, "email", "verification.html")))
 
 func (s *Server) signupHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("signup.html", "form-errors.html")

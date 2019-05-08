@@ -9,10 +9,19 @@ PG_PASSWORD ?= ""
 ROLLBACK_COUNT ?= "1"
 DEPLOY_NAME ?= "sqmgr-dev"
 
-run:
+.keys/private.key:
+	-mkdir .keys
+	openssl genrsa -out .keys/private.key 2048
+
+.keys/public.key: .keys/private.key
+	openssl pkey -in .keys/private.key -pubout -out .keys/public.key
+
+run: .keys/private.key .keys/public.key
 	# these keys MUST never be used outside of a dev environment
 	SESSION_AUTH_KEY=dev-session-auth-key---X2xr5nJgD2eetKHZoYOoh00otckwU8mmB3jEvTBhc \
 	SESSION_ENC_KEY=dev-session-enc-key---Bgvp9YxwQT \
+	JWT_PRIVATE_KEY=.keys/private.key \
+	JWT_PUBLIC_KEY=.keys/public.key \
 	OPAQUE_SALT=V45ixWTj \
 	go run cmd/sqmgrserver/*.go -dev
 

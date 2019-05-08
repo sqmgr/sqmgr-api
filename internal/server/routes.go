@@ -72,5 +72,9 @@ func (s *Server) setupRoutes() {
 	// temporary
 	s.Router.Path("/info").Methods(http.MethodGet).Handler(s.infoHandler())
 
+	// API stuff
+	s.Router.Path("/tokens/session").Methods(http.MethodGet).HandlerFunc(s.tokensSessionHandler())
+	s.Router.Path("/api/grid/{token:[A-Za-z0-9_-]{8}}/squares").Methods(http.MethodGet).Handler(s.apiGridSquaresHandler())
+
 	s.Router.NotFoundHandler = s.middleware(s.notFoundHandler())
 }

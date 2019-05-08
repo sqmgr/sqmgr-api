@@ -24,22 +24,32 @@ import (
 	"os"
 )
 
+// ErrNoPrivateKeySpecified is an error when a private key hasn't been specified
 var ErrNoPrivateKeySpecified = errors.New("jwt: no private key specified")
+
+// ErrNoPublicKeySpecified is an error when a public key hasn't been specified
 var ErrNoPublicKeySpecified = errors.New("jwt: no public key specified")
+
+// ErrExpired is an error when the JWT token has expired
 var ErrExpired = errors.New("jwt: token has expired")
 
-type JWT struct {
+// SMJWT is a help library for signing a JWT claim
+type SMJWT struct {
 	publicKey  *rsa.PublicKey
 	privateKey *rsa.PrivateKey
 }
 
-type JWTOptions struct {
+// Options are options passed to the New() constructor
+type Options struct {
 	PrivateKeyFile string
 	PublicKeyFile  string
 }
 
-func New(opts ...JWTOptions) (*JWT, error) {
-	var opt JWTOptions
+// New will instantiate a new SMJWT object. This method accepts an optional Options object. If you do not
+// pass in this object, you must specify JWT_PRIVATE_KEY and/or JWT_PUBLIC_KEY as an environment variable if you plan to
+// use Sign() and Validate() respectively.
+func New(opts ...Options) (*SMJWT, error) {
+	var opt Options
 	if len(opts) > 0 {
 		opt = opts[0]
 	}
@@ -52,7 +62,7 @@ func New(opts ...JWTOptions) (*JWT, error) {
 		opt.PrivateKeyFile = os.Getenv("JWT_PRIVATE_KEY")
 	}
 
-	j := JWT{}
+	j := SMJWT{}
 
 	if opt.PrivateKeyFile != "" {
 		file, err := ioutil.ReadFile(opt.PrivateKeyFile)
@@ -85,7 +95,8 @@ func New(opts ...JWTOptions) (*JWT, error) {
 	return &j, nil
 }
 
-func (j *JWT) Sign(claims jwt.Claims) (string, error) {
+// Sign will sign the JWT claims.
+func (j *SMJWT) Sign(claims jwt.Claims) (string, error) {
 	if j.privateKey == nil {
 		return "", ErrNoPrivateKeySpecified
 	}
@@ -94,12 +105,22 @@ func (j *JWT) Sign(claims jwt.Claims) (string, error) {
 	return token.SignedString(j.privateKey)
 }
 
-func (j *JWT) Validate(tokenStr string) (*jwt.Token, error) {
+// Validate will return the token if there were no errors and everything is fully valid. This method takes
+// an optional second argument of a jwt.Claims object that can be used to specify the claims type. If this is left out,
+// it will default to jwt.StandardClaims.
+func (j *SMJWT) Validate(tokenStr string, customClaims ...jwt.Claims) (*jwt.Token, error) {
 	if j.publicKey == nil {
 		return nil, ErrNoPublicKeySpecified
 	}
 
-	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (i interface{}, e error) {
+	var claimsType jwt.Claims
+	if len(customClaims) > 0 {
+		claimsType = customClaims[0]
+	} else {
+		claimsType = &jwt.StandardClaims{}
+	}
+
+	token, err := jwt.ParseWithClaims(tokenStr, claimsType, func(token *jwt.Token) (i interface{}, e error) {
 		return j.publicKey, nil
 	})
 

@@ -24,6 +24,8 @@ import (
 
 const templatesDir = "web/templates"
 
+var emailTpl = template.Must(template.ParseFiles(filepath.Join(templatesDir, "email", "verification.html")))
+
 func (s *Server) simpleGetHandler(page string) http.HandlerFunc {
 	tpl := s.loadTemplate(page)
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -27,7 +27,7 @@ import (
 func TestWithConstructor(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
-	j, err := New(JWTOptions{
+	j, err := New(Options{
 		PrivateKeyFile: "testdata/private.pem",
 		PublicKeyFile:  "testdata/public.pem",
 	})
@@ -42,6 +42,7 @@ func TestWithConstructor(t *testing.T) {
 	token, err := j.Validate(s)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(token).ShouldNot(gomega.BeNil())
+	g.Expect(token.Claims.(*jwt.StandardClaims).Id).Should(gomega.Equal("my-id"))
 
 	sExp, err := j.Sign(jwt.StandardClaims{
 		ExpiresAt: time.Now().Add(time.Minute * -1).Unix(),
@@ -54,7 +55,7 @@ func TestWithConstructor(t *testing.T) {
 	_, err = j.Validate("bad-token")
 	g.Expect(err).ShouldNot(gomega.Succeed())
 
-	jBadKey, _ := New(JWTOptions{
+	jBadKey, _ := New(Options{
 		PrivateKeyFile: "testdata/private.pem",
 		PublicKeyFile:  "testdata/bad-public.pem",
 	})
@@ -92,4 +93,33 @@ func TestWithMissingKeys(t *testing.T) {
 	_, err = j.Validate("fake-token")
 	g.Expect(err).Should(gomega.Equal(ErrNoPublicKeySpecified))
 
+}
+
+func TestWithCustomClaims(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	j, _ := New(Options{
+		PrivateKeyFile: "testdata/private.pem",
+		PublicKeyFile:  "testdata/public.pem",
+	})
+
+	type customClaims struct {
+		jwt.StandardClaims
+		Name string
+	}
+
+	s, err := j.Sign(customClaims{
+		StandardClaims: jwt.StandardClaims{
+			Id: "my-id",
+		},
+		Name: "my-name",
+	})
+	g.Expect(err).Should(gomega.Succeed())
+	token, err := j.Validate(s, &customClaims{})
+	g.Expect(err).Should(gomega.Succeed())
+
+	myToken, ok := token.Claims.(*customClaims)
+	g.Expect(ok).Should(gomega.BeTrue())
+	g.Expect(myToken.Id).Should(gomega.Equal("my-id"))
+	g.Expect(myToken.Name).Should(gomega.Equal("my-name"))
 }
