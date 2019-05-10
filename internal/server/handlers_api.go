@@ -34,6 +34,12 @@ func (s *Server) apiGridLogsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jcd := r.Context().Value(ctxKeyJWT).(*jwtContextData)
 
+		if !jcd.Claim.IsAdmin {
+			s.ServeJSONError(w, http.StatusUnauthorized, "")
+			return
+
+		}
+
 		grid, err := jcd.Grid.Logs(r.Context(), 0, 1000) // TODO: pagination???
 		if err != nil {
 			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
