@@ -201,7 +201,7 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION update_grid_square(_id bigint, _state text, _claimant text, _user_id bigint, _session_user_id text, _remote_addr text, _note text, _is_admin boolean) RETURNS boolean
+CREATE FUNCTION update_grid_square(_id bigint, _state square_states, _claimant text, _user_id bigint, _session_user_id text, _remote_addr text, _note text, _is_admin boolean) RETURNS boolean
     LANGUAGE plpgsql
     AS $$
 DECLARE
@@ -244,7 +244,7 @@ BEGIN
 END;
 $$;
 
---rollback DROP FUNCTION update_grid_square(bigint, text, text, bigint, text, text, text, boolean);
+--rollback DROP FUNCTION update_grid_square(bigint, square_states, text, bigint, text, text, text, boolean);
 --rollback DROP FUNCTION new_user(text, text);
 --rollback DROP FUNCTION set_user_confirmation(bigint, text);
 --rollback DROP FUNCTION new_token(text);
