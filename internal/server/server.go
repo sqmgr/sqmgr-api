@@ -51,6 +51,7 @@ const (
 	ctxKeySession ctxKey = iota
 	ctxKeyUser
 	ctxKeyGrid
+	ctxKeyJWT
 )
 
 type dependency string
