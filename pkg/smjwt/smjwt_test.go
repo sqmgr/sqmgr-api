@@ -27,11 +27,9 @@ import (
 func TestWithConstructor(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
-	j, err := New(Options{
-		PrivateKeyFile: "testdata/private.pem",
-		PublicKeyFile:  "testdata/public.pem",
-	})
-	g.Expect(err).Should(gomega.Succeed())
+	j := New()
+	g.Expect(j.LoadPrivateKey("testdata/private.pem")).Should(gomega.Succeed())
+	g.Expect(j.LoadPublicKey("testdata/public.pem")).Should(gomega.Succeed())
 
 	s, err := j.Sign(jwt.StandardClaims{
 		ExpiresAt: time.Now().Add(time.Minute).Unix(),
@@ -55,29 +53,11 @@ func TestWithConstructor(t *testing.T) {
 	_, err = j.Validate("bad-token")
 	g.Expect(err).ShouldNot(gomega.Succeed())
 
-	jBadKey, _ := New(Options{
-		PrivateKeyFile: "testdata/private.pem",
-		PublicKeyFile:  "testdata/bad-public.pem",
-	})
-
-	_, err = jBadKey.Validate(s)
+	// load the incorrect public key
+	g.Expect(j.LoadPublicKey("testdata/bad-public.pem")).Should(gomega.Succeed())
+	_, err = j.Validate(s)
 	jwtErr := err.(*jwt.ValidationError)
 	g.Expect(jwtErr.Errors & jwt.ValidationErrorSignatureInvalid).Should(gomega.BeNumerically(">", 0))
-}
-
-func TestWithEnvVars(t *testing.T) {
-	g := gomega.NewGomegaWithT(t)
-
-	_ = os.Setenv("JWT_PRIVATE_KEY", "testdata/private.pem")
-	_ = os.Setenv("JWT_PUBLIC_KEY", "testdata/public.pem")
-
-	j, err := New()
-	g.Expect(err).Should(gomega.Succeed())
-	s, err := j.Sign(jwt.StandardClaims{Id: "test"})
-	g.Expect(err).Should(gomega.Succeed())
-
-	_, err = j.Validate(s)
-	g.Expect(err).Should(gomega.Succeed())
 }
 
 func TestWithMissingKeys(t *testing.T) {
@@ -86,7 +66,7 @@ func TestWithMissingKeys(t *testing.T) {
 	_ = os.Setenv("JWT_PRIVATE_KEY", "")
 	_ = os.Setenv("JWT_PUBLIC_KEY", "")
 
-	j, _ := New()
+	j := New()
 	_, err := j.Sign(jwt.StandardClaims{})
 	g.Expect(err).Should(gomega.Equal(ErrNoPrivateKeySpecified))
 
@@ -98,10 +78,9 @@ func TestWithMissingKeys(t *testing.T) {
 func TestWithCustomClaims(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
-	j, _ := New(Options{
-		PrivateKeyFile: "testdata/private.pem",
-		PublicKeyFile:  "testdata/public.pem",
-	})
+	j := New()
+	g.Expect(j.LoadPrivateKey("testdata/private.pem")).Should(gomega.Succeed())
+	g.Expect(j.LoadPublicKey("testdata/public.pem")).Should(gomega.Succeed())
 
 	type customClaims struct {
 		jwt.StandardClaims

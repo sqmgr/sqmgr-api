@@ -21,7 +21,6 @@ import (
 	"errors"
 	"github.com/dgrijalva/jwt-go"
 	"io/ioutil"
-	"os"
 )
 
 // ErrNoPrivateKeySpecified is an error when a private key hasn't been specified
@@ -39,77 +38,61 @@ type SMJWT struct {
 	privateKey *rsa.PrivateKey
 }
 
-// Options are options passed to the New() constructor
-type Options struct {
-	PrivateKeyFile string
-	PublicKeyFile  string
+// New will return a new SMJWT object. Before you can use either Sign() or Validate(), you'll need to call
+// LoadPrivateKey() and/or LoadPublicKey() respectively
+func New() *SMJWT {
+	return &SMJWT{}
 }
 
-// New will instantiate a new SMJWT object. This method accepts an optional Options object. If you do not
-// pass in this object, you must specify JWT_PRIVATE_KEY and/or JWT_PUBLIC_KEY as an environment variable if you plan to
-// use Sign() and Validate() respectively.
-func New(opts ...Options) (*SMJWT, error) {
-	var opt Options
-	if len(opts) > 0 {
-		opt = opts[0]
+// LoadPublicKey will load the public key from the specified filename.
+func (s *SMJWT) LoadPublicKey(filename string) error {
+	file, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return err
 	}
 
-	if opt.PublicKeyFile == "" {
-		opt.PublicKeyFile = os.Getenv("JWT_PUBLIC_KEY")
+	key, err := jwt.ParseRSAPublicKeyFromPEM(file)
+	if err != nil {
+		return err
 	}
 
-	if opt.PrivateKeyFile == "" {
-		opt.PrivateKeyFile = os.Getenv("JWT_PRIVATE_KEY")
-	}
-
-	j := SMJWT{}
-
-	if opt.PrivateKeyFile != "" {
-		file, err := ioutil.ReadFile(opt.PrivateKeyFile)
-		if err != nil {
-			return nil, err
-		}
-
-		key, err := jwt.ParseRSAPrivateKeyFromPEM(file)
-		if err != nil {
-			return nil, err
-		}
-
-		j.privateKey = key
-	}
-
-	if opt.PublicKeyFile != "" {
-		file, err := ioutil.ReadFile(opt.PublicKeyFile)
-		if err != nil {
-			return nil, err
-		}
-
-		key, err := jwt.ParseRSAPublicKeyFromPEM(file)
-		if err != nil {
-			return nil, err
-		}
-
-		j.publicKey = key
-	}
-
-	return &j, nil
+	s.publicKey = key
+	return nil
 }
 
-// Sign will sign the JWT claims.
-func (j *SMJWT) Sign(claims jwt.Claims) (string, error) {
-	if j.privateKey == nil {
+// LoadPrivateKey will load the private key from the specified filename.
+func (s *SMJWT) LoadPrivateKey(filename string) error {
+	file, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+
+	key, err := jwt.ParseRSAPrivateKeyFromPEM(file)
+	if err != nil {
+		return err
+	}
+
+	s.privateKey = key
+
+	return nil
+}
+
+// Sign will sign the JWT claims. You MUST call LoadPrivateKey() before you can use this method.
+func (s *SMJWT) Sign(claims jwt.Claims) (string, error) {
+	if s.privateKey == nil {
 		return "", ErrNoPrivateKeySpecified
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	return token.SignedString(j.privateKey)
+	return token.SignedString(s.privateKey)
 }
 
 // Validate will return the token if there were no errors and everything is fully valid. This method takes
 // an optional second argument of a jwt.Claims object that can be used to specify the claims type. If this is left out,
 // it will default to jwt.StandardClaims.
-func (j *SMJWT) Validate(tokenStr string, customClaims ...jwt.Claims) (*jwt.Token, error) {
-	if j.publicKey == nil {
+// You MUST call LoadPublicKey before you can use this method.
+func (s *SMJWT) Validate(tokenStr string, customClaims ...jwt.Claims) (*jwt.Token, error) {
+	if s.publicKey == nil {
 		return nil, ErrNoPublicKeySpecified
 	}
 
@@ -121,7 +104,7 @@ func (j *SMJWT) Validate(tokenStr string, customClaims ...jwt.Claims) (*jwt.Toke
 	}
 
 	token, err := jwt.ParseWithClaims(tokenStr, claimsType, func(token *jwt.Token) (i interface{}, e error) {
-		return j.publicKey, nil
+		return s.publicKey, nil
 	})
 
 	// a-ok!

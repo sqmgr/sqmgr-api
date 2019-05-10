@@ -9,25 +9,25 @@ PG_PASSWORD ?= ""
 ROLLBACK_COUNT ?= "1"
 DEPLOY_NAME ?= "sqmgr-dev"
 
-.keys/private.key:
+.keys/private.pem:
 	-mkdir .keys
-	openssl genrsa -out .keys/private.key 2048
+	openssl genrsa -out .keys/private.pem 2048
 
-.keys/public.key: .keys/private.key
-	openssl pkey -in .keys/private.key -pubout -out .keys/public.key
+.keys/public.pem: .keys/private.pem
+	openssl pkey -in .keys/private.pem -pubout -out .keys/public.pem
 
 .PHONY: run
-run: .keys/private.key .keys/public.key
+run: .keys/private.pem .keys/public.pem
 	# these keys MUST never be used outside of a dev environment
 	SESSION_AUTH_KEY=dev-session-auth-key---X2xr5nJgD2eetKHZoYOoh00otckwU8mmB3jEvTBhc \
 	SESSION_ENC_KEY=dev-session-enc-key---Bgvp9YxwQT \
-	JWT_PRIVATE_KEY=.keys/private.key \
-	JWT_PUBLIC_KEY=.keys/public.key \
+	JWT_PRIVATE_KEY=.keys/private.pem \
+	JWT_PUBLIC_KEY=.keys/public.pem \
 	OPAQUE_SALT=V45ixWTj \
 	go run cmd/sqmgrserver/*.go -dev
 
 .PHONY: docker-build
-docker-build:
+docker-build: test-integration
 	docker build -t ${IMG} --build-arg BUILD_NUMBER=${BUILD_NUMBER} .
 	docker build -t ${LB_IMG} -f Dockerfile-liquibase .
 
@@ -39,6 +39,7 @@ docker-push: docker-build
 .PHONY: k8s-deploy
 k8s-deploy: docker-push
 	kubectl set image deploy ${DEPLOY_NAME} sqmgr=$(shell docker inspect --format='{{index .RepoDigests 0}}' reg.taproom.us/weters/sqmgrserver:latest) --record
+	kubectl rollout status deploy ${DEPLOY_NAME}
 
 .PHONY: test
 test:
@@ -77,11 +78,11 @@ dev-db: git-hooks
 
 .PHONY: dev-db-delete
 dev-db-delete:
+	-docker rm -f -v sqmgr-postgres
 
 .PHONY: integration-db
 integration-db: dev-db clean-integration
 	docker exec -it sqmgr-postgres createdb -Upostgres integration
-	-docker rm -f -v sqmgr-postgres
 
 .PHONY: dev-db-reset
 dev-db-reset: dev-db-delete dev-db wait migrations

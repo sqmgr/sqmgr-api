@@ -43,7 +43,18 @@ spec:
           value: https://sqmgr.com
         - name: DSN
           value: 'dbname=$(PG_DBNAME) host=$(PG_HOST) port=$(PG_PORT) user=$(PG_USER) sslmode=$(PG_SSLMODE) password=$(PG_PASSWORD)'
+        - name: JWT_PUBLIC_KEY
+          value: /opt/sqmgr/jwt-keys/public.pem
+        - name: JWT_PRIVATE_KEY
+          value: /opt/sqmgr/jwt-keys/private.pem
         image: reg.taproom.us/weters/sqmgrserver:latest
         imagePullPolicy: Always
+        volumeMounts:
+          - mountPath: /opt/sqmgr/jwt-keys
+            name: jwt-keys
+      volumes:
+        - name: jwt-keys
+          secret:
+            secretName: sqmgr-jwt-keys
       imagePullSecrets:
       - name: taproom.us

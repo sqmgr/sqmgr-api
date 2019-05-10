@@ -110,15 +110,10 @@ func New(db *sql.DB) *Server {
 		template.New("").Funcs(funcMap).ParseFiles(filepath.Join(templatesDir, "base.html")),
 	).Lookup("base.html")
 
-	j, err := smjwt.New()
-	if err != nil {
-		panic(err)
-	}
-
 	s := &Server{
 		Router:       mux.NewRouter(),
 		model:        model.New(db),
-		jwt:          j,
+		jwt:          buildSMJWT(),
 		baseTemplate: tpl,
 	}
 
@@ -339,4 +334,25 @@ func version() string {
 	}
 
 	return ver
+}
+
+func buildSMJWT() *smjwt.SMJWT {
+	s := smjwt.New()
+	if filename := os.Getenv("JWT_PUBLIC_KEY"); filename != "" {
+		if err := s.LoadPublicKey(filename); err != nil {
+			logrus.WithError(err).Fatal("could not load public key for JWT")
+		}
+	} else {
+		logrus.Fatal("JWT_PUBLIC_KEY not specified")
+	}
+
+	if filename := os.Getenv("JWT_PRIVATE_KEY"); filename != "" {
+		if err := s.LoadPrivateKey(filename); err != nil {
+			logrus.WithError(err).Fatal("could not load private key for JWT")
+		}
+	} else {
+		logrus.Fatal("JWT_PRIVATE_KEY not specified")
+	}
+
+	return s
 }
