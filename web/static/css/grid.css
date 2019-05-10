@@ -195,6 +195,12 @@ div.std25 div.square {
 	grid-column-start: span 2;
 }
 
+div.notes::before {
+	content: 'Note from organizer:';
+	display: block;
+    font-size: 0.8em;
+	color: var(--gray);
+}
 div.notes {
 	margin-bottom: var(--spacing);
 	white-space: pre-wrap;
