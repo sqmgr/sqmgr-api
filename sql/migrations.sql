@@ -1,13 +1,13 @@
 --liquibase formatted sql
 
 -- Copyright 2019 Tom Peters
--- 
+--
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
 -- You may obtain a copy of the License at
--- 
+--
 --    http://www.apache.org/licenses/LICENSE-2.0
--- 
+--
 -- Unless required by applicable law or agreed to in writing, software
 -- distributed under the License is distributed on an "AS IS" BASIS,
 -- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,20 +20,13 @@ CREATE TABLE tokens (
 	token text NOT NULL PRIMARY KEY
 );
 
-CREATE TABLE states (
-	name text NOT NULL PRIMARY KEY
-);
-
-INSERT INTO states (name) VALUES
-	('active'),
-	('pending'),
-	('disabled');
+CREATE TYPE states AS ENUM ('active', 'pending', 'disabled');
 
 CREATE TABLE users (
 	id bigserial NOT NULL PRIMARY KEY,
 	email text NULL UNIQUE,
 	password_hash text NOT NULL,
-	state text NOT NULL DEFAULT 'pending' REFERENCES states (name),
+	state states NOT NULL DEFAULT 'pending',
 	created TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'),
 	modified TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')
 );
@@ -80,22 +73,13 @@ CREATE TABLE grids_users (
 
 CREATE INDEX grids_users_grid_id_idx ON grids_users (grid_id);
 
-
-CREATE TABLE grid_square_states (
-    state text not null primary key
-);
-
-INSERT INTO grid_square_states (state) VALUES
-('unclaimed'),
-('claimed'),
-('paid-partial'),
-('paid-full');
+CREATE TYPE square_states AS ENUM ('unclaimed', 'claimed', 'paid-partial', 'paid-full');
 
 CREATE TABLE grid_squares (
     id bigserial not null primary key,
     grid_id bigint not null references grids (id),
     square_id int not null default 0,
-    state text not null default 'unclaimed' references grid_square_states (state),
+    state square_states not null default 'unclaimed',
     claimant text,
     user_id bigint references users (id), -- registered users
     session_user_id text, -- non-registered, session-based users
@@ -108,7 +92,7 @@ CREATE TABLE grid_squares_logs (
     grid_square_id bigint not null references grid_squares (id),
     user_id bigint references users (id),
     session_user_id text, -- non-registered, session-based users
-    state text not null default 'unclaimed' references grid_square_states (state),
+    state square_states not null default 'unclaimed',
     claimant text,
     remote_addr text,
     note text not null,
@@ -119,14 +103,14 @@ CREATE INDEX grid_squares_logs_grid_square_id_idx ON grid_squares_logs (grid_squ
 
 --rollback DROP TABLE grid_squares_logs;
 --rollback DROP TABLE grid_squares;
---rollback DROP TABLE grid_square_states;
 --rollback DROP TABLE grids_users;
 --rollback DROP TABLE grid_settings;
 --rollback DROP TABLE grids;
 --rollback DROP TABLE user_confirmations;
 --rollback DROP TABLE users;
---rollback DROP TABLE states;
 --rollback DROP TABLE tokens;
+--rollback DROP TYPE square_states;
+--rollback DROP TYPE states;
 
 
 --changeset weters:2 splitStatements:false
