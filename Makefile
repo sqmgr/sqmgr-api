@@ -16,6 +16,7 @@ DEPLOY_NAME ?= "sqmgr-dev"
 .keys/public.key: .keys/private.key
 	openssl pkey -in .keys/private.key -pubout -out .keys/public.key
 
+.PHONY: run
 run: .keys/private.key .keys/public.key
 	# these keys MUST never be used outside of a dev environment
 	SESSION_AUTH_KEY=dev-session-auth-key---X2xr5nJgD2eetKHZoYOoh00otckwU8mmB3jEvTBhc \
@@ -25,48 +26,67 @@ run: .keys/private.key .keys/public.key
 	OPAQUE_SALT=V45ixWTj \
 	go run cmd/sqmgrserver/*.go -dev
 
+.PHONY: docker-build
 docker-build:
 	docker build -t ${IMG} --build-arg BUILD_NUMBER=${BUILD_NUMBER} .
 	docker build -t ${LB_IMG} -f Dockerfile-liquibase .
 
+.PHONY: docker-push
 docker-push: docker-build
 	docker push ${IMG}
 	docker push ${LB_IMG}
 
+.PHONY: k8s-deploy
 k8s-deploy: docker-push
 	kubectl set image deploy ${DEPLOY_NAME} sqmgr=$(shell docker inspect --format='{{index .RepoDigests 0}}' reg.taproom.us/weters/sqmgrserver:latest) --record
 
+.PHONY: test
 test:
 	golint ./...
 	go vet ./...
 	go test -coverprofile=coverage.out ./...
 
+.PHONY: clean-integration
 clean-integration:
 	-docker exec -it sqmgr-postgres dropdb -Upostgres integration
 
+.PHONY: test-integration
 test-integration: PG_DATABASE=integration
 test-integration: integration-db migrations
 	golint ./...
 	go vet ./...
 	INTEGRATION=1 go test -v -coverprofile=coverage.out ./...
 
+.PHONY: cover
 cover: test
 	go tool cover -html coverage.out
 
+.PHONY: cover-integration
 cover-integration: test-integration
 	go tool cover -html coverage.out
-
-dev-db: git-hooks
-	-docker run --name sqmgr-postgres --detach --publish 5432:5432 postgres:11
-
-integration-db: dev-db clean-integration
-	docker exec -it sqmgr-postgres createdb -Upostgres integration
 
 .git/hooks/pre-commit:
 	ln -s ../../git-hooks/pre-commit .git/hooks/pre-commit
 
+.PHONY: git-hooks
 git-hooks: .git/hooks/pre-commit
 
+.PHONY: dev-db
+dev-db: git-hooks
+	-docker run --name sqmgr-postgres --detach --publish 5432:5432 postgres:11
+
+.PHONY: dev-db-delete
+dev-db-delete:
+
+.PHONY: integration-db
+integration-db: dev-db clean-integration
+	docker exec -it sqmgr-postgres createdb -Upostgres integration
+	-docker rm -f -v sqmgr-postgres
+
+.PHONY: dev-db-reset
+dev-db-reset: dev-db-delete dev-db wait migrations
+
+.PHONY: migrations
 migrations:
 	liquibase \
 		--changeLogFile ./sql/migrations.sql \
@@ -77,6 +97,7 @@ migrations:
 		--password ${PG_PASSWORD} \
 		update
 
+.PHONY: migrations-down
 migrations-down:
 	liquibase \
 		--changeLogFile ./sql/migrations.sql \
@@ -87,15 +108,11 @@ migrations-down:
 		--password ${PG_PASSWORD} \
 		rollbackCount ${ROLLBACK_COUNT}
 
+.PHONY: testdata
 testdata:
 	go run hack/testdata/*.go
 
-dev-db-delete:
-	-docker rm -f -v sqmgr-postgres
-
+.PHONY: wait
 wait:
 	sleep 1
 
-dev-db-reset: dev-db-delete dev-db wait migrations
-
-.PHONY: run docker-build docker-push test clean-integration test-integration cover cover-integration dev-db integration-db git-hooks migrations migrations-down wait dev-db-delete dev-db-reset testdata k8s-deploy
