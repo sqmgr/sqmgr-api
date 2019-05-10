@@ -24,11 +24,12 @@ SqMGR.Config = {
 SqMGR.buildSquares = function() {
 	const grid = SqMGR.grid
 
-	new SqMGR.GridBuilder(grid)
+	new SqMGR.GridBuilder(SqMGR.jwt, grid)
 }
 
-SqMGR.GridBuilder = function(grid) {
+SqMGR.GridBuilder = function(jwt, grid) {
 	this.modal = new SqMGR.Modal()
+	this.jwt = jwt
 	this.grid = grid
 	this.templates = document.querySelector('section.templates')
 	this.templates.remove()
@@ -118,7 +119,7 @@ SqMGR.GridBuilder.prototype.draw = function(squares) {
 }
 
 SqMGR.GridBuilder.prototype.loadSquares = function() {
-	SqMGR.get( "/grid/" + this.grid.token + "/squares", function (data) {
+	this.get( "/api/grid/" + this.grid.token + "/squares", function (data) {
 		this.draw(data)
 	}.bind(this))
 
@@ -130,7 +131,7 @@ SqMGR.GridBuilder.prototype.loadLogs = function() {
 		return
 	}
 
-	SqMGR.get("/grid/" + this.grid.token + "/logs", function(data) {
+	this.get("/api/grid/" + this.grid.token + "/logs", function(data) {
 		let section
 		const auditLog = this.templates.querySelector('section.audit-log').cloneNode(true)
 		const gridMetadata = document.querySelector('div.grid-metadata')
@@ -156,7 +157,7 @@ SqMGR.GridBuilder.prototype.getTeamValue = function(team, prop) {
 }
 
 SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
-	const path = "/grid/" + this.grid.token + "/squares/" + squareID
+	const path = "/api/grid/" + this.grid.token + "/squares/" + squareID
 	const drawDetails = function(data) {
 		const squareDetails = this.templates.querySelector('div.square-details').cloneNode(true)
 
@@ -215,6 +216,17 @@ SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
 			this.buildLogs(auditLog, data.logs, squareID)
 		}
 
+		// auditLog is only available for admins
+		if (auditLog) {
+			const addNote = auditLog.querySelector('a.add-note')
+			if (addNote) {
+				addNote.onclick = function () {
+					this.promptAndSubmitSquareData(squareID)
+					return false
+				}.bind(this)
+			}
+		}
+
 		SqMGR.DateTime.format(squareDetails)
 
 		this.modal.show(squareDetails).addEventListener('modalclose', function() {
@@ -222,7 +234,7 @@ SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
 		}.bind(this))
 	}.bind(this)
 
-	SqMGR.get(path, drawDetails)
+	this.get(path, drawDetails)
 }
 
 SqMGR.GridBuilder.prototype.buildLogs = function(auditLog, logs, squareID) {
@@ -241,14 +253,6 @@ SqMGR.GridBuilder.prototype.buildLogs = function(auditLog, logs, squareID) {
 
 		auditLogTbody.appendChild(row)
 	}.bind(this))
-
-	const addNote = auditLog.querySelector('a.add-note')
-	if (addNote) {
-		addNote.onclick = function() {
-			this.promptAndSubmitSquareData(squareID)
-			return false
-		}.bind(this)
-	}
 }
 
 SqMGR.GridBuilder.prototype.promptAndSubmitSquareData = function(squareID, options) {
@@ -261,7 +265,7 @@ SqMGR.GridBuilder.prototype.promptAndSubmitSquareData = function(squareID, optio
 	}
 
 	form.onsubmit = function() {
-		const path = "/grid/" + this.grid.token + "/squares/" + squareID
+		const path = "/api/grid/" + this.grid.token + "/squares/" + squareID
 		const body = JSON.stringify(Object.assign({
 			note: note.value,
 		}, options))
@@ -271,7 +275,7 @@ SqMGR.GridBuilder.prototype.promptAndSubmitSquareData = function(squareID, optio
 		const error = function(data) {
 			modal.nest().showError(data.error)
 		}.bind(this)
-		SqMGR.request("POST", path, body, success, error)
+		this.request("POST", path, body, success, error)
 		return false
 	}.bind(this)
 
@@ -283,7 +287,7 @@ SqMGR.GridBuilder.prototype.promptAndSubmitSquareData = function(squareID, optio
 }
 
 SqMGR.GridBuilder.prototype.unclaimSquare = function(squareID) {
-	const path = "/grid/"+this.grid.token+"/squares/"+squareID
+	const path = "/api/grid/"+this.grid.token+"/squares/"+squareID
 	const body = JSON.stringify({"unclaim": true})
 
 	const success = function() {
@@ -294,7 +298,7 @@ SqMGR.GridBuilder.prototype.unclaimSquare = function(squareID) {
 		this.modal.nest().showError(data.error)
 	}.bind(this)
 
-	SqMGR.request("POST", path, body, success, failure)
+	this.request("POST", path, body, success, failure)
 }
 
 SqMGR.GridBuilder.prototype.claimSquare = function(squareID) {
@@ -319,7 +323,7 @@ SqMGR.GridBuilder.prototype.claimSquare = function(squareID) {
 			localStorage.setItem(storageKey, input.value)
 		}
 
-		const path = "/grid/"+this.grid.token+"/squares/"+squareID
+		const path = "/api/grid/"+this.grid.token+"/squares/"+squareID
 		const body = JSON.stringify({"claimant": input.value})
 
 		const success = function(data) {
@@ -330,7 +334,7 @@ SqMGR.GridBuilder.prototype.claimSquare = function(squareID) {
 			modal.nest().showError(data.error)
 		}.bind(this)
 
-		SqMGR.request("POST", path, body, success, failure)
+		this.request("POST", path, body, success, failure)
 
 		return false
 	}.bind(this)
@@ -342,11 +346,35 @@ SqMGR.GridBuilder.prototype.claimSquare = function(squareID) {
 	input.select()
 }
 
-SqMGR.get = function(path, callback, errorCallback) {
-	SqMGR.request("GET", path, null, callback, errorCallback)
+SqMGR.GridBuilder.prototype.get = function(path, callback, errorCallback) {
+	this.request("GET", path, null, callback, errorCallback)
 }
 
-SqMGR.request = function(method, path, body, callback, errorCallback) {
+SqMGR.GridBuilder.prototype.refreshJWT = function(retryFunc) {
+    console.log('refreshing JWT')
+	const xhr = new XMLHttpRequest()
+	xhr.open("GET", "/grid/" + this.grid.token + "/jwt")
+    xhr.onload = function() {
+		let data = null
+		try {
+			data = JSON.parse(xhr.response)
+		} catch (err) {
+			console.log("could not parse JSON", err)
+		}
+
+		if (data.status === "OK" && data.result) {
+			this.jwt = data.result
+			retryFunc()
+            return
+		}
+
+		throw new Error('could not refresh JWT')
+
+	}.bind(this)
+	xhr.send()
+}
+
+SqMGR.GridBuilder.prototype.request = function(method, path, body, callback, errorCallback, _attempt = 0) {
 	const xhr = new XMLHttpRequest()
 	xhr.open(method, path)
 	xhr.onloadend = function() {
@@ -355,6 +383,17 @@ SqMGR.request = function(method, path, body, callback, errorCallback) {
 	xhr.onload = function() {
 		let data
 		try {
+		    if (xhr.status === 401) {
+		    	if (_attempt > 0) {
+		    		throw new Error("unauthorized")
+				}
+
+		        this.refreshJWT(function() {
+		        	this.request(method, path, body, callback, errorCallback, _attempt+1)
+				}.bind(this))
+				return
+			}
+
 			data = JSON.parse(xhr.response)
 		} catch (err) {
 			console.log("could not parse JSON", err)
@@ -366,9 +405,10 @@ SqMGR.request = function(method, path, body, callback, errorCallback) {
 		} else if (typeof(errorCallback) === "function") {
 			errorCallback(data)
 		}
-	}
+	}.bind(this)
 
 	xhr.setRequestHeader("Content-Type", "application/json")
+	xhr.setRequestHeader("Authorization", "Bearer " + this.jwt)
 
 	SqMGR.Loading.show()
 	xhr.send(body)

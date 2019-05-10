@@ -84,6 +84,7 @@ type gridSquareJSON struct {
 	Logs         []*GridSquareLog `json:"logs,omitempty"`
 }
 
+// MarshalJSON will custom JSON encode a GridSquare
 func (g *GridSquare) MarshalJSON() ([]byte, error) {
 	oid, err := opaqueID(g.UserIdentifier())
 	if err != nil {

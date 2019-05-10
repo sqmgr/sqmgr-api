@@ -19,11 +19,11 @@ package server
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/sirupsen/logrus"
+	"github.com/dgrijalva/jwt-go"
 	"net/http"
-	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/weters/sqmgr/internal/model"
@@ -31,6 +31,11 @@ import (
 )
 
 const responseOK = "OK"
+
+// ErrNotMember is an error when the user does not belong to the grid
+var ErrNotMember = errors.New("server: user does not belong to grid")
+
+var jwtTTL = time.Minute * 5
 
 type gridContextData struct {
 	EffectiveUser model.EffectiveUser
@@ -98,201 +103,33 @@ func (s *Server) gridHandler() http.HandlerFunc {
 		Grid             *model.Grid
 		GridSquareStates []model.GridSquareState
 		OpaqueUserID     string
+		JWT              string
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		gridCtxData := r.Context().Value(ctxKeyGrid).(*gridContextData)
-		oid, err := gridCtxData.EffectiveUser.OpaqueUserID(r.Context())
+		ctx := r.Context()
+		gcd := ctx.Value(ctxKeyGrid).(*gridContextData)
+
+		signedJWT, err := s.gridJWT(ctx, gcd)
+		if err != nil {
+			// don't need to worry about ErrNotMember since we already ensured they are
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		oid, err := gcd.EffectiveUser.OpaqueUserID(ctx)
 		if err != nil {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
 		s.ExecuteTemplate(w, r, tpl, data{
-			IsAdmin:          gridCtxData.IsAdmin,
-			Grid:             gridCtxData.Grid,
+			IsAdmin:          gcd.IsAdmin,
+			Grid:             gcd.Grid,
 			GridSquareStates: model.GridSquareStates,
 			OpaqueUserID:     oid,
+			JWT:              signedJWT,
 		})
-	}
-}
-
-// ServeJSON will serve JSON to the user
-func (s *Server) ServeJSON(w http.ResponseWriter, statusCode int, content interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-
-	enc := json.NewEncoder(w)
-	if err := enc.Encode(content); err != nil {
-		logrus.WithError(err).Error("could not encode JSON")
-		return
-	}
-}
-
-type jsonResponse struct {
-	Status string      `json:"status"`
-	Error  string      `json:"error,omitempty"`
-	Result interface{} `json:"result,omitempty"`
-}
-
-// ServeJSONError will render a JSON error message
-func (s *Server) ServeJSONError(w http.ResponseWriter, statusCode int, userMessage string, err ...error) {
-	if userMessage == "" {
-		userMessage = http.StatusText(statusCode)
-	}
-
-	res := jsonResponse{
-		Status: "Error",
-		Error:  userMessage,
-	}
-
-	if len(err) > 0 {
-		logrus.WithError(err[0]).Error("could not serve request")
-	}
-
-	s.ServeJSON(w, statusCode, res)
-}
-
-func (s *Server) gridLogsHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		contextData := r.Context().Value(ctxKeyGrid).(*gridContextData)
-		grid, err := contextData.Grid.Logs(r.Context(), 0, 1000) // TODO: pagination???
-		if err != nil {
-			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
-			return
-		}
-
-		res := jsonResponse{
-			Status: responseOK,
-			Result: grid,
-		}
-
-		s.ServeJSON(w, http.StatusOK, res)
-		return
-	}
-}
-
-func (s *Server) gridSquaresHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		grid := r.Context().Value(ctxKeyGrid).(*gridContextData).Grid
-		squares, err := grid.Squares()
-		if err != nil {
-			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
-			return
-		}
-
-		res := jsonResponse{
-			Status: responseOK,
-			Result: squares,
-		}
-
-		s.ServeJSON(w, http.StatusOK, res)
-	}
-}
-
-// FIXME: this method is too complex. It currently handles:
-// 1) claims, 2) unclaims and 3) admin modifications
-func (s *Server) gridSquaresSquareHandler() http.HandlerFunc {
-	type postPayload struct {
-		Claimant string                `json:"claimant"`
-		State    model.GridSquareState `json:"state"`
-		Note     string                `json:"note"`
-		Unclaim  bool                  `json:"unclaim"`
-	}
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		squareIDStr := vars["square"]
-		squareID, err := strconv.Atoi(squareIDStr)
-		if err != nil {
-			s.ServeJSONError(w, http.StatusBadRequest, "invalid square ID", err)
-			return
-		}
-
-		data := r.Context().Value(ctxKeyGrid).(*gridContextData)
-
-		grid := data.Grid
-		square, err := grid.SquareBySquareID(squareID)
-		if err != nil {
-			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
-			return
-		}
-
-		if r.Method == http.MethodPost {
-			dec := json.NewDecoder(r.Body)
-			var payload postPayload
-			if err := dec.Decode(&payload); err != nil {
-				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
-				return
-			}
-
-			userID := data.EffectiveUser.UserID(r.Context())
-
-			if len(payload.Claimant) > 0 {
-				v := validator.New()
-				claimant := v.Printable("name", payload.Claimant)
-				claimant = v.ContainsWordChar("name", claimant)
-
-				if !v.OK() {
-					s.ServeJSONError(w, http.StatusBadRequest, v.String())
-					return
-				}
-
-				square.Claimant = claimant
-				square.State = model.GridSquareStateClaimed
-				square.SetUserIdentifier(data.EffectiveUser.UserID(r.Context()))
-
-				logrus.WithField("claimant", payload.Claimant).Info("claiming square")
-				if err := square.Save(r.Context(), false, model.GridSquareLog{
-					RemoteAddr: r.RemoteAddr,
-					Note:       "user: initial claim",
-				}); err != nil {
-					s.ServeJSONError(w, http.StatusInternalServerError, "", err)
-					return
-				}
-			} else if payload.Unclaim && square.UserIdentifier() == userID {
-				square.State = model.GridSquareStateUnclaimed
-				square.SetUserIdentifier(userID)
-
-				if err := square.Save(r.Context(), false, model.GridSquareLog{
-					RemoteAddr: r.RemoteAddr,
-					Note:       fmt.Sprintf("user: `%s` unclaimed", square.Claimant),
-				}); err != nil {
-					s.ServeJSONError(w, http.StatusInternalServerError, "", err)
-					return
-				}
-			} else if data.IsAdmin {
-				if payload.State.IsValid() {
-					square.State = payload.State
-				}
-
-				if err := square.Save(r.Context(), true, model.GridSquareLog{
-					RemoteAddr: r.RemoteAddr,
-					Note:       payload.Note,
-				}); err != nil {
-					s.ServeJSONError(w, http.StatusInternalServerError, "", err)
-					return
-				}
-			} else {
-				logrus.WithField("remoteAddr", r.RemoteAddr).Warn("non-admin tried to administer squares")
-				s.ServeJSONError(w, http.StatusForbidden, "")
-				return
-			}
-		}
-
-		if data.IsAdmin {
-			if err := square.LoadLogs(r.Context()); err != nil {
-				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
-				return
-			}
-		}
-
-		res := jsonResponse{
-			Status: "OK",
-			Result: square,
-		}
-
-		s.ServeJSON(w, http.StatusOK, res)
 	}
 }
 
@@ -396,6 +233,51 @@ func (s *Server) gridCustomizeHandler() http.HandlerFunc {
 		}
 
 		s.ExecuteTemplate(w, r, tpl, tplData)
+		return
+	}
+}
+
+type tokenJWTClaim struct {
+	jwt.StandardClaims
+	EffectiveUserID interface{}
+	Token           string
+	IsAdmin         bool
+}
+
+func (s *Server) gridJWT(ctx context.Context, gcd *gridContextData) (string, error) {
+	if !gcd.IsMember {
+		return "", ErrNotMember
+	}
+
+	return s.jwt.Sign(tokenJWTClaim{
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(jwtTTL).Unix(),
+		},
+		EffectiveUserID: gcd.EffectiveUser.UserID(ctx),
+		Token:           gcd.Grid.Token(),
+		IsAdmin:         gcd.IsAdmin,
+	})
+}
+
+func (s *Server) gridJWTHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gcd := r.Context().Value(ctxKeyGrid).(*gridContextData)
+
+		jwtStr, err := s.gridJWT(r.Context(), gcd)
+		if err != nil {
+			if err == ErrNotMember {
+				s.ServeJSONError(w, http.StatusUnauthorized, "")
+				return
+			}
+
+			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+
+		s.ServeJSON(w, http.StatusOK, jsonResponse{
+			Status: responseOK,
+			Result: jwtStr,
+		})
 		return
 	}
 }

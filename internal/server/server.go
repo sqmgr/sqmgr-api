@@ -20,6 +20,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"github.com/weters/sqmgr/pkg/smjwt"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -50,6 +51,13 @@ const (
 	ctxKeySession ctxKey = iota
 	ctxKeyUser
 	ctxKeyGrid
+	ctxKeyJWT
+)
+
+type dependency string
+
+const (
+	depJWT dependency = "smjwt"
 )
 
 var store *sessions.CookieStore
@@ -90,6 +98,7 @@ type Server struct {
 	*mux.Router
 	Reload        bool
 	model         *model.Model
+	jwt           *smjwt.SMJWT
 	baseTemplate  *template.Template
 	errorTemplate *template.Template
 }
@@ -101,9 +110,15 @@ func New(db *sql.DB) *Server {
 		template.New("").Funcs(funcMap).ParseFiles(filepath.Join(templatesDir, "base.html")),
 	).Lookup("base.html")
 
+	j, err := smjwt.New()
+	if err != nil {
+		panic(err)
+	}
+
 	s := &Server{
 		Router:       mux.NewRouter(),
 		model:        model.New(db),
+		jwt:          j,
 		baseTemplate: tpl,
 	}
 
