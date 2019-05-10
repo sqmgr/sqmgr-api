@@ -22,15 +22,17 @@ SqMGR.Config = {
 }
 
 SqMGR.buildSquares = function() {
-	const grid = SqMGR.grid
-
-	new SqMGR.GridBuilder(SqMGR.jwt, grid)
+	new SqMGR.GridBuilder(SqMGR.gridConfig)
 }
 
-SqMGR.GridBuilder = function(jwt, grid) {
+SqMGR.GridBuilder = function(config) {
+	this.jwt = config.jwt
+	this.grid = config.grid
+	this.isAdmin = config.isAdmin
+	this.opaqueUserID = config.opaqueUserID
+    this.gridSquareStates = config.gridSquareStates
+
 	this.modal = new SqMGR.Modal()
-	this.jwt = jwt
-	this.grid = grid
 	this.templates = document.querySelector('section.templates')
 	this.templates.remove()
 
@@ -104,7 +106,7 @@ SqMGR.GridBuilder.prototype.draw = function(squares) {
 		if (square) {
 			nameSpan.textContent = square.claimant
 
-			if (square.opaqueUserID === SqMGR.ouid) {
+			if (square.opaqueUserID === this.opaqueUserID) {
 				const ownedSpan = document.createElement('span')
 				ownedSpan.classList.add('owned')
 				squareDiv.appendChild(ownedSpan)
@@ -127,7 +129,7 @@ SqMGR.GridBuilder.prototype.loadSquares = function() {
 }
 
 SqMGR.GridBuilder.prototype.loadLogs = function() {
-	if (!SqMGR.isAdmin) {
+	if (!this.isAdmin) {
 		return
 	}
 
@@ -161,12 +163,12 @@ SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
 	const drawDetails = function(data) {
 		const squareDetails = this.templates.querySelector('div.square-details').cloneNode(true)
 
-		if (data.state === 'unclaimed' || !SqMGR.isAdmin) {
+		if (data.state === 'unclaimed' || !this.isAdmin) {
 			squareDetails.querySelector('td.state').textContent = data.state
 		} else {
 			const select = document.createElement('select')
 			let option
-			SqMGR.gridSquareStates.forEach(function (state) {
+			this.gridSquareStates.forEach(function (state) {
 				option = document.createElement('option')
 				option.value = state
 				option.textContent = state
@@ -201,7 +203,7 @@ SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
 		}
 
 		const unclaimP = squareDetails.querySelector('p.unclaim')
-		if (data.state === 'claimed' && data.opaqueUserID === SqMGR.ouid) {
+		if (data.state === 'claimed' && data.opaqueUserID === this.opaqueUserID) {
 			unclaimP.querySelector('a').onclick = function() {
 				this.unclaimSquare(squareID)
 				return false

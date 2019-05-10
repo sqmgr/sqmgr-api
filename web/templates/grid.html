@@ -148,11 +148,13 @@ limitations under the License.
 {{ define "javascripts" }}
 <script>
 function SqMGR() { }
-SqMGR.grid = {{.Local.Grid}}
-SqMGR.isAdmin = {{.Local.IsAdmin}}
-SqMGR.ouid = {{.Local.OpaqueUserID}}
-SqMGR.gridSquareStates = {{.Local.GridSquareStates}}
-SqMGR.jwt = {{.Local.JWT}}
+SqMGR.gridConfig = {
+	grid: {{.Local.Grid}},
+	isAdmin: {{.Local.IsAdmin}},
+	opaqueUserID: {{.Local.OpaqueUserID}},
+	gridSquareStates: {{.Local.GridSquareStates}},
+    jwt: {{.Local.JWT}}
+}
 </script>
 <script src="/static/js/modal.js"></script>
 <script src="/static/js/datetime.js"></script>
