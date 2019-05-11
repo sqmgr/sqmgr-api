@@ -18,7 +18,7 @@ limitations under the License.
 :root {
 	--minimal-spacing: 4px;
 	--spacing: 20px;
-	
+
 	--midnight-gray: #171717;
 	--light-gray: #eee;
 	--gray: #bbb;
@@ -257,6 +257,12 @@ p.generated-by {
 	header nav {
 		margin-top: var(--spacing);
 		position: static;
+        text-align: center;
+	}
+
+	header h2 {
+		font-size: 1.8em;
+		margin: var(--spacing) 0;
 	}
 
 	footer p.version {

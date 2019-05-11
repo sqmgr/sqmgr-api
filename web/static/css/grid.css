@@ -27,9 +27,7 @@ section.grid {
 }
 
 p.customize {
-	position: absolute;
-	top: 0;
-	right: 0;
+	margin-top: calc( -1 * var(--spacing) );
 }
 
 div.squares {
