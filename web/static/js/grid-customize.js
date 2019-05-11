@@ -38,4 +38,6 @@ window.addEventListener('load', function() {
 
 	notes.onkeyup = notes.onpaste = checkRemaining
 	checkRemaining.apply(notes)
+
+	document.querySelector('input[name="lock-tz"]').value = new Date().getTimezoneOffset()
 })

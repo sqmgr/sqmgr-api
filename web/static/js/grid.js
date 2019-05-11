@@ -193,7 +193,7 @@ SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
 		squareDetails.querySelector('td.modified').setAttribute('data-datetime', data.modified)
 
 		const claimP = squareDetails.querySelector('p.claim')
-		if (data.state !== 'unclaimed') {
+		if (data.state !== 'unclaimed' || (!this.isAdmin && this.grid.isLocked)) {
 			claimP.remove()
 		} else {
 			claimP.querySelector('a').onclick = function() {
@@ -203,13 +203,14 @@ SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
 		}
 
 		const unclaimP = squareDetails.querySelector('p.unclaim')
-		if (data.state === 'claimed' && data.opaqueUserID === this.opaqueUserID) {
+		if ((!this.isAdmin && this.grid.isLocked) ||
+			(data.state !== 'claimed' || data.opaqueUserID !== this.opaqueUserID)) {
+			unclaimP.remove()
+		} else {
 			unclaimP.querySelector('a').onclick = function() {
 				this.unclaimSquare(squareID)
 				return false
 			}.bind(this)
-		} else {
-			unclaimP.remove()
 		}
 
 		const auditLog = squareDetails.querySelector('section.audit-log')

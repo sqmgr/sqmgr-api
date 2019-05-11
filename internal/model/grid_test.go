@@ -336,3 +336,14 @@ func TestGridSquares(t *testing.T) {
 	})
 	g.Expect(err).Should(gomega.Equal(ErrSquareAlreadyClaimed))
 }
+
+func TestLocking(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	grid := Grid{}
+	g.Expect(grid.IsLocked()).Should(gomega.BeFalse())
+	grid.SetLocks(time.Now())
+	g.Expect(grid.IsLocked()).Should(gomega.BeTrue())
+	grid.SetLocks(time.Now().Add(time.Minute))
+	g.Expect(grid.IsLocked()).Should(gomega.BeFalse())
+}

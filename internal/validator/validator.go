@@ -19,6 +19,7 @@ package validator
 
 import (
 	"fmt"
+	"math"
 	"net/mail"
 	"regexp"
 	"strconv"
@@ -166,33 +167,6 @@ func (v *Validator) Password(key, pw, cpw string, minLen int) string {
 	return pw
 }
 
-// Datetime will validate the provider datetime and return a a time.Time object in UTC.
-// This will convert a timezoneOffset which is provided by JS like "-5" and convert it
-// into a time zone that Go can understand like -0500 or +0000.
-func (v *Validator) Datetime(key, datetime, timezoneOffset string) time.Time {
-	tzInt, err := strconv.Atoi(timezoneOffset)
-	if err != nil {
-		logrus.Errorf("invalid timezone found: %s", timezoneOffset)
-	}
-
-	tzInt *= 100
-	tzStr := ""
-	if tzInt < 0 {
-		tzStr = fmt.Sprintf("%05d", tzInt)
-	} else {
-		tzStr = "+" + fmt.Sprintf("%04d", tzInt)
-	}
-
-	dt, err := time.Parse("2006-01-02T15:04-0700", datetime+tzStr)
-	if err != nil {
-		logrus.WithError(err).Warnf("could not parse date string: %s", datetime+tzStr)
-		v.AddError(key, "must be a valid date and time")
-		return time.Time{}
-	}
-
-	return dt.UTC()
-}
-
 // GridType will ensure that the string is a valid grid type
 func (v *Validator) GridType(key, val string) model.GridType {
 	if err := model.IsValidGridType(val); err != nil {
@@ -201,6 +175,32 @@ func (v *Validator) GridType(key, val string) model.GridType {
 	}
 
 	return model.GridType(val)
+}
+
+// Datetime will validate a set of date, time and time zone values and return a time object
+func (v *Validator) Datetime(key, dateStr, timeStr, timeZoneOffsetStr string, isOptional ...bool) time.Time {
+	if len(isOptional) > 0 && isOptional[0] && len(dateStr) == 0 {
+		return time.Time{}
+	}
+
+	if timeStr == "" {
+		timeStr = "00:00"
+	}
+
+	tz, err := parseTimeZoneOffset(timeZoneOffsetStr)
+	if err != nil {
+		v.AddError(key, "invalid time zone")
+		logrus.WithError(err).WithField("timeZone", timeZoneOffsetStr).Warn("could not parse time zone")
+		return time.Time{}
+	}
+
+	dt, err := time.Parse("2006-01-02T15:04:05Z0700", fmt.Sprintf("%sT%s:00%s", dateStr, timeStr, tz))
+	if err != nil {
+		v.AddError(key, "invalid date and/or time")
+		return time.Time{}
+	}
+
+	return dt
 }
 
 // OK will return true if no errors were found
@@ -227,4 +227,28 @@ func (v *Validator) String() string {
 	}
 
 	return strings.Join(errors, "; ")
+}
+
+// parseTimeZoneOffset will take a string time zone offset from JavaScript like 240 or -330 and will convert
+// it into a standard ISO 8601 timezone like -0400 or +0530
+func parseTimeZoneOffset(s string) (string, error) {
+	val, err := strconv.Atoi(s)
+	if err != nil {
+		return "", err
+	}
+
+	if val == 0 {
+		return "+0000", nil
+	}
+
+	sig := "+"
+	if val > 0 {
+		sig = "-"
+	}
+
+	val = int(math.Abs(float64(val)))
+	h := val / 60
+	m := val % 60
+
+	return fmt.Sprintf("%s%02d%02d", sig, h, m), nil
 }

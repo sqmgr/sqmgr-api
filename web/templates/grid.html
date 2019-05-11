@@ -31,7 +31,7 @@ limitations under the License.
     {{ end }}
 
 	{{ if .Local.IsAdmin }}
-		<p><a href="/grid/{{.Local.Grid.Token}}/customize">Customize</a>
+		<p class="customize"><a href="/grid/{{.Local.Grid.Token}}/customize">Configuration &amp; Customization</a>
 	{{ end }}
 
 	<div id="grid-container"></div>
@@ -48,8 +48,16 @@ limitations under the License.
 					<td>{{.Local.Grid.GridType.Description}}
 				</tr>
 				<tr>
-					<td>Locks
-					<td>{{ if .Local.Grid.Locks.IsZero }}&nbsp;{{ else }}{{.Local.Grid.Locks}}{{ end }}
+					<td>Lock Date
+					{{ if .Local.Grid.Locks.IsZero }}
+                        <td>Not set
+					{{ else }}
+                        <td data-datetime="{{.Local.Grid.Locks.Format "2006-01-02T15:04:05Z0700"}}">
+					{{ end }}
+				</tr>
+				<tr>
+					<td>Is Locked
+					<td>{{ if .Local.Grid.IsLocked }}Yes{{ else }}No{{ end }}</td>
 				</tr>
 				<tr>
 					<td>Created

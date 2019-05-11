@@ -177,22 +177,26 @@ func (s *Server) gridCustomizeHandler() http.HandlerFunc {
 			formValues["AwayTeamColor1"] = r.PostFormValue("away-team-color-1")
 			formValues["AwayTeamColor2"] = r.PostFormValue("away-team-color-2")
 			formValues["Notes"] = r.PostFormValue("notes")
+			formValues["LockDate"] = r.PostFormValue("lock-date")
+			formValues["LockTime"] = r.PostFormValue("lock-time")
 
-			name := v.Printable("name", r.PostFormValue("name"))
-			name = v.MaxLength("name", name, maxNameLen)
-			homeTeamName := v.Printable("home-team-name", r.PostFormValue("home-team-name"), true)
-			homeTeamName = v.MaxLength("home-team-name", homeTeamName, model.TeamNameMaxLength)
-			homeTeamColor1 := v.Color("home-team-color-1", r.PostFormValue("home-team-color-1"), true)
-			homeTeamColor2 := v.Color("home-team-color-2", r.PostFormValue("home-team-color-2"), true)
-			awayTeamName := v.Printable("away-team-name", r.PostFormValue("away-team-name"), true)
-			awayTeamName = v.MaxLength("away-team-name", awayTeamName, model.TeamNameMaxLength)
-			awayTeamColor1 := v.Color("away-team-color-1", r.PostFormValue("away-team-color-1"), true)
-			awayTeamColor2 := v.Color("away-team-color-2", r.PostFormValue("away-team-color-2"), true)
-			notes := v.PrintableWithNewline("notes", r.PostFormValue("notes"), true)
-			notes = v.MaxLength("notes", notes, model.NotesMaxLength)
+			name := v.Printable("Name", r.PostFormValue("name"))
+			name = v.MaxLength("Name", name, maxNameLen)
+			homeTeamName := v.Printable("Home Team Name", r.PostFormValue("home-team-name"), true)
+			homeTeamName = v.MaxLength("Home Team Name", homeTeamName, model.TeamNameMaxLength)
+			homeTeamColor1 := v.Color("Home Team Colors", r.PostFormValue("home-team-color-1"), true)
+			homeTeamColor2 := v.Color("Home Team Colors", r.PostFormValue("home-team-color-2"), true)
+			awayTeamName := v.Printable("Away Team Name", r.PostFormValue("away-team-name"), true)
+			awayTeamName = v.MaxLength("Away Team Name", awayTeamName, model.TeamNameMaxLength)
+			awayTeamColor1 := v.Color("Away Team Colors", r.PostFormValue("away-team-color-1"), true)
+			awayTeamColor2 := v.Color("Away Team Colors", r.PostFormValue("away-team-color-2"), true)
+			notes := v.PrintableWithNewline("Notes", r.PostFormValue("notes"), true)
+			notes = v.MaxLength("Notes", notes, model.NotesMaxLength)
+			locks := v.Datetime("Locks Entries", r.PostFormValue("lock-date"), r.PostFormValue("lock-time"), r.PostFormValue("lock-tz"), true)
 
 			if v.OK() {
 				grid.SetName(name)
+				grid.SetLocks(locks)
 				settings := grid.Settings()
 				settings.SetHomeTeamName(homeTeamName)
 				settings.SetHomeTeamColor1(homeTeamColor1)
@@ -226,6 +230,11 @@ func (s *Server) gridCustomizeHandler() http.HandlerFunc {
 			formValues["AwayTeamColor1"] = settings.AwayTeamColor1()
 			formValues["AwayTeamColor2"] = settings.AwayTeamColor2()
 			formValues["Notes"] = settings.Notes()
+
+			if locks := grid.Locks(); !locks.IsZero() {
+				formValues["LockDate"] = locks.Format("2006-01-02")
+				formValues["LockTime"] = locks.Format("15:04")
+			}
 
 			session := s.Session(r)
 			tplData.DidUpdate = session.Flashes(didUpdate) != nil

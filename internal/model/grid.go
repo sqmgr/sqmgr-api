@@ -48,6 +48,11 @@ type Grid struct {
 	squares  map[int]*GridSquare
 }
 
+// SetLocks is a setter for locks
+func (g *Grid) SetLocks(locks time.Time) {
+	g.locks = locks
+}
+
 // GridWithID returns an empty grid object with only the ID set
 func GridWithID(id int64) *Grid {
 	return &Grid{id: id}
@@ -57,6 +62,7 @@ type gridJSON struct {
 	Token    string       `json:"token"`
 	Name     string       `json:"name"`
 	GridType GridType     `json:"gridType"`
+	IsLocked bool         `json:"isLocked"`
 	Locks    time.Time    `json:"locks"`
 	Created  time.Time    `json:"created"`
 	Modified time.Time    `json:"modified"`
@@ -81,6 +87,15 @@ func (g *Grid) Name() string {
 // Locks is a getter for the locks date
 func (g *Grid) Locks() time.Time {
 	return g.locks
+}
+
+// IsLocked will return true if locks is specified and the datetime is before now
+func (g *Grid) IsLocked() bool {
+	if g.locks.IsZero() {
+		return false
+	}
+
+	return g.locks.Before(time.Now())
 }
 
 // Created is a getter for the locks date
@@ -118,6 +133,7 @@ func (g *Grid) MarshalJSON() ([]byte, error) {
 		Token:    g.token,
 		Name:     g.name,
 		GridType: g.gridType,
+		IsLocked: g.IsLocked(),
 		Locks:    g.locks,
 		Created:  g.created,
 		Modified: g.modified,
@@ -143,7 +159,7 @@ func (m *Model) gridByRow(scan scanFunc, loadSettings bool) (*Grid, error) {
 	s.modified = s.modified.In(locationNewYork)
 
 	if locks != nil {
-		s.locks = *locks
+		s.locks = locks.In(locationNewYork)
 	}
 
 	if loadSettings {
@@ -318,17 +334,18 @@ func (g *Grid) Save() error {
 
 	var locks *time.Time
 	if !g.locks.IsZero() {
-		locks = &g.locks
+		locksInUTC := g.locks.UTC()
+		locks = &locksInUTC
 	}
 
 	if _, err := tx.Exec("UPDATE grids SET name = $1, grid_type = $2, password_hash = $3, locks = $4, modified = (NOW() AT TIME ZONE 'utc')  WHERE id = $5",
 		g.name, g.gridType, g.passwordHash, locks, g.id); err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 
 	if err := g.settings.Save(tx); err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 

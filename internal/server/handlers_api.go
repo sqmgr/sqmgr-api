@@ -93,6 +93,12 @@ func (s *Server) apiGridSquaresSquareHandler() http.HandlerFunc {
 		}
 
 		if r.Method == http.MethodPost {
+			// if the user isn't an admin and the grid is locked, do not let the user do anything
+			if !jcd.Claim.IsAdmin && jcd.Grid.IsLocked() {
+				s.ServeJSONError(w, http.StatusForbidden, "The grid is locked")
+				return
+			}
+
 			dec := json.NewDecoder(r.Body)
 			var payload postPayload
 			if err := dec.Decode(&payload); err != nil {
@@ -108,6 +114,7 @@ func (s *Server) apiGridSquaresSquareHandler() http.HandlerFunc {
 			}
 
 			if len(payload.Claimant) > 0 {
+				// making a claim
 				v := validator.New()
 				claimant := v.Printable("name", payload.Claimant)
 				claimant = v.ContainsWordChar("name", claimant)
@@ -130,6 +137,7 @@ func (s *Server) apiGridSquaresSquareHandler() http.HandlerFunc {
 					return
 				}
 			} else if payload.Unclaim && square.UserIdentifier() == userID {
+				// trying to unclaim as user
 				square.State = model.GridSquareStateUnclaimed
 				square.SetUserIdentifier(userID)
 
@@ -141,6 +149,7 @@ func (s *Server) apiGridSquaresSquareHandler() http.HandlerFunc {
 					return
 				}
 			} else if jcd.Claim.IsAdmin {
+				// admin actions
 				if payload.State.IsValid() {
 					square.State = payload.State
 				}

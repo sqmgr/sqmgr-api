@@ -22,6 +22,16 @@ limitations under the License.
 	--grid-gray: #ddd;
 }
 
+section.grid {
+	position: relative;
+}
+
+p.customize {
+	position: absolute;
+	top: 0;
+	right: 0;
+}
+
 div.squares {
 	background-color: #fff;
 	display: grid;
