@@ -24,91 +24,91 @@ import (
 	"time"
 )
 
-// GridSquareState represents the state of an individual square within a given grid
-type GridSquareState string
+// PoolSquareState represents the state of an individual square within a given pool
+type PoolSquareState string
 
-// constants for GridSquareState
+// constants for PoolSquareState
 const (
-	GridSquareStateUnclaimed   GridSquareState = "unclaimed"
-	GridSquareStateClaimed     GridSquareState = "claimed"
-	GridSquareStatePaidPartial GridSquareState = "paid-partial"
-	GridSquareStatePaidFull    GridSquareState = "paid-full"
+	PoolSquareStateUnclaimed   PoolSquareState = "unclaimed"
+	PoolSquareStateClaimed     PoolSquareState = "claimed"
+	PoolSquareStatePaidPartial PoolSquareState = "paid-partial"
+	PoolSquareStatePaidFull    PoolSquareState = "paid-full"
 )
 
-// GridSquareStates are the valid states of a GridSquare
-var GridSquareStates = []GridSquareState{
-	GridSquareStateClaimed,
-	GridSquareStatePaidPartial,
-	GridSquareStatePaidFull,
-	GridSquareStateUnclaimed,
+// PoolSquareStates are the valid states of a PoolSquare
+var PoolSquareStates = []PoolSquareState{
+	PoolSquareStateClaimed,
+	PoolSquareStatePaidPartial,
+	PoolSquareStatePaidFull,
+	PoolSquareStateUnclaimed,
 }
 
 // ErrSquareAlreadyClaimed is an error when a user tries to claim a square that has already been claimed.
 var ErrSquareAlreadyClaimed = errors.New("square has already been claimed")
 
-// ValidGridSquareStates contains a map of valid states.
-var ValidGridSquareStates = map[GridSquareState]bool{}
+// ValidPoolSquareStates contains a map of valid states.
+var ValidPoolSquareStates = map[PoolSquareState]bool{}
 
 func init() {
-	for _, state := range GridSquareStates {
-		ValidGridSquareStates[state] = true
+	for _, state := range PoolSquareStates {
+		ValidPoolSquareStates[state] = true
 	}
 }
 
 // IsValid will ensure that it's a valid state
-func (g GridSquareState) IsValid() bool {
-	_, ok := ValidGridSquareStates[g]
+func (g PoolSquareState) IsValid() bool {
+	_, ok := ValidPoolSquareStates[g]
 	return ok
 }
 
-// GridSquare is an individual square within a grid
-type GridSquare struct {
+// PoolSquare is an individual square within a pool
+type PoolSquare struct {
 	*Model
 	ID            int64 `json:"-"`
-	GridID        int64 `json:"-"`
+	PoolID        int64 `json:"-"`
 	userID        int64
 	sessionUserID string
 	SquareID      int              `json:"squareID"`
-	State         GridSquareState  `json:"state"`
+	State         PoolSquareState  `json:"state"`
 	Claimant      string           `json:"claimant"`
 	Modified      time.Time        `json:"modified"`
-	Logs          []*GridSquareLog `json:"logs,omitempty"`
+	Logs          []*PoolSquareLog `json:"logs,omitempty"`
 }
 
-type gridSquareJSON struct {
+type poolSquareJSON struct {
 	OpaqueUserID string           `json:"opaqueUserID"`
 	SquareID     int              `json:"squareID"`
-	State        GridSquareState  `json:"state"`
+	State        PoolSquareState  `json:"state"`
 	Claimant     string           `json:"claimant"`
 	Modified     time.Time        `json:"modified"`
-	Logs         []*GridSquareLog `json:"logs,omitempty"`
+	Logs         []*PoolSquareLog `json:"logs,omitempty"`
 }
 
-// MarshalJSON will custom JSON encode a GridSquare
-func (g *GridSquare) MarshalJSON() ([]byte, error) {
-	oid, err := opaqueID(g.UserIdentifier())
+// MarshalJSON will custom JSON encode a PoolSquare
+func (p *PoolSquare) MarshalJSON() ([]byte, error) {
+	oid, err := opaqueID(p.UserIdentifier())
 	if err != nil {
 		return nil, err
 	}
 
-	return json.Marshal(gridSquareJSON{
+	return json.Marshal(poolSquareJSON{
 		OpaqueUserID: oid,
-		SquareID:     g.SquareID,
-		State:        g.State,
-		Claimant:     g.Claimant,
-		Modified:     g.Modified,
-		Logs:         g.Logs,
+		SquareID:     p.SquareID,
+		State:        p.State,
+		Claimant:     p.Claimant,
+		Modified:     p.Modified,
+		Logs:         p.Logs,
 	})
 }
 
-// GridSquareLog represents an individual log entry for a grid square
-type GridSquareLog struct {
+// PoolSquareLog represents an individual log entry for a pool square
+type PoolSquareLog struct {
 	id            int64
-	gridSquareID  int64
+	poolSquareID  int64
 	squareID      int
 	userID        int64
 	sessionUserID string
-	state         GridSquareState
+	state         PoolSquareState
 	claimant      string
 	RemoteAddr    string
 	Note          string
@@ -116,39 +116,39 @@ type GridSquareLog struct {
 }
 
 // SetUserIdentifier will allow you to set either the userID (int64) or the sessionUserID (string)
-func (g *GridSquare) SetUserIdentifier(uid interface{}) {
+func (p *PoolSquare) SetUserIdentifier(uid interface{}) {
 	switch val := uid.(type) {
 	case int64:
-		g.userID = val
+		p.userID = val
 	case string:
-		g.sessionUserID = val
+		p.sessionUserID = val
 	default:
 		panic(fmt.Sprintf("invalid userID type %T", uid))
 	}
 }
 
 // UserIdentifier will return the appropriate ID
-func (g *GridSquare) UserIdentifier() interface{} {
-	if g.userID > 0 {
-		return g.userID
+func (p *PoolSquare) UserIdentifier() interface{} {
+	if p.userID > 0 {
+		return p.userID
 	}
 
-	return g.sessionUserID
+	return p.sessionUserID
 }
 
 // SquareID is a getter for the square ID
-func (g *GridSquareLog) SquareID() int {
-	return g.squareID
+func (p *PoolSquareLog) SquareID() int {
+	return p.squareID
 }
 
 // Claimant is a getter for the claimant
-func (g *GridSquareLog) Claimant() string {
-	return g.claimant
+func (p *PoolSquareLog) Claimant() string {
+	return p.claimant
 }
 
-type gridSquareLogJSON struct {
+type poolSquareLogJSON struct {
 	SquareID   int             `json:"squareID"`
-	State      GridSquareState `json:"state"`
+	State      PoolSquareState `json:"state"`
 	Claimant   string          `json:"claimant"`
 	RemoteAddr string          `json:"remoteAddr"`
 	Note       string          `json:"note"`
@@ -156,62 +156,62 @@ type gridSquareLogJSON struct {
 }
 
 // MarshalJSON will custom marshal the JSON
-func (g *GridSquareLog) MarshalJSON() ([]byte, error) {
-	return json.Marshal(gridSquareLogJSON{
-		SquareID:   g.SquareID(),
-		State:      g.State(),
-		Claimant:   g.Claimant(),
-		RemoteAddr: g.RemoteAddr,
-		Note:       g.Note,
-		Created:    g.Created(),
+func (p *PoolSquareLog) MarshalJSON() ([]byte, error) {
+	return json.Marshal(poolSquareLogJSON{
+		SquareID:   p.SquareID(),
+		State:      p.State(),
+		Claimant:   p.Claimant(),
+		RemoteAddr: p.RemoteAddr,
+		Note:       p.Note,
+		Created:    p.Created(),
 	})
 }
 
 // Created is a getter for created
-func (g *GridSquareLog) Created() time.Time {
-	return g.created
+func (p *PoolSquareLog) Created() time.Time {
+	return p.created
 }
 
 // State is a getter for state
-func (g *GridSquareLog) State() GridSquareState {
-	return g.state
+func (p *PoolSquareLog) State() PoolSquareState {
+	return p.state
 }
 
-// GridSquareID is a getter for gridSquareID
-func (g *GridSquareLog) GridSquareID() int64 {
-	return g.gridSquareID
+// PoolSquareID is a getter for poolSquareID
+func (p *PoolSquareLog) PoolSquareID() int64 {
+	return p.poolSquareID
 }
 
 // ID is a getter for id
-func (g *GridSquareLog) ID() int64 {
-	return g.id
+func (p *PoolSquareLog) ID() int64 {
+	return p.id
 }
 
-// Save will save the grid square and the associated log data to the database
-func (g *GridSquare) Save(ctx context.Context, isAdmin bool, gridSquareLog GridSquareLog) error {
+// Save will save the pool square and the associated log data to the database
+func (p *PoolSquare) Save(ctx context.Context, isAdmin bool, poolSquareLog PoolSquareLog) error {
 	var claimant *string
-	if g.Claimant != "" {
-		claimant = &g.Claimant
+	if p.Claimant != "" {
+		claimant = &p.Claimant
 	}
 
 	var userID *int64
 	var sessionUserID *string
 	var remoteAddr *string
 
-	if g.userID > 0 {
-		userID = &g.userID
+	if p.userID > 0 {
+		userID = &p.userID
 	}
 
-	if g.sessionUserID != "" {
-		sessionUserID = &g.sessionUserID
+	if p.sessionUserID != "" {
+		sessionUserID = &p.sessionUserID
 	}
 
-	if gridSquareLog.RemoteAddr != "" {
-		remoteAddr = &gridSquareLog.RemoteAddr
+	if poolSquareLog.RemoteAddr != "" {
+		remoteAddr = &poolSquareLog.RemoteAddr
 	}
 
-	const query = "SELECT * FROM update_grid_square($1, $2, $3, $4, $5, $6, $7, $8)"
-	row := g.Model.db.QueryRowContext(ctx, query, g.ID, g.State, claimant, userID, sessionUserID, remoteAddr, gridSquareLog.Note, isAdmin)
+	const query = "SELECT * FROM update_pool_square($1, $2, $3, $4, $5, $6, $7, $8)"
+	row := p.Model.db.QueryRowContext(ctx, query, p.ID, p.State, claimant, userID, sessionUserID, remoteAddr, poolSquareLog.Note, isAdmin)
 
 	var ok bool
 	if err := row.Scan(&ok); err != nil {
@@ -225,14 +225,14 @@ func (g *GridSquare) Save(ctx context.Context, isAdmin bool, gridSquareLog GridS
 	return nil
 }
 
-func gridSquareLogByRow(scan scanFunc) (*GridSquareLog, error) {
-	var l GridSquareLog
+func poolSquareLogByRow(scan scanFunc) (*PoolSquareLog, error) {
+	var l PoolSquareLog
 	var remoteAddr *string
 	var userID *int64
 	var sessionUserID *string
 	var claimant *string
 
-	if err := scan(&l.id, &l.gridSquareID, &l.squareID, &userID, &sessionUserID, &l.state, &claimant, &remoteAddr, &l.Note, &l.created); err != nil {
+	if err := scan(&l.id, &l.poolSquareID, &l.squareID, &userID, &sessionUserID, &l.state, &claimant, &remoteAddr, &l.Note, &l.created); err != nil {
 		return nil, err
 	}
 
@@ -258,22 +258,22 @@ func gridSquareLogByRow(scan scanFunc) (*GridSquareLog, error) {
 }
 
 // LoadLogs will load the logs for the given square
-func (g *GridSquare) LoadLogs(ctx context.Context) error {
+func (p *PoolSquare) LoadLogs(ctx context.Context) error {
 	const query = `
-		SELECT grid_squares_logs.id, grid_square_id, square_id, grid_squares_logs.user_id, grid_squares_logs.session_user_id, grid_squares_logs.state, grid_squares_logs.claimant, remote_addr, note, grid_squares_logs.created
-		FROM grid_squares_logs
-		INNER JOIN grid_squares ON grid_squares_logs.grid_square_id = grid_squares.id
-		WHERE grid_square_id = $1 
+		SELECT pool_squares_logs.id, pool_square_id, square_id, pool_squares_logs.user_id, pool_squares_logs.session_user_id, pool_squares_logs.state, pool_squares_logs.claimant, remote_addr, note, pool_squares_logs.created
+		FROM pool_squares_logs
+		INNER JOIN pool_squares ON pool_squares_logs.pool_square_id = pool_squares.id
+		WHERE pool_square_id = $1 
 		ORDER BY id DESC`
-	rows, err := g.Model.db.QueryContext(ctx, query, g.ID)
+	rows, err := p.Model.db.QueryContext(ctx, query, p.ID)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 
-	logs := make([]*GridSquareLog, 0)
+	logs := make([]*PoolSquareLog, 0)
 	for rows.Next() {
-		l, err := gridSquareLogByRow(rows.Scan)
+		l, err := poolSquareLogByRow(rows.Scan)
 		if err != nil {
 			return err
 		}
@@ -281,6 +281,6 @@ func (g *GridSquare) LoadLogs(ctx context.Context) error {
 		logs = append(logs, l)
 	}
 
-	g.Logs = logs
+	p.Logs = logs
 	return nil
 }

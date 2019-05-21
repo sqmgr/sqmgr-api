@@ -44,6 +44,7 @@ CREATE TABLE pools (
     name text not null,
     grid_type text not null,
     password_hash text not null,
+    locks timestamp,
     created timestamp not null default (now() at time zone 'utc'),
     modified timestamp not null default (now() at time zone 'utc')
 );
@@ -51,13 +52,16 @@ CREATE TABLE pools (
 CREATE TABLE grids (
     id bigserial not null primary key,
     pool_id bigint not null references pools (id),
-    home_squares text[],
-    away_squares text[],
-    locks timestamp,
+    ord int not null default 0,
+    name text not null,
+    home_numbers text[],
+    away_numbers text[],
     event_date timestamp,
     created timestamp not null default (now() at time zone 'utc'),
     modified timestamp not null default (now() at time zone 'utc')
 );
+
+CREATE INDEX grids_pool_id_ord_idx ON grids(pool_id, ord);
 
 CREATE TABLE grid_settings (
     grid_id bigint not null primary key references grids (id),
@@ -184,34 +188,6 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION new_pool(_token text, _user_id bigint, _name text, _grid_type text, _password_hash text, _squares int) RETURNS grids
-	LANGUAGE plpgsql
-	AS $$
-DECLARE
-	_row grids;
-    _counter integer := 0;
-BEGIN
-	INSERT INTO pools (token, user_id, name, grid_type, password_hash)
-	VALUES (_token, _user_id, _name, _grid_type, _password_hash)
-	RETURNING * INTO _row;
-
-	INSERT INTO pool_settings (pool_id)
-	VALUES (_row.id);
-
-    LOOP
-       EXIT WHEN _counter = _squares;
-
-       -- +1 because the square IDs are 1-based not 0-based
-       INSERT INTO pool_squares (pool_id, square_id) VALUES
-       (_row.id, _counter + 1);
-
-       _counter := _counter + 1;
-    END LOOP;
-
-	RETURN _row;
-END;
-$$;
-
 CREATE FUNCTION update_pool_square(_id bigint, _state square_states, _claimant text, _user_id bigint, _session_user_id text, _remote_addr text, _note text, _is_admin boolean) RETURNS boolean
     LANGUAGE plpgsql
     AS $$
@@ -255,8 +231,53 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION new_grid(_pool_id bigint, _name text) RETURNS grids
+    LANGUAGE plpgsql
+    AS $$
+    declare
+        _row grids;
+    begin
+        INSERT INTO grids (pool_id, name)
+        VALUES (_pool_id, _name)
+        RETURNING * INTO _row;
+
+        INSERT INTO grid_settings (grid_id)
+        VALUES (_row.id);
+
+        RETURN _row;
+    end;
+$$;
+
+CREATE FUNCTION new_pool(_token text, _user_id bigint, _name text, _grid_type text, _password_hash text, _squares int) RETURNS pools
+    LANGUAGE plpgsql
+AS $$
+DECLARE
+    _row pools;
+    _counter integer := 0;
+BEGIN
+    INSERT INTO pools (token, user_id, name, grid_type, password_hash)
+    VALUES (_token, _user_id, _name, _grid_type, _password_hash)
+           RETURNING * INTO _row;
+
+    LOOP
+        EXIT WHEN _counter = _squares;
+
+        -- +1 because the square IDs are 1-based not 0-based
+        INSERT INTO pool_squares (pool_id, square_id) VALUES
+        (_row.id, _counter + 1);
+
+        _counter := _counter + 1;
+    END LOOP;
+
+    PERFORM new_grid(_row.id, _name);
+
+    RETURN _row;
+END;
+$$;
+
+--rollback DROP FUNCTION new_pool(text, bigint, text, text, text, int);
+--rollback DROP FUNCTION new_grid(bigint, text);
 --rollback DROP FUNCTION update_pool_square(bigint, square_states, text, bigint, text, text, text, boolean);
 --rollback DROP FUNCTION new_user(text, text);
 --rollback DROP FUNCTION set_user_confirmation(bigint, text);
 --rollback DROP FUNCTION new_token(text);
---rollback DROP FUNCTION new_pool(text, bigint, text, text, text, int);

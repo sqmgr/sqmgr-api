@@ -50,7 +50,7 @@ type TemplateData struct {
 const (
 	ctxKeySession ctxKey = iota
 	ctxKeyUser
-	ctxKeyGrid
+	ctxKeyPool
 	ctxKeyJWT
 )
 
@@ -268,7 +268,7 @@ func (s *Server) EffectiveUser(r *http.Request) (model.EffectiveUser, error) {
 
 	userID, _ := sess.Values[userIDKey].(string)
 	logrus.WithField("userID", userID).Trace("effective user is session user")
-	eu := model.NewSessionUser(userID, ids, model.JoinGrid(func(ctx context.Context, grid *model.Grid) error {
+	eu := model.NewSessionUser(userID, ids, model.JoinGrid(func(ctx context.Context, grid *model.Pool) error {
 		ids, ok := sess.Values[gridIDKey].(map[int64]bool)
 		if !ok {
 			ids = make(map[int64]bool)

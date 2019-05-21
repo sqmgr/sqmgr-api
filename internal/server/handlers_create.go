@@ -59,15 +59,15 @@ func (s *Server) createHandler() http.HandlerFunc {
 			tplData.FormData["Name"] = gridName
 			tplData.FormData["Type"] = gridType
 
-			v.Printable("Grid Name", gridName)
-			v.MaxLength("Grid Name", gridName, maxNameLen)
+			v.Printable("Pool Name", gridName)
+			v.MaxLength("Pool Name", gridName, maxNameLen)
 			v.Password("Join Password", password, confirmPassword, minJoinPasswordLen)
 			if err := model.IsValidGridType(gridType); err != nil {
-				v.AddError("Grid Configuration", "you must select a valid configuration option")
+				v.AddError("Pool Configuration", "you must select a valid configuration option")
 			}
 
 			if v.OK() {
-				grid, err := s.model.NewGrid(user.ID, gridName, model.GridType(gridType), password)
+				grid, err := s.model.NewPool(r.Context(), user.ID, gridName, model.GridType(gridType), password)
 				if err != nil {
 					s.Error(w, r, http.StatusInternalServerError, err)
 					return

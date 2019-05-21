@@ -37,18 +37,18 @@ func NewSessionUser(userID string, ids map[int64]bool, joinFunc JoinGrid) *Sessi
 }
 
 // IsAdminOf will always return false for a session-based user
-func (u *SessionUser) IsAdminOf(ctx context.Context, s *Grid) bool {
+func (u *SessionUser) IsAdminOf(ctx context.Context, s *Pool) bool {
 	return false
 }
 
 // IsMemberOf will return true if the user is a member of the grid
-func (u *SessionUser) IsMemberOf(ctx context.Context, s *Grid) (bool, error) {
+func (u *SessionUser) IsMemberOf(ctx context.Context, s *Pool) (bool, error) {
 	_, found := u.gridIDs[s.id]
 	return found, nil
 }
 
 // JoinGrid will attempt to join the grid
-func (u *SessionUser) JoinGrid(ctx context.Context, s *Grid) error {
+func (u *SessionUser) JoinGrid(ctx context.Context, s *Pool) error {
 	return u.joinFunc(ctx, s)
 }
 
@@ -63,4 +63,4 @@ func (u *SessionUser) OpaqueUserID(ctx context.Context) (string, error) {
 }
 
 // JoinGrid is a function which can be called to join grids
-type JoinGrid func(ctx context.Context, s *Grid) error
+type JoinGrid func(ctx context.Context, s *Pool) error

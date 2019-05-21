@@ -78,7 +78,7 @@ func (s *Server) apiGridSquaresHandler() http.HandlerFunc {
 func (s *Server) apiGridSquaresSquareHandler() http.HandlerFunc {
 	type postPayload struct {
 		Claimant string                `json:"claimant"`
-		State    model.GridSquareState `json:"state"`
+		State    model.PoolSquareState `json:"state"`
 		Note     string                `json:"note"`
 		Unclaim  bool                  `json:"unclaim"`
 	}
@@ -125,11 +125,11 @@ func (s *Server) apiGridSquaresSquareHandler() http.HandlerFunc {
 				}
 
 				square.Claimant = claimant
-				square.State = model.GridSquareStateClaimed
+				square.State = model.PoolSquareStateClaimed
 				square.SetUserIdentifier(userID)
 
 				logrus.WithField("claimant", payload.Claimant).Info("claiming square")
-				if err := square.Save(r.Context(), false, model.GridSquareLog{
+				if err := square.Save(r.Context(), false, model.PoolSquareLog{
 					RemoteAddr: r.RemoteAddr,
 					Note:       "user: initial claim",
 				}); err != nil {
@@ -138,10 +138,10 @@ func (s *Server) apiGridSquaresSquareHandler() http.HandlerFunc {
 				}
 			} else if payload.Unclaim && square.UserIdentifier() == userID {
 				// trying to unclaim as user
-				square.State = model.GridSquareStateUnclaimed
+				square.State = model.PoolSquareStateUnclaimed
 				square.SetUserIdentifier(userID)
 
-				if err := square.Save(r.Context(), false, model.GridSquareLog{
+				if err := square.Save(r.Context(), false, model.PoolSquareLog{
 					RemoteAddr: r.RemoteAddr,
 					Note:       fmt.Sprintf("user: `%s` unclaimed", square.Claimant),
 				}); err != nil {
@@ -154,7 +154,7 @@ func (s *Server) apiGridSquaresSquareHandler() http.HandlerFunc {
 					square.State = payload.State
 				}
 
-				if err := square.Save(r.Context(), true, model.GridSquareLog{
+				if err := square.Save(r.Context(), true, model.PoolSquareLog{
 					RemoteAddr: r.RemoteAddr,
 					Note:       payload.Note,
 				}); err != nil {
@@ -186,7 +186,7 @@ func (s *Server) apiGridSquaresSquareHandler() http.HandlerFunc {
 
 type jwtContextData struct {
 	Claim *tokenJWTClaim
-	Grid  *model.Grid
+	Grid  *model.Pool
 }
 
 func (s *Server) apiGridJWTHandler(next http.Handler) http.HandlerFunc {
@@ -222,7 +222,7 @@ func (s *Server) apiGridJWTHandler(next http.Handler) http.HandlerFunc {
 			return
 		}
 
-		grid, err := s.model.GridByToken(r.Context(), claims.Token)
+		grid, err := s.model.PoolByToken(r.Context(), claims.Token)
 		if err != nil {
 			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 			return

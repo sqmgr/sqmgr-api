@@ -37,9 +37,9 @@ func init() {
 
 // EffectiveUser provides common user functionality
 type EffectiveUser interface {
-	JoinGrid(ctx context.Context, s *Grid) error
-	IsMemberOf(ctx context.Context, s *Grid) (bool, error)
-	IsAdminOf(ctx context.Context, s *Grid) bool
+	JoinGrid(ctx context.Context, s *Pool) error
+	IsMemberOf(ctx context.Context, s *Pool) (bool, error)
+	IsAdminOf(ctx context.Context, s *Pool) bool
 	UserID(ctx context.Context) interface{}
 	OpaqueUserID(ctx context.Context) (string, error)
 }

@@ -38,7 +38,7 @@ func TestJoinGrid(t *testing.T) {
 	u2, err := m.NewUser(randString()+"@sqmgr.com", "test1234")
 	g.Expect(err).Should(gomega.Succeed())
 
-	s, err := m.NewGrid(u.ID, "test", GridTypeStd100, "join-password")
+	s, err := m.NewPool(context.Background(), u.ID, "test", GridTypeStd100, "join-password")
 	g.Expect(err).Should(gomega.Succeed())
 
 	ok, err := u.IsMemberOf(context.Background(), s)

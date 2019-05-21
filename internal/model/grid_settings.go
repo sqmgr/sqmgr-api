@@ -17,6 +17,7 @@ limitations under the License.
 package model
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 	"unicode/utf8"
@@ -79,8 +80,8 @@ func (g GridSettings) MarshalJSON() ([]byte, error) {
 }
 
 // Save will save the settings
-func (g *GridSettings) Save(q executer) error {
-	_, err := q.Exec(`
+func (g *GridSettings) Save(ctx context.Context, q executer) error {
+	_, err := q.ExecContext(ctx, `
 		UPDATE grid_settings SET
 			home_team_name = $1,
 			home_team_color_1 = $2,

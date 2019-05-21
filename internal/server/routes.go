@@ -51,12 +51,15 @@ func (s *Server) setupRoutes() {
 	s.Router.Path("/account/deleted").Methods(http.MethodGet).Handler(s.authHandler(s.accountDeletedHandler()))
 	s.Router.Path("/account/verify").Methods(http.MethodGet, http.MethodPost).Handler(s.authHandler(s.accountVerifyHandler()))
 
-	// grids
-	s.Router.Path("/grid/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodGet).Handler(s.gridMemberHandler(true, false, s.gridHandler()))
-	s.Router.Path("/grid/{token:[A-Za-z0-9_-]{8}}/join").Methods(http.MethodGet, http.MethodPost).Handler(s.gridMemberHandler(false, false, s.gridJoinHandler()))
-	s.Router.Path("/grid/{token:[A-Za-z0-9_-]{8}}/customize").Methods(http.MethodGet, http.MethodPost).Handler(s.gridMemberHandler(true, true, s.gridCustomizeHandler()))
+	// pools
+	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodGet).Handler(s.poolMemberHandler(true, false, s.poolHandler()))
+	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/join").Methods(http.MethodGet, http.MethodPost).Handler(s.poolMemberHandler(false, false, s.poolJoinHandler()))
 	// probably only necessary temporarily
-	s.Router.Path("/grid/{token:[A-Za-z0-9_-]{8}}/jwt").Methods(http.MethodGet).Handler(s.gridMemberHandler(false, false, s.gridJWTHandler()))
+	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/jwt").Methods(http.MethodGet).Handler(s.poolMemberHandler(false, false, s.poolJWTHandler()))
+
+	// grids
+	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/{grid:[0-9]+}").Methods(http.MethodGet).Handler(s.poolMemberHandler(true, false, s.gridHandler()))
+	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/{grid:[0-9]+}/customize").Methods(http.MethodGet, http.MethodPost).Handler(s.poolMemberHandler(true, true, s.gridCustomizeHandler()))
 
 	// signup
 	s.Router.Path("/signup").Methods(http.MethodGet, http.MethodPost).Handler(s.signupHandler())

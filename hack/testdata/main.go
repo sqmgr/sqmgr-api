@@ -92,7 +92,7 @@ func main() {
 
 		name := words.Create(2, " ")
 		logrus.WithFields(logrus.Fields{"name": name, "user": user.Email}).Info("creating grid")
-		grid, err := m.NewGrid(user.ID, name, gridType, "joinpw")
+		grid, err := m.NewPool(user.ID, name, gridType, "joinpw")
 		if err != nil {
 			panic(err)
 		}
@@ -124,16 +124,16 @@ func main() {
 			if n < unclaimed {
 				continue
 			} else if n < claimed {
-				square.State = model.GridSquareStateClaimed
+				square.State = model.PoolSquareStateClaimed
 			} else if n < paidPartial {
-				square.State = model.GridSquareStatePaidPartial
+				square.State = model.PoolSquareStatePaidPartial
 			} else {
-				square.State = model.GridSquareStatePaidFull
+				square.State = model.PoolSquareStatePaidFull
 			}
 
 			square.Claimant = nameList[rand.Intn(len(nameList))]
 
-			gsl := model.GridSquareLog{
+			gsl := model.PoolSquareLog{
 				RemoteAddr: "127.0.0.1",
 				Note:       "state changed",
 			}
