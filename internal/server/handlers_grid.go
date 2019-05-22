@@ -18,122 +18,64 @@ package server
 
 import (
 	"context"
-	"database/sql"
-	"errors"
-	"fmt"
-	"github.com/dgrijalva/jwt-go"
-	"net/http"
-	"time"
-
-	"github.com/gorilla/mux"
 	"github.com/weters/sqmgr/internal/model"
 	"github.com/weters/sqmgr/internal/validator"
+	"net/http"
 )
 
-const responseOK = "OK"
-
-// ErrNotMember is an error when the user does not belong to the grid
-var ErrNotMember = errors.New("server: user does not belong to grid")
-
-var jwtTTL = time.Minute * 5
-
-type gridContextData struct {
-	EffectiveUser model.EffectiveUser
-	Grid          *model.Grid
-	IsMember      bool
-	IsAdmin       bool
-}
-
-func (s *Server) gridMemberHandler(mustBeMember, mustBeAdmin bool, nextHandler http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		token := vars["token"]
-
-		grid, err := s.model.GridByToken(r.Context(), token)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				s.Error(w, r, http.StatusNotFound)
-				return
-			}
-
-			s.Error(w, r, http.StatusInternalServerError, err)
-			return
-		}
-
-		user, err := s.EffectiveUser(r)
-		if err != nil {
-			s.Error(w, r, http.StatusInternalServerError, err)
-			return
-		}
-
-		isMember, err := user.IsMemberOf(r.Context(), grid)
-		if err != nil {
-			s.Error(w, r, http.StatusInternalServerError, err)
-			return
-		}
-
-		if mustBeMember && !isMember {
-			http.Redirect(w, r, fmt.Sprintf("/grid/%s/join", grid.Token()), http.StatusSeeOther)
-			return
-		}
-
-		isAdmin := user.IsAdminOf(r.Context(), grid)
-		if mustBeAdmin && !isAdmin {
-			s.Error(w, r, http.StatusUnauthorized)
-			return
-		}
-
-		// add value
-		r = r.WithContext(context.WithValue(r.Context(), ctxKeyGrid, &gridContextData{
-			EffectiveUser: user,
-			Grid:          grid,
-			IsMember:      isMember,
-			IsAdmin:       isAdmin,
-		}))
-
-		nextHandler.ServeHTTP(w, r)
-	}
-}
-
-func (s *Server) gridHandler() http.HandlerFunc {
+func (s *Server) poolHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("grid.html")
 
 	type data struct {
 		IsAdmin          bool
+		Pool             *model.Pool
 		Grid             *model.Grid
-		GridSquareStates []model.GridSquareState
+		GridSquareStates []model.PoolSquareState
 		OpaqueUserID     string
 		JWT              string
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		gcd := ctx.Value(ctxKeyGrid).(*gridContextData)
+		pcd := ctx.Value(ctxKeyPool).(*poolContextData)
 
-		signedJWT, err := s.gridJWT(ctx, gcd)
+		pool := pcd.Pool
+		grid, err := pool.DefaultGrid(r.Context())
+		if err != nil {
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		if err := grid.LoadSettings(context.Background()); err != nil {
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		signedJWT, err := s.poolJWT(ctx, pcd)
 		if err != nil {
 			// don't need to worry about ErrNotMember since we already ensured they are
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
-		oid, err := gcd.EffectiveUser.OpaqueUserID(ctx)
+		oid, err := pcd.EffectiveUser.OpaqueUserID(ctx)
 		if err != nil {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
 		s.ExecuteTemplate(w, r, tpl, data{
-			IsAdmin:          gcd.IsAdmin,
-			Grid:             gcd.Grid,
-			GridSquareStates: model.GridSquareStates,
+			IsAdmin:          pcd.IsAdmin,
+			Pool:             pcd.Pool,
+			Grid:             grid,
+			GridSquareStates: model.PoolSquareStates,
 			OpaqueUserID:     oid,
 			JWT:              signedJWT,
 		})
 	}
 }
 
-func (s *Server) gridCustomizeHandler() http.HandlerFunc {
+func (s *Server) poolCustomizeHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("grid-customize.html", "form-errors.html")
 
 	const didUpdate = "didUpdate"
@@ -142,6 +84,7 @@ func (s *Server) gridCustomizeHandler() http.HandlerFunc {
 		FormValues        map[string]string
 		FormErrors        validator.Errors
 		Grid              *model.Grid
+		Pool              *model.Pool
 		DidUpdate         bool
 		NotesMaxLength    int
 		NameMaxLength     int
@@ -149,10 +92,15 @@ func (s *Server) gridCustomizeHandler() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		gridCtxData := r.Context().Value(ctxKeyGrid).(*gridContextData)
-		grid := gridCtxData.Grid
+		poolCtxData := r.Context().Value(ctxKeyPool).(*poolContextData)
 
-		if err := grid.LoadSettings(); err != nil {
+		pool := poolCtxData.Pool
+		grid, err := pool.DefaultGrid(r.Context())
+		if err != nil {
+			s.Error(w, r, http.StatusInternalServerError, err)
+		}
+
+		if err := grid.LoadSettings(r.Context()); err != nil {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
@@ -160,6 +108,7 @@ func (s *Server) gridCustomizeHandler() http.HandlerFunc {
 		formValues := make(map[string]string)
 		tplData := data{
 			Grid:              grid,
+			Pool:              pool,
 			FormValues:        formValues,
 			NotesMaxLength:    model.NotesMaxLength,
 			NameMaxLength:     maxNameLen,
@@ -192,11 +141,9 @@ func (s *Server) gridCustomizeHandler() http.HandlerFunc {
 			awayTeamColor2 := v.Color("Away Team Colors", r.PostFormValue("away-team-color-2"), true)
 			notes := v.PrintableWithNewline("Notes", r.PostFormValue("notes"), true)
 			notes = v.MaxLength("Notes", notes, model.NotesMaxLength)
-			locks := v.Datetime("Locks Entries", r.PostFormValue("lock-date"), r.PostFormValue("lock-time"), r.PostFormValue("lock-tz"), true)
 
 			if v.OK() {
 				grid.SetName(name)
-				grid.SetLocks(locks)
 				settings := grid.Settings()
 				settings.SetHomeTeamName(homeTeamName)
 				settings.SetHomeTeamColor1(homeTeamColor1)
@@ -206,7 +153,7 @@ func (s *Server) gridCustomizeHandler() http.HandlerFunc {
 				settings.SetAwayTeamColor2(awayTeamColor2)
 				settings.SetNotes(notes)
 
-				if err := grid.Save(); err != nil {
+				if err := grid.Save(r.Context()); err != nil {
 					s.Error(w, r, http.StatusInternalServerError, err)
 					return
 				}
@@ -231,98 +178,9 @@ func (s *Server) gridCustomizeHandler() http.HandlerFunc {
 			formValues["AwayTeamColor2"] = settings.AwayTeamColor2()
 			formValues["Notes"] = settings.Notes()
 
-			if locks := grid.Locks(); !locks.IsZero() {
-				formValues["LockDate"] = locks.Format("2006-01-02")
-				formValues["LockTime"] = locks.Format("15:04")
-			}
-
 			session := s.Session(r)
 			tplData.DidUpdate = session.Flashes(didUpdate) != nil
 			session.Save()
-		}
-
-		s.ExecuteTemplate(w, r, tpl, tplData)
-		return
-	}
-}
-
-type tokenJWTClaim struct {
-	jwt.StandardClaims
-	EffectiveUserID interface{}
-	Token           string
-	IsAdmin         bool
-}
-
-func (s *Server) gridJWT(ctx context.Context, gcd *gridContextData) (string, error) {
-	if !gcd.IsMember {
-		return "", ErrNotMember
-	}
-
-	return s.jwt.Sign(tokenJWTClaim{
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(jwtTTL).Unix(),
-		},
-		EffectiveUserID: gcd.EffectiveUser.UserID(ctx),
-		Token:           gcd.Grid.Token(),
-		IsAdmin:         gcd.IsAdmin,
-	})
-}
-
-func (s *Server) gridJWTHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		gcd := r.Context().Value(ctxKeyGrid).(*gridContextData)
-
-		jwtStr, err := s.gridJWT(r.Context(), gcd)
-		if err != nil {
-			if err == ErrNotMember {
-				s.ServeJSONError(w, http.StatusUnauthorized, "")
-				return
-			}
-
-			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
-			return
-		}
-
-		s.ServeJSON(w, http.StatusOK, jsonResponse{
-			Status: responseOK,
-			Result: jwtStr,
-		})
-		return
-	}
-}
-
-func (s *Server) gridJoinHandler() http.HandlerFunc {
-	tpl := s.loadTemplate("grid-join.html")
-
-	type data struct {
-		Error string
-	}
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		sqCtxData := r.Context().Value(ctxKeyGrid).(*gridContextData)
-		grid := sqCtxData.Grid
-		user := sqCtxData.EffectiveUser
-
-		if sqCtxData.IsMember {
-			http.Redirect(w, r, fmt.Sprintf("/grid/%s", grid.Token()), http.StatusSeeOther)
-			return
-		}
-
-		tplData := data{}
-		if r.Method == http.MethodPost {
-			password := r.PostFormValue("password")
-			if grid.PasswordIsValid(password) {
-
-				if err := user.JoinGrid(r.Context(), grid); err != nil {
-					s.Error(w, r, http.StatusInternalServerError, err)
-					return
-				}
-
-				http.Redirect(w, r, fmt.Sprintf("/grid/%s", grid.Token()), http.StatusSeeOther)
-				return
-			}
-
-			tplData.Error = "password is not valid"
 		}
 
 		s.ExecuteTemplate(w, r, tpl, tplData)

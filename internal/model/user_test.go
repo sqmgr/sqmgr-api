@@ -38,7 +38,7 @@ func TestJoinGrid(t *testing.T) {
 	u2, err := m.NewUser(randString()+"@sqmgr.com", "test1234")
 	g.Expect(err).Should(gomega.Succeed())
 
-	s, err := m.NewGrid(u.ID, "test", GridTypeStd100, "join-password")
+	s, err := m.NewPool(context.Background(), u.ID, "test", GridTypeStd100, "join-password")
 	g.Expect(err).Should(gomega.Succeed())
 
 	ok, err := u.IsMemberOf(context.Background(), s)
@@ -49,8 +49,8 @@ func TestJoinGrid(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(ok).Should(gomega.BeFalse())
 
-	g.Expect(u2.JoinGrid(context.Background(), s)).Should(gomega.Succeed())
-	g.Expect(u2.JoinGrid(context.Background(), s)).Should(gomega.Succeed(), "test ON CONFLICT")
+	g.Expect(u2.JoinPool(context.Background(), s)).Should(gomega.Succeed())
+	g.Expect(u2.JoinPool(context.Background(), s)).Should(gomega.Succeed(), "test ON CONFLICT")
 
 	ok, err = u2.IsMemberOf(context.Background(), s)
 	g.Expect(err).Should(gomega.Succeed())

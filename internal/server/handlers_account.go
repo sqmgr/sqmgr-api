@@ -39,10 +39,10 @@ const (
 
 type gridsTemplateData struct {
 	Pagination *Pagination
-	Grids      []*model.Grid
+	Grids      []*model.Pool
 }
 
-type collectionFn func(ctx context.Context, u *model.User, offset int, limit int) ([]*model.Grid, error)
+type collectionFn func(ctx context.Context, u *model.User, offset int, limit int) ([]*model.Pool, error)
 type countFn func(ctx context.Context, u *model.User) (int64, error)
 
 // page is index-1 based.
@@ -79,13 +79,13 @@ func (s *Server) accountHandler() http.HandlerFunc {
 		user := s.AuthUser(r)
 		ctx := r.Context()
 
-		joinedData, err := getGrids(ctx, user, "/account/joined", s.model.GridsJoinedByUser, s.model.GridsJoinedByUserCount, 1)
+		joinedData, err := getGrids(ctx, user, "/account/joined", s.model.PoolsJoinedByUser, s.model.PoolsJoinedByUserCount, 1)
 		if err != nil && err != sql.ErrNoRows {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
-		ownedData, err := getGrids(ctx, user, "/account/owned", s.model.GridsOwnedByUser, s.model.GridsOwnedByUserCount, 1)
+		ownedData, err := getGrids(ctx, user, "/account/owned", s.model.PoolsOwnedByUser, s.model.PoolsOwnedByUserCount, 1)
 		if err != nil && err != sql.ErrNoRows {
 			s.Error(w, r, http.StatusInternalServerError, err)
 			return
@@ -107,11 +107,11 @@ func (s *Server) accountSquaresHandler(asType accountSquaresHandlerType) http.Ha
 
 	switch asType {
 	case owned:
-		clFn = s.model.GridsOwnedByUser
-		cnFn = s.model.GridsOwnedByUserCount
+		clFn = s.model.PoolsOwnedByUser
+		cnFn = s.model.PoolsOwnedByUserCount
 	default:
-		clFn = s.model.GridsJoinedByUser
-		cnFn = s.model.GridsJoinedByUserCount
+		clFn = s.model.PoolsJoinedByUser
+		cnFn = s.model.PoolsJoinedByUserCount
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {

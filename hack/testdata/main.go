@@ -91,9 +91,19 @@ func main() {
 		}
 
 		name := words.Create(2, " ")
-		logrus.WithFields(logrus.Fields{"name": name, "user": user.Email}).Info("creating grid")
-		grid, err := m.NewGrid(user.ID, name, gridType, "joinpw")
+		logrus.WithFields(logrus.Fields{"name": name, "user": user.Email}).Info("creating pool")
+		pool, err := m.NewPool(context.Background(), user.ID, name, gridType, "joinpw")
 		if err != nil {
+			panic(err)
+		}
+
+		grids, err := pool.Grids(context.Background(), 0, 1)
+		if err != nil {
+			panic(err)
+		}
+		grid := grids[0]
+
+		if err := grid.LoadSettings(context.Background()); err != nil {
 			panic(err)
 		}
 
@@ -105,11 +115,11 @@ func main() {
 		grid.Settings().SetAwayTeamName(awayTeam)
 		grid.Settings().SetAwayTeamColor1(color())
 		grid.Settings().SetAwayTeamColor2(color())
-		if err := grid.Save(); err != nil {
+		if err := pool.Save(context.Background()); err != nil {
 			panic(err)
 		}
 
-		squares, err := grid.Squares()
+		squares, err := pool.Squares()
 		if err != nil {
 			panic(err)
 		}
@@ -124,16 +134,16 @@ func main() {
 			if n < unclaimed {
 				continue
 			} else if n < claimed {
-				square.State = model.GridSquareStateClaimed
+				square.State = model.PoolSquareStateClaimed
 			} else if n < paidPartial {
-				square.State = model.GridSquareStatePaidPartial
+				square.State = model.PoolSquareStatePaidPartial
 			} else {
-				square.State = model.GridSquareStatePaidFull
+				square.State = model.PoolSquareStatePaidFull
 			}
 
 			square.Claimant = nameList[rand.Intn(len(nameList))]
 
-			gsl := model.GridSquareLog{
+			gsl := model.PoolSquareLog{
 				RemoteAddr: "127.0.0.1",
 				Note:       "state changed",
 			}
@@ -149,9 +159,9 @@ func main() {
 			}
 
 			if rand.Intn(100) < *chance {
-				logrus.WithFields(logrus.Fields{"name": name, "user": account.Email}).Info("joining grid")
-				if err := account.JoinGrid(context.Background(), grid); err != nil {
-					logrus.WithError(err).Fatal("could not join grid")
+				logrus.WithFields(logrus.Fields{"name": name, "user": account.Email}).Info("joining pool")
+				if err := account.JoinPool(context.Background(), pool); err != nil {
+					logrus.WithError(err).Fatal("could not join pool")
 				}
 			}
 		}

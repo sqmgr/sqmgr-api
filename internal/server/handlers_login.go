@@ -63,7 +63,7 @@ func (s *Server) loginHandler() http.HandlerFunc {
 				ids, ok := session.Values[gridIDKey].(map[int64]bool)
 				if ok {
 					for id := range ids {
-						if err := user.JoinGrid(r.Context(), model.GridWithID(id)); err != nil {
+						if err := user.JoinPool(r.Context(), model.PoolWithID(id)); err != nil {
 							s.Error(w, r, http.StatusInternalServerError, err)
 							return
 						}
