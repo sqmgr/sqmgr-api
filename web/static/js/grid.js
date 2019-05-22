@@ -28,6 +28,7 @@ SqMGR.buildSquares = function() {
 SqMGR.GridBuilder = function(config) {
 	this.jwt = config.jwt
 	this.grid = config.grid
+	this.pool = config.pool
 	this.isAdmin = config.isAdmin
 	this.opaqueUserID = config.opaqueUserID
     this.gridSquareStates = config.gridSquareStates
@@ -49,7 +50,7 @@ SqMGR.GridBuilder.prototype.draw = function(squares) {
 		square
 
 	parent.classList.add('squares')
-	parent.classList.add(this.grid.gridType)
+	parent.classList.add(this.pool.gridType)
 
 	elem = document.createElement('div')
 	elem.classList.add('spacer')
@@ -80,7 +81,7 @@ SqMGR.GridBuilder.prototype.draw = function(squares) {
 		}
 	}.bind(this))
 
-	numSquares = SqMGR.Config.Types[this.grid.gridType]
+	numSquares = SqMGR.Config.Types[this.pool.gridType]
 	for (i=1; i<=numSquares; i++) {
 		square = squares ? squares[i] : null
 
@@ -121,7 +122,7 @@ SqMGR.GridBuilder.prototype.draw = function(squares) {
 }
 
 SqMGR.GridBuilder.prototype.loadSquares = function() {
-	this.get( "/api/grid/" + this.grid.token + "/squares", function (data) {
+	this.get( "/api/pool/" + this.pool.token + "/squares", function (data) {
 		this.draw(data)
 	}.bind(this))
 
@@ -133,7 +134,7 @@ SqMGR.GridBuilder.prototype.loadLogs = function() {
 		return
 	}
 
-	this.get("/api/grid/" + this.grid.token + "/logs", function(data) {
+	this.get("/api/pool/" + this.pool.token + "/logs", function(data) {
 		let section
 		const auditLog = this.templates.querySelector('section.audit-log').cloneNode(true)
 		const gridMetadata = document.querySelector('div.grid-metadata')
@@ -159,7 +160,7 @@ SqMGR.GridBuilder.prototype.getTeamValue = function(team, prop) {
 }
 
 SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
-	const path = "/api/grid/" + this.grid.token + "/squares/" + squareID
+	const path = "/api/pool/" + this.pool.token + "/squares/" + squareID
 	const drawDetails = function(data) {
 		const squareDetails = this.templates.querySelector('div.square-details').cloneNode(true)
 
@@ -193,7 +194,7 @@ SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
 		squareDetails.querySelector('td.modified').setAttribute('data-datetime', data.modified)
 
 		const claimP = squareDetails.querySelector('p.claim')
-		if (data.state !== 'unclaimed' || (!this.isAdmin && this.grid.isLocked)) {
+		if (data.state !== 'unclaimed' || (!this.isAdmin && this.pool.isLocked)) {
 			claimP.remove()
 		} else {
 			claimP.querySelector('a').onclick = function() {
@@ -203,7 +204,7 @@ SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
 		}
 
 		const unclaimP = squareDetails.querySelector('p.unclaim')
-		if ((!this.isAdmin && this.grid.isLocked) ||
+		if ((!this.isAdmin && this.pool.isLocked) ||
 			(data.state !== 'claimed' || data.opaqueUserID !== this.opaqueUserID)) {
 			unclaimP.remove()
 		} else {
@@ -268,7 +269,7 @@ SqMGR.GridBuilder.prototype.promptAndSubmitSquareData = function(squareID, optio
 	}
 
 	form.onsubmit = function() {
-		const path = "/api/grid/" + this.grid.token + "/squares/" + squareID
+		const path = "/api/pool/" + this.pool.token + "/squares/" + squareID
 		const body = JSON.stringify(Object.assign({
 			note: note.value,
 		}, options))
@@ -290,7 +291,7 @@ SqMGR.GridBuilder.prototype.promptAndSubmitSquareData = function(squareID, optio
 }
 
 SqMGR.GridBuilder.prototype.unclaimSquare = function(squareID) {
-	const path = "/api/grid/"+this.grid.token+"/squares/"+squareID
+	const path = "/api/pool/"+this.pool.token+"/squares/"+squareID
 	const body = JSON.stringify({"unclaim": true})
 
 	const success = function() {
@@ -326,7 +327,7 @@ SqMGR.GridBuilder.prototype.claimSquare = function(squareID) {
 			localStorage.setItem(storageKey, input.value)
 		}
 
-		const path = "/api/grid/"+this.grid.token+"/squares/"+squareID
+		const path = "/api/pool/"+this.pool.token+"/squares/"+squareID
 		const body = JSON.stringify({"claimant": input.value})
 
 		const success = function(data) {
@@ -356,7 +357,7 @@ SqMGR.GridBuilder.prototype.get = function(path, callback, errorCallback) {
 SqMGR.GridBuilder.prototype.refreshJWT = function(retryFunc) {
     console.log('refreshing JWT')
 	const xhr = new XMLHttpRequest()
-	xhr.open("GET", "/grid/" + this.grid.token + "/jwt")
+	xhr.open("GET", "/pool/" + this.pool.token + "/jwt")
     xhr.onload = function() {
 		let data = null
 		try {

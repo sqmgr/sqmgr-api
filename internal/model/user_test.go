@@ -49,8 +49,8 @@ func TestJoinGrid(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(ok).Should(gomega.BeFalse())
 
-	g.Expect(u2.JoinGrid(context.Background(), s)).Should(gomega.Succeed())
-	g.Expect(u2.JoinGrid(context.Background(), s)).Should(gomega.Succeed(), "test ON CONFLICT")
+	g.Expect(u2.JoinPool(context.Background(), s)).Should(gomega.Succeed())
+	g.Expect(u2.JoinPool(context.Background(), s)).Should(gomega.Succeed(), "test ON CONFLICT")
 
 	ok, err = u2.IsMemberOf(context.Background(), s)
 	g.Expect(err).Should(gomega.Succeed())

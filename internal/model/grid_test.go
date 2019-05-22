@@ -44,15 +44,20 @@ func TestGrid(t *testing.T) {
 	g.Expect(pool.name).Should(gomega.Equal("My Pool"))
 	g.Expect(pool.gridType).Should(gomega.Equal(GridTypeStd25))
 
+	newGrid, err := pool.NewGrid(context.Background(), "my new grid")
+	g.Expect(err).Should(gomega.Succeed())
+
 	grids, err := pool.Grids(context.Background(), 0, 1000)
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(len(grids)).Should(gomega.Equal(1))
+	g.Expect(len(grids)).Should(gomega.Equal(2))
 
 	grid := grids[0]
 	g.Expect(grid.name).Should(gomega.Equal("My Pool"))
 	g.Expect(grid.poolID).Should(gomega.Equal(pool.id))
 	g.Expect(grid.ord).Should(gomega.Equal(0))
 	g.Expect(grid.eventDate.IsZero()).Should(gomega.BeTrue())
+
+	g.Expect(grids[1].name).Should(gomega.Equal(newGrid.name))
 
 	grid.name = "Different Name"
 	grid.ord = 2
@@ -105,7 +110,7 @@ func TestGrid(t *testing.T) {
 	g.Expect(grid.settings.AwayTeamColor2()).Should(gomega.Equal("green"))
 	g.Expect(grid.settings.Notes()).Should(gomega.Equal("my notes"))
 
-	grid.settings.SetHomeTeamName("")
+	grid.Settings().SetHomeTeamName("")
 	grid.settings.SetHomeTeamColor1("")
 	grid.settings.SetHomeTeamColor2("")
 	grid.settings.SetAwayTeamName("")

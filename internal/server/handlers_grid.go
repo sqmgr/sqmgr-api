@@ -17,18 +17,18 @@ limitations under the License.
 package server
 
 import (
-	"github.com/gorilla/mux"
+	"context"
 	"github.com/weters/sqmgr/internal/model"
 	"github.com/weters/sqmgr/internal/validator"
 	"net/http"
-	"strconv"
 )
 
-func (s *Server) gridHandler() http.HandlerFunc {
+func (s *Server) poolHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("grid.html")
 
 	type data struct {
 		IsAdmin          bool
+		Pool             *model.Pool
 		Grid             *model.Grid
 		GridSquareStates []model.PoolSquareState
 		OpaqueUserID     string
@@ -39,11 +39,15 @@ func (s *Server) gridHandler() http.HandlerFunc {
 		ctx := r.Context()
 		pcd := ctx.Value(ctxKeyPool).(*poolContextData)
 
-		id, _ := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
 		pool := pcd.Pool
-		grid, err := pool.GridByID(r.Context(), id)
+		grid, err := pool.DefaultGrid(r.Context())
 		if err != nil {
-			http.NotFound(w, r)
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		if err := grid.LoadSettings(context.Background()); err != nil {
+			s.Error(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -62,6 +66,7 @@ func (s *Server) gridHandler() http.HandlerFunc {
 
 		s.ExecuteTemplate(w, r, tpl, data{
 			IsAdmin:          pcd.IsAdmin,
+			Pool:             pcd.Pool,
 			Grid:             grid,
 			GridSquareStates: model.PoolSquareStates,
 			OpaqueUserID:     oid,
@@ -70,7 +75,7 @@ func (s *Server) gridHandler() http.HandlerFunc {
 	}
 }
 
-func (s *Server) gridCustomizeHandler() http.HandlerFunc {
+func (s *Server) poolCustomizeHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("grid-customize.html", "form-errors.html")
 
 	const didUpdate = "didUpdate"
@@ -79,6 +84,7 @@ func (s *Server) gridCustomizeHandler() http.HandlerFunc {
 		FormValues        map[string]string
 		FormErrors        validator.Errors
 		Grid              *model.Grid
+		Pool              *model.Pool
 		DidUpdate         bool
 		NotesMaxLength    int
 		NameMaxLength     int
@@ -88,12 +94,10 @@ func (s *Server) gridCustomizeHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		poolCtxData := r.Context().Value(ctxKeyPool).(*poolContextData)
 
-		id, _ := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
 		pool := poolCtxData.Pool
-		grid, err := pool.GridByID(r.Context(), id)
+		grid, err := pool.DefaultGrid(r.Context())
 		if err != nil {
-			http.NotFound(w, r)
-			return
+			s.Error(w, r, http.StatusInternalServerError, err)
 		}
 
 		if err := grid.LoadSettings(r.Context()); err != nil {
@@ -104,6 +108,7 @@ func (s *Server) gridCustomizeHandler() http.HandlerFunc {
 		formValues := make(map[string]string)
 		tplData := data{
 			Grid:              grid,
+			Pool:              pool,
 			FormValues:        formValues,
 			NotesMaxLength:    model.NotesMaxLength,
 			NameMaxLength:     maxNameLen,

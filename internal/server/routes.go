@@ -53,13 +53,10 @@ func (s *Server) setupRoutes() {
 
 	// pools
 	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodGet).Handler(s.poolMemberHandler(true, false, s.poolHandler()))
+	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/customize").Methods(http.MethodGet, http.MethodPost).Handler(s.poolMemberHandler(true, false, s.poolCustomizeHandler()))
 	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/join").Methods(http.MethodGet, http.MethodPost).Handler(s.poolMemberHandler(false, false, s.poolJoinHandler()))
 	// probably only necessary temporarily
 	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/jwt").Methods(http.MethodGet).Handler(s.poolMemberHandler(false, false, s.poolJWTHandler()))
-
-	// grids
-	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/{grid:[0-9]+}").Methods(http.MethodGet).Handler(s.poolMemberHandler(true, false, s.gridHandler()))
-	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/{grid:[0-9]+}/customize").Methods(http.MethodGet, http.MethodPost).Handler(s.poolMemberHandler(true, true, s.gridCustomizeHandler()))
 
 	// signup
 	s.Router.Path("/signup").Methods(http.MethodGet, http.MethodPost).Handler(s.signupHandler())
@@ -75,9 +72,9 @@ func (s *Server) setupRoutes() {
 	s.Router.Path("/info").Methods(http.MethodGet).Handler(s.infoHandler())
 
 	// API stuff
-	s.Router.Path("/api/grid/{token:[A-Za-z0-9_-]{8}}/squares").Methods(http.MethodGet).Handler(s.apiGridJWTHandler(s.apiGridSquaresHandler()))
-	s.Router.Path("/api/grid/{token:[A-Za-z0-9_-]{8}}/logs").Methods(http.MethodGet).Handler(s.apiGridJWTHandler(s.apiGridLogsHandler()))
-	s.Router.Path("/api/grid/{token:[A-Za-z0-9_-]{8}}/squares/{square:[0-9]{1,3}}").Methods(http.MethodGet, http.MethodPost).Handler(s.apiGridJWTHandler(s.apiGridSquaresSquareHandler()))
+	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/squares").Methods(http.MethodGet).Handler(s.apiPoolJWTHandler(s.apiPoolSquaresHandler()))
+	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/logs").Methods(http.MethodGet).Handler(s.apiPoolJWTHandler(s.apiPoolLogsHandler()))
+	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/squares/{square:[0-9]{1,3}}").Methods(http.MethodGet, http.MethodPost).Handler(s.apiPoolJWTHandler(s.apiPoolSquaresSquareHandler()))
 
 	s.Router.NotFoundHandler = s.middleware(s.notFoundHandler())
 }

@@ -25,11 +25,11 @@ import (
 type SessionUser struct {
 	userID   string
 	gridIDs  map[int64]bool
-	joinFunc JoinGrid
+	joinFunc JoinPool
 }
 
 // NewSessionUser returns a new session user
-func NewSessionUser(userID string, ids map[int64]bool, joinFunc JoinGrid) *SessionUser {
+func NewSessionUser(userID string, ids map[int64]bool, joinFunc JoinPool) *SessionUser {
 	if userID == "" {
 		userID = uuid.New().String()
 	}
@@ -47,8 +47,8 @@ func (u *SessionUser) IsMemberOf(ctx context.Context, s *Pool) (bool, error) {
 	return found, nil
 }
 
-// JoinGrid will attempt to join the grid
-func (u *SessionUser) JoinGrid(ctx context.Context, s *Pool) error {
+// JoinPool will attempt to join the grid
+func (u *SessionUser) JoinPool(ctx context.Context, s *Pool) error {
 	return u.joinFunc(ctx, s)
 }
 
@@ -62,5 +62,5 @@ func (u *SessionUser) OpaqueUserID(ctx context.Context) (string, error) {
 	return opaqueID(u.userID)
 }
 
-// JoinGrid is a function which can be called to join grids
-type JoinGrid func(ctx context.Context, s *Pool) error
+// JoinPool is a function which can be called to join grids
+type JoinPool func(ctx context.Context, p *Pool) error

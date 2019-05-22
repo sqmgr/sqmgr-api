@@ -18,6 +18,17 @@ limitations under the License.
 
 {{ define "content" }}
     <section class="pool">
-        <h3>Pool</h3>
+        <h3>{{.Local.Pool.Name}}</h3>
+
+        <table>
+            <tbody>
+            {{ $token := .Local.Pool.Token }}
+            {{ range .Local.Grids }}
+                <tr>
+                    <td><a href="/pool/{{$token}}/grid/{{.ID}}">{{.Name}}</a></td>
+                </tr>
+            {{ end }}
+            </tbody>
+        </table>
     </section>
 {{ end }}

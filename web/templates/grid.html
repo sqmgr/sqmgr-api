@@ -31,7 +31,7 @@ limitations under the License.
     {{ end }}
 
 	{{ if .Local.IsAdmin }}
-		<p class="customize"><a href="/grid/{{.Local.Grid.Token}}/customize">Configuration &amp; Customization</a>
+		<p class="customize"><a href="/pool/{{.Local.Pool.Token}}/customize">Configuration &amp; Customization</a>
 	{{ end }}
 
 	<div id="grid-container"></div>
@@ -41,31 +41,31 @@ limitations under the License.
 			<tbody>
 				<tr>
 					<td>ID
-					<td>{{.Local.Grid.Token}}
+					<td>{{.Local.Pool.Token}}
 				</tr>
 				<tr>
 					<td>Type
-					<td>{{.Local.Grid.GridType.Description}}
+					<td>{{.Local.Pool.GridType.Description}}
 				</tr>
 				<tr>
 					<td>Lock Date
-					{{ if .Local.Grid.Locks.IsZero }}
+					{{ if .Local.Pool.Locks.IsZero }}
                         <td>Not set
 					{{ else }}
-                        <td data-datetime="{{.Local.Grid.Locks.Format "2006-01-02T15:04:05Z0700"}}">
+                        <td data-datetime="{{.Local.Pool.Locks.Format "2006-01-02T15:04:05Z0700"}}">
 					{{ end }}
 				</tr>
 				<tr>
 					<td>Is Locked
-					<td>{{ if .Local.Grid.IsLocked }}Yes{{ else }}No{{ end }}</td>
+					<td>{{ if .Local.Pool.IsLocked }}Yes{{ else }}No{{ end }}</td>
 				</tr>
 				<tr>
 					<td>Created
-					<td data-datetime="{{.Local.Grid.Created.Format "2006-01-02T15:04:05Z0700"}}">{{.Local.Grid.Created.Format "1/2/06, 3:04 PM"}}</td>
+					<td data-datetime="{{.Local.Pool.Created.Format "2006-01-02T15:04:05Z0700"}}">{{.Local.Pool.Created.Format "1/2/06, 3:04 PM"}}</td>
 				</tr>
 				<tr>
 					<td>Last Modified
-					<td data-datetime="{{.Local.Grid.Modified.Format "2006-01-02T15:04:05Z0700"}}">{{.Local.Grid.Modified.Format "1/2/06, 3:04 PM"}}</td>
+					<td data-datetime="{{.Local.Pool.Modified.Format "2006-01-02T15:04:05Z0700"}}">{{.Local.Pool.Modified.Format "1/2/06, 3:04 PM"}}</td>
 				</tr>
 			</tbody>
 		</table>
@@ -160,6 +160,7 @@ limitations under the License.
 function SqMGR() { }
 SqMGR.gridConfig = {
 	grid: {{.Local.Grid}},
+	pool: {{.Local.Pool}},
 	isAdmin: {{.Local.IsAdmin}},
 	opaqueUserID: {{.Local.OpaqueUserID}},
 	gridSquareStates: {{.Local.GridSquareStates}},

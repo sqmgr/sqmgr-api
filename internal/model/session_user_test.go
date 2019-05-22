@@ -30,7 +30,7 @@ func TestSessionUser(t *testing.T) {
 	theGrid := &Pool{}
 	called := false
 
-	joinFn := JoinGrid(func(ctx context.Context, grid *Pool) error {
+	joinFn := JoinPool(func(ctx context.Context, grid *Pool) error {
 		g.Expect(ctx).Should(gomega.Equal(theContext))
 		g.Expect(grid).Should(gomega.Equal(theGrid))
 		called = true
@@ -50,7 +50,7 @@ func TestSessionUser(t *testing.T) {
 
 	g.Expect(u.IsAdminOf(context.Background(), &Pool{id: 1000})).Should(gomega.BeFalse())
 
-	g.Expect(u.JoinGrid(theContext, theGrid)).Should(gomega.Succeed())
+	g.Expect(u.JoinPool(theContext, theGrid)).Should(gomega.Succeed())
 	g.Expect(called).Should(gomega.BeTrue())
 
 	u2 := NewSessionUser("", nil, joinFn)

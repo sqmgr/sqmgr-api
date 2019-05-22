@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"github.com/lib/pq"
 	"math/big"
@@ -41,6 +42,56 @@ type Grid struct {
 	modified    time.Time
 
 	settings *GridSettings
+}
+
+type gridJSON struct {
+	ID          int64         `json:"id"`
+	Name        string        `json:"name"`
+	HomeNumbers []int         `json:"homeNumbers"`
+	AwayNumbers []int         `json:"awayNumbers"`
+	EventDate   time.Time     `json:"eventDate"`
+	Created     time.Time     `json:"created"`
+	Modified    time.Time     `json:"modified"`
+	Settings    *GridSettings `json:"settings"`
+}
+
+// MarshalJSON will marshal the JSON using a custom marshaller
+func (g *Grid) MarshalJSON() ([]byte, error) {
+	return json.Marshal(gridJSON{
+		ID:          g.ID(),
+		Name:        g.Name(),
+		HomeNumbers: g.HomeNumbers(),
+		AwayNumbers: g.AwayNumbers(),
+		EventDate:   g.EventDate(),
+		Created:     g.Created(),
+		Modified:    g.modified,
+		Settings:    g.settings,
+	})
+}
+
+// ID returns the grid ID
+func (g *Grid) ID() int64 {
+	return g.id
+}
+
+// Created returns the created timestamp
+func (g *Grid) Created() time.Time {
+	return g.created
+}
+
+// EventDate returns the date of the event
+func (g *Grid) EventDate() time.Time {
+	return g.eventDate
+}
+
+// AwayNumbers returns the numbers to be used for the away team
+func (g *Grid) AwayNumbers() []int {
+	return g.awayNumbers
+}
+
+// HomeNumbers returns the numbers to be used for the home team
+func (g *Grid) HomeNumbers() []int {
+	return g.homeNumbers
 }
 
 // Save will save the grid. It will also save any dependent objects

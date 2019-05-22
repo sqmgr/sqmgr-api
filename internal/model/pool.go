@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"time"
 	"unicode/utf8"
 
@@ -49,6 +50,10 @@ type Pool struct {
 
 // IsLocked will return true if the locks date is in the past
 func (p *Pool) IsLocked() bool {
+	if p.locks.IsZero() {
+		return false
+	}
+
 	return p.locks.Before(time.Now())
 }
 
@@ -286,10 +291,10 @@ func (p *Pool) SetPassword(password string) error {
 }
 
 // Save will save the pool
-func (p *Pool) Save() error {
+func (p *Pool) Save(ctx context.Context) error {
 	const query = `UPDATE pools SET name = $1, grid_type = $2, password_hash = $3, modified = (NOW() AT TIME ZONE 'utc')  WHERE id = $4`
 
-	_, err := p.model.db.Exec(query, p.name, p.gridType, p.passwordHash, p.id)
+	_, err := p.model.db.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, p.id)
 	return err
 }
 
@@ -422,6 +427,20 @@ func (p *Pool) LogsCount(ctx context.Context) (int64, error) {
 	}
 
 	return count, nil
+}
+
+// DefaultGrid will return the default grid for the pool
+func (p *Pool) DefaultGrid(ctx context.Context) (*Grid, error) {
+	grids, err := p.Grids(ctx, 0, 1)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(grids) != 1 {
+		return nil, fmt.Errorf("expected only 1 grid to be returned for pool %s, but got %d", p.token, len(grids))
+	}
+
+	return grids[0], nil
 }
 
 // Grids returns all grids assigned to the pool

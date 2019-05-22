@@ -100,13 +100,6 @@ func (s *Server) poolMemberHandler(mustBeMember, mustBeAdmin bool, nextHandler h
 	}
 }
 
-func (s *Server) poolHandler() http.HandlerFunc {
-	tpl := s.loadTemplate("pool.html")
-	return func(w http.ResponseWriter, r *http.Request) {
-		s.ExecuteTemplate(w, r, tpl, nil)
-	}
-}
-
 func (s *Server) poolJWT(ctx context.Context, pcd *poolContextData) (string, error) {
 	if !pcd.IsMember {
 		return "", ErrNotMember
@@ -167,7 +160,7 @@ func (s *Server) poolJoinHandler() http.HandlerFunc {
 			password := r.PostFormValue("password")
 			if pool.PasswordIsValid(password) {
 
-				if err := user.JoinGrid(r.Context(), pool); err != nil {
+				if err := user.JoinPool(r.Context(), pool); err != nil {
 					s.Error(w, r, http.StatusInternalServerError, err)
 					return
 				}

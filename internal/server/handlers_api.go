@@ -30,7 +30,7 @@ import (
 	"strings"
 )
 
-func (s *Server) apiGridLogsHandler() http.HandlerFunc {
+func (s *Server) apiPoolLogsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jcd := r.Context().Value(ctxKeyJWT).(*jwtContextData)
 
@@ -56,7 +56,7 @@ func (s *Server) apiGridLogsHandler() http.HandlerFunc {
 	}
 }
 
-func (s *Server) apiGridSquaresHandler() http.HandlerFunc {
+func (s *Server) apiPoolSquaresHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jcd := r.Context().Value(ctxKeyJWT).(*jwtContextData)
 
@@ -73,9 +73,8 @@ func (s *Server) apiGridSquaresHandler() http.HandlerFunc {
 	}
 }
 
-// GET|POST /api/grid/squares/:square
 // may want to refactor since this handler is pretty complex
-func (s *Server) apiGridSquaresSquareHandler() http.HandlerFunc {
+func (s *Server) apiPoolSquaresSquareHandler() http.HandlerFunc {
 	type postPayload struct {
 		Claimant string                `json:"claimant"`
 		State    model.PoolSquareState `json:"state"`
@@ -189,7 +188,7 @@ type jwtContextData struct {
 	Grid  *model.Pool
 }
 
-func (s *Server) apiGridJWTHandler(next http.Handler) http.HandlerFunc {
+func (s *Server) apiPoolJWTHandler(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authzHeader := r.Header.Get("Authorization")
 		if authzHeader == "" {

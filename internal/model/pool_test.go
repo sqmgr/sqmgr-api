@@ -79,6 +79,10 @@ func TestPool(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(pool).ShouldNot(gomega.BeNil())
 
+	grid, err := pool.DefaultGrid(context.Background())
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(grid.Name()).Should(gomega.Equal("My Pool"))
+
 	g.Expect(pool.id).Should(gomega.BeNumerically(">", 0))
 	g.Expect(pool.userID).Should(gomega.Equal(user.ID))
 	g.Expect(pool.token).Should(gomega.MatchRegexp(`^[A-Za-z0-9_-]{8}\z`))
@@ -93,7 +97,7 @@ func TestPool(t *testing.T) {
 	pool.name = "Different Name"
 	pool.gridType = GridTypeStd25
 
-	err = pool.Save()
+	err = pool.Save(context.Background())
 	g.Expect(err).Should(gomega.Succeed())
 
 	pool2, err := m.PoolByID(pool.id)
@@ -103,10 +107,10 @@ func TestPool(t *testing.T) {
 	g.Expect(pool2.name).Should(gomega.Equal("Different Name"))
 	g.Expect(pool2.gridType).Should(gomega.Equal(GridTypeStd25))
 
-	grid3, err := m.PoolByToken(context.Background(), pool2.token)
+	pool3, err := m.PoolByToken(context.Background(), pool2.token)
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(grid3).ShouldNot(gomega.BeNil())
-	g.Expect(grid3).Should(gomega.Equal(pool2))
+	g.Expect(pool3).ShouldNot(gomega.BeNil())
+	g.Expect(pool3).Should(gomega.Equal(pool2))
 }
 
 func TestNewGridInvalidGridType(t *testing.T) {
@@ -129,9 +133,9 @@ func TestGridCollections(t *testing.T) {
 	user, err := m.NewUser(randString()+"@sqmgr.com", "my-unique-password")
 	g.Expect(err).Should(gomega.Succeed())
 
-	grid, err := m.NewPool(context.Background(), user.ID, "Test for Collection", GridTypeStd100, "my-other-unique-password")
+	pool, err := m.NewPool(context.Background(), user.ID, "Test for Collection", GridTypeStd100, "my-other-unique-password")
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(grid).ShouldNot(gomega.BeNil())
+	g.Expect(pool).ShouldNot(gomega.BeNil())
 
 	user2, err := m.NewUser(randString()+"@sqmgr.com", "my-unique-password-2")
 	g.Expect(err).Should(gomega.Succeed())
@@ -144,7 +148,7 @@ func TestGridCollections(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(0))
 
-	g.Expect(user2.JoinGrid(context.Background(), grid)).Should(gomega.Succeed())
+	g.Expect(user2.JoinPool(context.Background(), pool)).Should(gomega.Succeed())
 	collection, err = m.PoolsJoinedByUser(context.Background(), user2, 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(1))
@@ -173,11 +177,11 @@ func TestGridCollectionPagination(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	for i := 0; i < 30; i++ {
-		grid, err := m.NewPool(context.Background(), user1.ID, randString(), GridTypeStd100, "my-other-unique-password")
+		pool, err := m.NewPool(context.Background(), user1.ID, randString(), GridTypeStd100, "my-other-unique-password")
 		g.Expect(err).Should(gomega.Succeed())
 
 		if i < 20 {
-			g.Expect(user2.JoinGrid(context.Background(), grid)).Should(gomega.Succeed())
+			g.Expect(user2.JoinPool(context.Background(), pool)).Should(gomega.Succeed())
 		}
 	}
 
@@ -241,10 +245,10 @@ func TestGridSquares(t *testing.T) {
 	user, err := m.NewUser(randString()+"@sqmgr.com", "password")
 	g.Expect(err).Should(gomega.Succeed())
 
-	grid, err := m.NewPool(context.Background(), user.ID, "Test Pool", GridTypeStd25, "a password")
+	pool, err := m.NewPool(context.Background(), user.ID, "Test Pool", GridTypeStd25, "a password")
 	g.Expect(err).Should(gomega.Succeed())
 
-	squares, err := grid.Squares()
+	squares, err := pool.Squares()
 	g.Expect(err).Should(gomega.Succeed())
 
 	g.Expect(len(squares)).Should(gomega.Equal(25))
@@ -262,8 +266,8 @@ func TestGridSquares(t *testing.T) {
 	})
 	g.Expect(err).Should(gomega.Succeed())
 
-	grid.squares = nil // force a fresh fetch
-	squares, err = grid.Squares()
+	pool.squares = nil // force a fresh fetch
+	squares, err = pool.Squares()
 	g.Expect(err).Should(gomega.Succeed())
 
 	square = squares[15]
@@ -274,7 +278,7 @@ func TestGridSquares(t *testing.T) {
 	})
 	g.Expect(err).Should(gomega.Succeed())
 
-	squares2, err := grid.SquareBySquareID(15)
+	squares2, err := pool.SquareBySquareID(15)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(squares2.ID).Should(gomega.Equal(square.ID))
 
@@ -293,11 +297,11 @@ func TestGridSquares(t *testing.T) {
 	g.Expect(square.Logs[1].userID).Should(gomega.Equal(user.ID))
 	g.Expect(square.Logs[1].Claimant()).Should(gomega.Equal("Test User"))
 
-	logs, err := grid.Logs(context.Background(), 0, 1000)
+	logs, err := pool.Logs(context.Background(), 0, 1000)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(logs)).Should(gomega.BeNumerically(">", 0))
 
-	count, err := grid.LogsCount(context.Background())
+	count, err := pool.LogsCount(context.Background())
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(len(logs))))
 
@@ -306,4 +310,20 @@ func TestGridSquares(t *testing.T) {
 		Note: "",
 	})
 	g.Expect(err).Should(gomega.Equal(ErrSquareAlreadyClaimed))
+}
+
+func TestLocks(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	p := &Pool{}
+	g.Expect(p.IsLocked()).Should(gomega.BeFalse())
+	g.Expect(p.Locks()).Should(gomega.Equal(time.Time{}))
+	then := time.Now().Add(time.Minute)
+	p.SetLocks(then)
+	g.Expect(p.Locks()).Should(gomega.Equal(then))
+	g.Expect(p.IsLocked()).Should(gomega.BeFalse())
+
+	p.SetLocks(time.Now())
+	g.Expect(p.IsLocked()).Should(gomega.BeTrue())
+
 }
