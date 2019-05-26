@@ -14,84 +14,85 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export default class Modal {
+export class Modal {
     constructor(optionalParent) {
-        this.parent = optionalParent // the parent modal (optional)
-        this.node = null
-        this.nestedModal = null
-        this._keyup = this.keyup.bind(this)
+        this.modals = []
     }
 
-    nest() {
-        if (this.nestedModal) {
-            this.nestedModal.close()
-        }
-
-        this.nestedModal = new Modal(this)
-        return this.nestedModal
-    }
-
-    nestedDidClose() {
-        this.nestedModal = null
-    }
-
-    close() {
-        window.removeEventListener('keyup', this._keyup)
-
-        if (this.node) {
-            this.node.dispatchEvent(new Event('modalclose'))
-
-            this.node.remove()
-            this.node = null
-        }
-
-        if (this.parent) {
-            this.parent.nestedDidClose()
-        }
-
-        return false
-    }
-
-    show(childNode) {
-        const node = document.createElement('div')
-        node.classList.add('modal')
+    element(childNode) {
+        const modal = document.createElement('div')
+        modal.classList.add('modal')
 
         const closeLink = document.createElement('a')
         closeLink.setAttribute('href', '#')
         closeLink.classList.add('close')
 
-        const closeText = document.createElement('span')
-        closeText.textContent = 'Close'
+        const closeSpan = document.createElement('span')
+        closeSpan.classList.add('close')
+        closeSpan.textContent = 'Close'
 
         const container = document.createElement('div')
         container.classList.add('container')
 
-        const content = document.createElement('div')
-        content.classList.add('container-content')
+        const containerContent = document.createElement('div')
+        containerContent.classList.add('container-content')
 
-        closeLink.appendChild(closeText)
-        container.appendChild(closeLink)
-        content.appendChild(childNode)
-        container.appendChild(content)
-        node.appendChild(container)
+        closeLink.appendChild(closeSpan)
+        modal.appendChild(closeLink)
 
-        container.onclick = function (event) {
-            event.cancelBubble = true
-        }
+        containerContent.appendChild(childNode)
+        container.appendChild(containerContent)
+        modal.appendChild(container)
 
-        if (this.node) {
+        modal.onclick = e => {
+            e.preventDefault()
             this.close()
         }
 
-        this.node = node
+        closeLink.onclick = e => {
+            e.preventDefault()
+            this.close()
+        }
 
-        this.node.onclick = closeLink.onclick = this.close.bind(this)
+        container.onclick  = e => e.stopPropagation()
 
-        document.body.appendChild(node)
+        return modal
+    }
 
-        window.addEventListener('keyup', this._keyup)
+    show(childNode) {
+        const modal = this.element(childNode)
+        this.modals.push(modal)
+        document.body.appendChild(modal)
 
-        return node
+        if (this.modals.length === 1) {
+            this._keyup = event => {
+                if (event.key === 'Escape') {
+                    event.stopPropagation()
+                    this.close()
+                }
+            }
+
+            window.addEventListener('keyup', this._keyup)
+        }
+    }
+
+    close() {
+        const modal = this.modals.pop()
+        if (this.modals.length === 0) {
+            window.removeEventListener('keyup', this._keyup)
+        }
+
+        if (modal) {
+            modal.remove()
+            return true
+        }
+
+        return false
+    }
+
+    closeAll() {
+        while (this.close())
+            ;
     }
 
     showError(errorMsg) {
@@ -101,16 +102,6 @@ export default class Modal {
 
         this.show(div)
     }
-
-    keyup(event) {
-        if (this.nestedModal) {
-            return
-        }
-
-        if (event.key === 'Escape') {
-            event.stopPropagation()
-            this.close()
-            return
-        }
-    }
 }
+
+export default new Modal()

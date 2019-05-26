@@ -14,6 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+
+import Vue from 'vue'
+import Grid from './components/Grid.vue'
+
+new Vue({
+	render: h => h(Grid)
+}).$mount('#grid-container')
+
+
+
+
+
+
+
+
 import FormatDateTimes from './datetime'
 import Modal from './modal'
 import Loading from './loading'
@@ -423,6 +438,6 @@ SqMGR.GridBuilder.prototype.request = function(method, path, body, callback, err
 }
 
 window.addEventListener('load', () => {
-	FormatDateTimes(document.body)
-	SqMGR.buildSquares()
+	//FormatDateTimes(document.body)
+	//SqMGR.buildSquares()
 })

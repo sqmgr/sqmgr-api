@@ -19,7 +19,7 @@ files=$(
 		\! -path '*/node_modules/*' \
 		\! -path './.git/*' \
 		\! -path './vendor/*' \
-		\( -name '*.go' -o -name '*.js' -o -name '*.css' -o -name '*.html' \) \
+		\( -name '*.go' -o -name '*.js' -o -name '*.css' -o -name '*.html' -o '*.vue' \) \
 		| xargs grep -L 'Apache License'
 	)
 
