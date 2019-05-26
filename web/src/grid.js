@@ -14,6 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import FormatDateTimes from './datetime'
+import Modal from './modal'
+import Loading from './loading'
+
 SqMGR.Config = {
 	Types: {
 		'std100': 100,
@@ -33,7 +37,7 @@ SqMGR.GridBuilder = function(config) {
 	this.opaqueUserID = config.opaqueUserID
     this.gridSquareStates = config.gridSquareStates
 
-	this.modal = new SqMGR.Modal()
+	this.modal = new Modal()
 	this.templates = document.querySelector('section.templates')
 	this.templates.remove()
 
@@ -148,7 +152,7 @@ SqMGR.GridBuilder.prototype.loadLogs = function() {
 			gridMetadata.appendChild(auditLog)
 		}
 
-		SqMGR.DateTime.format(auditLog)
+		FormatDateTimes(auditLog)
 
 		document.querySelector('div.grid-metadata').appendChild(auditLog)
 	}.bind(this))
@@ -231,7 +235,7 @@ SqMGR.GridBuilder.prototype.showSquareDetails = function(squareID) {
 			}
 		}
 
-		SqMGR.DateTime.format(squareDetails)
+		FormatDateTimes(squareDetails)
 
 		this.modal.show(squareDetails).addEventListener('modalclose', function() {
 			this.loadSquares()
@@ -382,7 +386,7 @@ SqMGR.GridBuilder.prototype.request = function(method, path, body, callback, err
 	const xhr = new XMLHttpRequest()
 	xhr.open(method, path)
 	xhr.onloadend = function() {
-		SqMGR.Loading.hide()
+		Loading.hide()
 	}
 	xhr.onload = function() {
 		let data
@@ -414,8 +418,11 @@ SqMGR.GridBuilder.prototype.request = function(method, path, body, callback, err
 	xhr.setRequestHeader("Content-Type", "application/json")
 	xhr.setRequestHeader("Authorization", "Bearer " + this.jwt)
 
-	SqMGR.Loading.show()
+	Loading.show()
 	xhr.send(body)
 }
 
-window.addEventListener('load', SqMGR.buildSquares)
+window.addEventListener('load', () => {
+	FormatDateTimes(document.body)
+	SqMGR.buildSquares()
+})

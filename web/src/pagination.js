@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-window.addEventListener('load', function() {
-	var setupPagination = function(nav) {
-		var parentNode
+export default class Pagination {
+	constructor(nav) {
+		let parentNode
 
 		for (parentNode = nav.parentNode; parentNode.nodeName !== '#document' && !parentNode.getAttribute("data-pagination"); parentNode = parentNode.parentNode)
-			; 
+			;
 
 		if (parentNode.nodeName === '#document') {
 			return
@@ -27,12 +27,12 @@ window.addEventListener('load', function() {
 
 		nav.querySelectorAll('a').forEach(function(link) {
 			link.onclick = function() {
-				var request = new XMLHttpRequest()
+				const request = new XMLHttpRequest()
 				request.open("GET", link.getAttribute("href"))
 				request.onload = function() {
-					var div = document.createElement('div')
+					const div = document.createElement('div')
 					div.innerHTML = request.responseText
-					setupPagination(div.querySelector('nav.pagination'))
+					new Pagination(div.querySelector('nav.pagination'))
 					parentNode.replaceWith(div.firstElementChild)
 				}
 				request.send()
@@ -41,8 +41,5 @@ window.addEventListener('load', function() {
 			}
 		})
 	}
+}
 
-	document.querySelectorAll('nav.pagination').forEach(function(nav) {
-		setupPagination(nav)
-	})
-})

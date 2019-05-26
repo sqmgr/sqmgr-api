@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-window.addEventListener('load', function() {
-	var buffer = 1 // spacing for error message
+export function setupPasswordInput() {
+	const buffer = 1 // spacing for error message
 
 	document.querySelectorAll('input[type="password"]').forEach(function(input) {
-		var id = input.getAttribute('id')
-		var confirmInput, checkPasswordFn, noMatchElem
+		const id = input.getAttribute('id');
+		let confirmInput, checkPasswordFn, noMatchElem
 
 		if (id.indexOf('confirm-') === 0) {
 			// if a confirm- is present, that means that we are expecting user to input
@@ -35,7 +35,6 @@ window.addEventListener('load', function() {
 		}
 
 		checkPasswordFn = function() {
-			var clientRect
 			if (input.value === confirmInput.value) {
 				if (noMatchElem) {
 					noMatchElem.remove()
@@ -52,7 +51,7 @@ window.addEventListener('load', function() {
 				return
 			}
 
-			clientRect = confirmInput.getBoundingClientRect()
+			const clientRect = confirmInput.getBoundingClientRect()
 
 			noMatchElem = document.createElement('div')
 			noMatchElem.textContent = 'The passwords do not match'
@@ -65,10 +64,17 @@ window.addEventListener('load', function() {
 		input.addEventListener('keyup', checkPasswordFn)
 		confirmInput.addEventListener('keyup', checkPasswordFn)
 	})
+}
 
+export function setupTimeInput() {
 	document.querySelectorAll('input[type="time"]').forEach(function(input) {
 		if (input.value === '') {
 			input.value = '00:00'
 		}
 	})
-})
+}
+
+export default function() {
+    setupPasswordInput()
+	setupTimeInput()
+}

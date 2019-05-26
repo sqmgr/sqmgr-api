@@ -117,3 +117,6 @@ testdata:
 wait:
 	sleep 1
 
+.PHONY: web
+web:
+	$(MAKE) -C web npm-install build

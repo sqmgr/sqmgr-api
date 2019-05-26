@@ -1,0 +1,22 @@
+{
+  "name": "sqmgr",
+  "version": "1.0.0",
+  "scripts": {
+    "clean": "rm -rf static/dist",
+    "build": "npm run clean && NODE_ENV=production npx webpack",
+    "watch": "npm run clean && npx webpack --watch"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@babel/core": "^7.4.5",
+    "babel-loader": "^8.0.6",
+    "css-loader": "^2.1.1",
+    "path": "^0.12.7",
+    "mini-css-extract-plugin": "^0.6.0",
+    "webpack": "^4.32.2",
+    "webpack-cli": "^3.3.2",
+    "vue": "^2.6.10",
+    "vue-loader": "^15.7.0",
+    "vue-template-compiler": "^2.6.10"
+  }
+}

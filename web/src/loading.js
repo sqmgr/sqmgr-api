@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-(function() {
-    const loading = function() {
-       this.calls = 0
+class Loading {
+    constructor() {
+        this.calls = 0
 
         const div = document.createElement('div')
         div.classList.add('loading-indicator')
@@ -25,13 +25,13 @@ limitations under the License.
         this.loadingDiv = div
     }
 
-    loading.prototype.show = function() {
+    show() {
         if (this.calls++ === 0) {
             document.body.appendChild(this.loadingDiv)
         }
     }
 
-    loading.prototype.hide = function() {
+    hide() {
         if (this.calls <= 0) {
             throw new Error('hide() called too many times')
         }
@@ -40,6 +40,6 @@ limitations under the License.
             this.loadingDiv.remove()
         }
     }
+}
 
-    SqMGR.Loading = new loading()
-})()
+export default new Loading()

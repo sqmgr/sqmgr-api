@@ -14,21 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-SqMGR.DateTime = {}
-SqMGR.DateTime.format = function(node) {
+export default function FormatDateTimes(node) {
     node.querySelectorAll('*[data-datetime]').forEach(function(node) {
-       const datetimeStr = node.getAttribute("data-datetime")
-       node.removeAttribute("data-datetime")
+        const datetimeStr = node.getAttribute("data-datetime")
+        node.removeAttribute("data-datetime")
 
-       const datetime = new Date(datetimeStr)
-       if (isNaN(datetime.getTime())) {
-           return
-       }
+        const datetime = new Date(datetimeStr)
+        if (isNaN(datetime.getTime())) {
+            return
+        }
 
-       node.textContent = datetime.toLocaleDateString('default', {year: '2-digit', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric'})
+        node.textContent = datetime.toLocaleDateString('default', {year: '2-digit', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric'})
     })
 }
-
-window.addEventListener('load', function() {
-    SqMGR.DateTime.format(document.body)
-})
