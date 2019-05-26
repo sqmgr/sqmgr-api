@@ -22,6 +22,7 @@ const webpack = require('webpack')
 
 module.exports = {
     mode: process.env.NODE_ENV !== 'production' ? 'development' : 'production',
+    devtool: process.env.NODE_ENV !== 'production' ? 'eval-source-map' : 'cheap-source-map',
     entry: {
         'generic-forms': path.resolve(__dirname, 'src', 'generic-forms.js'),
         'account-delete': path.resolve(__dirname, 'src', 'account-delete.js'),
