@@ -38,17 +38,26 @@ limitations under the License.
             squareId: Number,
         },
         data() {
+            let name = null
+            if (window.hasOwnProperty('localStorage')) {
+                name = localStorage.getItem('claimant-name')
+            }
+
             return {
-                name: null
+                name
             }
         },
         mounted() {
-            setTimeout(() => this.$refs.name.focus(), 10)
+            setTimeout(() => this.$refs.name.select(), 25)
         },
         methods: {
             submit() {
                 if (!this.name) {
                     return
+                }
+
+                if (window.hasOwnProperty('localStorage')) {
+                    localStorage.setItem('claimant-name', this.name)
                 }
 
                 api.claimSquare(this.squareId, this.name)
