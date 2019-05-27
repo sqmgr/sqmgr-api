@@ -31,7 +31,7 @@ limitations under the License.
         </div>
 
         <template v-if="isAdmin">
-            <Logs :add-note="false" :logs="logs"/>
+            <Logs :show-add-note="false" :logs="logs"/>
         </template>
     </div>
 </template>

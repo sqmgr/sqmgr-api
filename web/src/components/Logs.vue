@@ -18,8 +18,8 @@ limitations under the License.
     <section class="audit-log">
         <h4>Audit Log</h4>
 
-        <template v-if="addNote">
-            <p class="add-note"><a href="#" class="add-note">Add Note</a></p>
+        <template v-if="showAddNote">
+            <p class="add-note"><a href="#" class="add-note" @click.prevent="addNote">Add Note</a></p>
         </template>
 
         <table>
@@ -48,13 +48,36 @@ limitations under the License.
 </template>
 
 <script>
+    import Note from './Note.vue'
+    import Vue from 'vue'
+    import Modal from '../modal'
+    import api from '../models/api'
     export default {
         name: "Logs",
         props: {
+            squareId: Number,
             logs: Array,
-            addNote: Boolean,
+            showAddNote: Boolean,
         },
         methods: {
+            addNote() {
+                const vm = new (Vue.extend(Note))
+                vm.$on('submit', note => {
+                    if (note) {
+                        api.updateSquare(this.squareId, {note})
+                            .then(() => {
+                                Modal.close()
+                                this.$emit('note-added')
+                            })
+                            .catch(err => Modal.showError(err))
+                        return
+                    }
+
+                    Modal.close()
+                })
+
+                Modal.show(vm.$mount().$el)
+            },
             datetime(dt) {
                 return new Date(dt).toLocaleDateString('default', {year: '2-digit', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric'})
             }

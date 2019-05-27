@@ -56,7 +56,7 @@ limitations under the License.
         </table>
 
         <template v-if="isAdmin">
-            <Logs :logs="square.logs" :add-note="true"></Logs>
+            <Logs @note-added="reloadData" :square-id="this.square.squareID" :logs="square.logs" :show-add-note="true"></Logs>
         </template>
     </div>
 </template>
