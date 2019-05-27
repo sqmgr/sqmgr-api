@@ -92,6 +92,3 @@ limitations under the License.
         }
     }
 </script>
-
-<style>
-</style>

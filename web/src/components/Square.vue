@@ -55,7 +55,3 @@ limitations under the License.
         }
     }
 </script>
-
-<style scoped>
-
-</style>
