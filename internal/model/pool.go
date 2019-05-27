@@ -130,6 +130,7 @@ func (p *Pool) MarshalJSON() ([]byte, error) {
 	return json.Marshal(poolJSON{
 		Token:    p.token,
 		Name:     p.name,
+		Locks:    p.Locks(),
 		GridType: p.gridType,
 		Created:  p.created,
 		Modified: p.modified,

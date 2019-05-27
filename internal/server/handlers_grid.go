@@ -126,8 +126,6 @@ func (s *Server) poolCustomizeHandler() http.HandlerFunc {
 			formValues["AwayTeamColor1"] = r.PostFormValue("away-team-color-1")
 			formValues["AwayTeamColor2"] = r.PostFormValue("away-team-color-2")
 			formValues["Notes"] = r.PostFormValue("notes")
-			formValues["LockDate"] = r.PostFormValue("lock-date")
-			formValues["LockTime"] = r.PostFormValue("lock-time")
 
 			name := v.Printable("Name", r.PostFormValue("name"))
 			name = v.MaxLength("Name", name, maxNameLen)

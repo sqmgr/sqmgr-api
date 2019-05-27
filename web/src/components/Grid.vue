@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-   http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,36 @@ limitations under the License.
 
 <template>
     <div>
+        <template v-if="grid.settings.notes">
+            <div class="notes">{{ grid.settings.notes }}</div>
+        </template>
+
+        <div class="grid-metadata">
+            <table>
+                <tbody>
+                <tr>
+                    <td>ID</td>
+                    <td>{{ pool.token }}</td>
+                </tr>
+                <tr>
+                    <td>Type</td>
+                    <td>{{ pool.gridType }}</td>
+                </tr>
+                <tr>
+                    <td>Lock Date</td>
+                    <td>{{ locksFormatted }}</td>
+                </tr>
+                <tr>
+                    <td>Is Locked</td>
+                    <td>
+                        <template v-if="isLocked">Yes</template>
+                        <template v-else>No</template>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
         <div :class="`squares ${pool.gridType}`">
             <div class="spacer">&nbsp;</div>
 
@@ -62,6 +92,26 @@ limitations under the License.
                 numSquares: Config.Squares[SqMGR.gridConfig.pool.gridType],
                 squares: [],
                 logs: [],
+            }
+        },
+        computed: {
+            locks() {
+                const locks = new Date(this.pool.locks)
+                return locks.getFullYear() > 0 ? locks : null
+            },
+            locksFormatted() {
+                return this.locks ?
+                    this.locks.toLocaleDateString('default', {
+                        year: '2-digit',
+                        month: 'numeric',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: 'numeric'
+                    })
+                    : null
+            },
+            isLocked() {
+                return this.locks && this.locks.getTime() < new Date().getTime()
             }
         },
         beforeMount() {

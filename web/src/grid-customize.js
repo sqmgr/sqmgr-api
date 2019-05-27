@@ -38,21 +38,4 @@ window.addEventListener('load', function() {
 
 	notes.onkeyup = notes.onpaste = checkRemaining
 	checkRemaining.apply(notes)
-
-	document.querySelector('input[name="lock-tz"]').value = new Date().getTimezoneOffset()
-
-	const pad = function(val) {
-		if (val < 10) {
-			return "0" + val
-		}
-
-		return val
-	}
-
-	document.querySelector('a[class="lock-now"]').onclick = function() {
-		const now = new Date()
-	    document.getElementById('lock-date').value = now.getFullYear() + "-" + pad(now.getMonth()+1) + "-" + pad(now.getDate())
-		document.getElementById('lock-time').value = pad(now.getHours()) + ":" + pad(now.getMinutes())
-		return false
-	}
 })
