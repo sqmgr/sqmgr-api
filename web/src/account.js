@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import Pagination from './Pagination'
+import Pagination from './pagination'
 
 window.addEventListener('load', () => new Pagination(document.querySelector('nav.pagination')))
