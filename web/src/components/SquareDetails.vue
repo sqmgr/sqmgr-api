@@ -79,7 +79,7 @@ limitations under the License.
             return {
                 loadedData: null,
                 form: {
-                    state: this.data.state,
+                    state: this.loadedData ? this.loadedData.state : this.data.state,
                 },
                 states: SqMGR.gridConfig.gridSquareStates,
             }
@@ -95,16 +95,16 @@ limitations under the License.
                 return SqMGR.gridConfig.pool.isLocked
             },
             canClaim() {
-                return this.data.state === 'unclaimed' && !this.isLocked
+                return this.square.state === 'unclaimed' && !this.isLocked
             },
             opaqueUserID() {
                 return SqMGR.gridConfig.opaqueUserID
             },
             canUnclaim() {
-                if (this.data.state !== 'claimed') return false
+                if (this.square.state !== 'claimed') return false
                 if (this.isAdmin) return true
                 if (this.isLocked) return false
-                return this.data.opaqueUserID === this.opaqueUserID
+                return this.square.opaqueUserID === this.opaqueUserID
             }
         },
         methods: {
@@ -112,21 +112,21 @@ limitations under the License.
                 const Component = Vue.extend(Claim)
                 const vm = new Component({
                     propsData: {
-                        squareId: this.data.squareID,
+                        squareId: this.square.squareID,
                     }
                 })
 
                 Modal.show(vm.$mount().$el)
             },
             unclaimSquare() {
-                api.unclaimSquare(this.data.squareID)
+                api.unclaimSquare(this.square.squareID)
                     .then(() => Modal.close())
                     .catch(err => Modal.showError(err))
             },
             stateDidChange() {
                 const vm = new (Vue.extend(Note))
                 vm.$on('submit', note => {
-                    api.setSquareState(this.data.squareID, this.form.state, note)
+                    api.setSquareState(this.square.squareID, this.form.state, note)
                         .then(() => {
                             Modal.close()
                             this.reloadData()
