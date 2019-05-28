@@ -98,7 +98,12 @@ export class Modal {
     showError(errorMsg) {
         const div = document.createElement('div')
         div.classList.add('error')
-        div.textContent = errorMsg
+
+        if (errorMsg instanceof Error) {
+            div.textContent = errorMsg.message
+        } else {
+            div.textContent = errorMsg
+        }
 
         this.show(div)
     }

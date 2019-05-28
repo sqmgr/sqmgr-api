@@ -134,10 +134,12 @@ limitations under the License.
                         this.squares = res
                     })
 
-                api.getLogs()
-                    .then(res => {
-                        this.logs = res
-                    })
+                if (this.isAdmin) {
+                    api.getLogs()
+                        .then(res => {
+                            this.logs = res
+                        })
+                }
             }
         }
     }

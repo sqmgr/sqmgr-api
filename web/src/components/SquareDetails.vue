@@ -38,7 +38,7 @@ limitations under the License.
             <tr>
                 <td>State</td>
                 <td class="state">
-                    <template v-if="square.state === 'unclaimed'">
+                    <template v-if="!isAdmin || square.state === 'unclaimed'">
                         {{square.state}}
                     </template>
                     <template v-else>
@@ -131,7 +131,7 @@ limitations under the License.
                             Modal.close()
                             this.reloadData()
                         })
-                        .catch(err => Modal.show(err))
+                        .catch(err => Modal.showError(err.message))
                 })
 
                 Modal.show(vm.$mount().$el)
