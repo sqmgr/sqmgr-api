@@ -148,6 +148,7 @@ func (s *Server) poolCustomizeHandler() http.HandlerFunc {
 		v := validator.New()
 
 		if r.Method == http.MethodPost {
+			formValues["EventDate"] = r.PostFormValue("event-date")
 			formValues["HomeTeamName"] = r.PostFormValue("home-team-name")
 			formValues["HomeTeamColor1"] = r.PostFormValue("home-team-color-1")
 			formValues["HomeTeamColor2"] = r.PostFormValue("home-team-color-2")
@@ -156,6 +157,7 @@ func (s *Server) poolCustomizeHandler() http.HandlerFunc {
 			formValues["AwayTeamColor2"] = r.PostFormValue("away-team-color-2")
 			formValues["Notes"] = r.PostFormValue("notes")
 
+			eventDate := v.Datetime("Event Date", r.PostFormValue("event-date"), "00:00", "0", true)
 			homeTeamName := v.Printable("Home Team Name", r.PostFormValue("home-team-name"), true)
 			homeTeamName = v.MaxLength("Home Team Name", homeTeamName, model.TeamNameMaxLength)
 			homeTeamColor1 := v.Color("Home Team Colors", r.PostFormValue("home-team-color-1"), true)
@@ -168,6 +170,7 @@ func (s *Server) poolCustomizeHandler() http.HandlerFunc {
 			notes = v.MaxLength("Notes", notes, model.NotesMaxLength)
 
 			if v.OK() {
+				grid.SetEventDate(eventDate)
 				grid.SetHomeTeamName(homeTeamName)
 				grid.SetAwayTeamName(awayTeamName)
 				settings := grid.Settings()
@@ -193,6 +196,10 @@ func (s *Server) poolCustomizeHandler() http.HandlerFunc {
 			tplData.FormErrors = v.Errors
 		} else {
 			settings := grid.Settings()
+			if !grid.EventDate().IsZero() {
+				formValues["EventDate"] = grid.EventDate().Format("2006-01-02")
+			}
+
 			formValues["HomeTeamName"] = grid.HomeTeamName()
 			formValues["AwayTeamName"] = grid.AwayTeamName()
 			formValues["HomeTeamColor1"] = settings.HomeTeamColor1()

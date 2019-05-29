@@ -36,6 +36,11 @@ limitations under the License.
 			<legend>General Settings</legend>
 
 			<div class="field">
+				<label for="event-date">Event Date</label>
+                <input type="date" id="event-date" name="event-date" value="{{.Local.FormValues.EventDate}}">
+			</div>
+
+			<div class="field">
 				<label for="notes" class="optional">Notes</label>
 				<textarea id="notes" maxlength="{{.Local.NotesMaxLength}}" name="notes" placeholder="Notes">{{.Local.FormValues.Notes}}</textarea>
 			</div>

@@ -52,6 +52,8 @@ limitations under the License.
     import Vue from 'vue'
     import Modal from '../modal'
     import api from '../models/api'
+    import Common from '../common'
+
     export default {
         name: "Logs",
         props: {
@@ -79,7 +81,7 @@ limitations under the License.
                 Modal.show(vm.$mount().$el)
             },
             datetime(dt) {
-                return new Date(dt).toLocaleDateString('default', {year: '2-digit', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric'})
+                return new Date(dt).toLocaleDateString('default', Common.DateTimeOptions)
             }
         }
     }

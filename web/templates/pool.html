@@ -34,7 +34,8 @@ limitations under the License.
                 <tr>
                     <td>{{Add $i 1}}</td>
                     <td><a href="/pool/{{$token}}/game/{{$grid.ID}}">{{$grid.Name}}</a></td>
-                    <td data-datetime="{{$grid.EventDate}}">{{$grid.EventDate}}</td>
+                    <!-- TODO  - rewrite in Vue -->
+                    <td>{{$grid.EventDate.Format "January 2, 2006"}}</td>
                 </tr>
             {{ end }}
             </tbody>

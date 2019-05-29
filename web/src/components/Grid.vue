@@ -28,6 +28,10 @@ limitations under the License.
                     <td>{{ pool.token }}</td>
                 </tr>
                 <tr>
+                    <td>Event Date</td>
+                    <td>{{ eventDate }}</td>
+                </tr>
+                <tr>
                     <td>Type</td>
                     <td>{{ pool.gridType }}</td>
                 </tr>
@@ -71,6 +75,7 @@ limitations under the License.
     import Logs from './Logs.vue'
     import api from '../models/api.js'
     import EventBus from '../models/EventBus'
+    import Common from '../common'
 
     api.token = SqMGR.gridConfig.pool.token
 
@@ -95,20 +100,15 @@ limitations under the License.
             }
         },
         computed: {
+            eventDate() {
+                return Common.NewDateWithoutTimezone(this.grid.eventDate).toLocaleDateString("default", Common.DateOptions)
+            },
             locks() {
                 const locks = new Date(this.pool.locks)
                 return locks.getFullYear() > 0 ? locks : null
             },
             locksFormatted() {
-                return this.locks ?
-                    this.locks.toLocaleDateString('default', {
-                        year: '2-digit',
-                        month: 'numeric',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: 'numeric'
-                    })
-                    : null
+                return this.locks ? this.locks.toLocaleDateString('default', Common.DateTimeOptions) : null
             },
             isLocked() {
                 return this.locks && this.locks.getTime() < new Date().getTime()

@@ -83,6 +83,11 @@ func (g *Grid) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// SetEventDate is a setter for the event date
+func (g *Grid) SetEventDate(eventDate time.Time) {
+	g.eventDate = eventDate
+}
+
 // AwayTeamName is a getter for the away team name
 func (g *Grid) AwayTeamName() string {
 	if g.awayTeamName == nil {
@@ -184,7 +189,7 @@ func (g *Grid) Save(ctx context.Context) error {
 	}
 
 	var eventDate *time.Time
-	if g.eventDate.IsZero() {
+	if !g.eventDate.IsZero() {
 		eventDate = &g.eventDate
 	}
 
@@ -298,7 +303,7 @@ func (m *Model) gridByRow(scan scanFunc) (*Grid, error) {
 	}
 
 	if eventDate != nil {
-		grid.eventDate = eventDate.In(locationNewYork)
+		grid.eventDate = *eventDate
 	}
 
 	grid.modified = grid.modified.In(locationNewYork)
