@@ -21,9 +21,32 @@ import (
 	"github.com/onsi/gomega"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestGridName(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	grid := &Grid{}
+
+	g.Expect(grid.Name()).Should(gomega.Equal("Away Team vs. Home Team"))
+	grid.SetAwayTeamName("Foo")
+	g.Expect(grid.Name()).Should(gomega.Equal("Foo vs. Home Team"))
+	grid.SetHomeTeamName("Bar")
+	g.Expect(grid.Name()).Should(gomega.Equal("Foo vs. Bar"))
+	grid.SetAwayTeamName("")
+	g.Expect(grid.Name()).Should(gomega.Equal("Away Team vs. Bar"))
+	grid.SetHomeTeamName("")
+	g.Expect(grid.Name()).Should(gomega.Equal("Away Team vs. Home Team"))
+
+	grid.SetHomeTeamName(strings.Repeat("á", 50) + "é")
+	g.Expect(grid.HomeTeamName()).Should(gomega.Equal(strings.Repeat("á", 50)))
+
+	grid.SetAwayTeamName(strings.Repeat("í", 50) + "é")
+	g.Expect(grid.AwayTeamName()).Should(gomega.Equal(strings.Repeat("í", 50)))
+}
 
 func TestGrid(t *testing.T) {
 	if len(os.Getenv("INTEGRATION")) == 0 {
@@ -44,7 +67,7 @@ func TestGrid(t *testing.T) {
 	g.Expect(pool.name).Should(gomega.Equal("My Pool"))
 	g.Expect(pool.gridType).Should(gomega.Equal(GridTypeStd25))
 
-	newGrid, err := pool.NewGrid(context.Background(), "my new grid")
+	newGrid, err := pool.NewGrid(context.Background())
 	g.Expect(err).Should(gomega.Succeed())
 
 	grids, err := pool.Grids(context.Background(), 0, 1000)
@@ -52,14 +75,12 @@ func TestGrid(t *testing.T) {
 	g.Expect(len(grids)).Should(gomega.Equal(2))
 
 	grid := grids[0]
-	g.Expect(grid.name).Should(gomega.Equal("My Pool"))
 	g.Expect(grid.poolID).Should(gomega.Equal(pool.id))
 	g.Expect(grid.ord).Should(gomega.Equal(0))
 	g.Expect(grid.eventDate.IsZero()).Should(gomega.BeTrue())
 
-	g.Expect(grids[1].name).Should(gomega.Equal(newGrid.name))
+	g.Expect(grids[1].id).Should(gomega.Equal(newGrid.id))
 
-	grid.name = "Different Name"
 	grid.ord = 2
 	grid.homeNumbers = []int{1, 2, 3}
 	grid.awayNumbers = []int{4, 5, 6}
@@ -69,7 +90,6 @@ func TestGrid(t *testing.T) {
 
 	grid, err = pool.GridByID(context.Background(), grid.id)
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(grid.name).Should(gomega.Equal("Different Name"))
 	g.Expect(grid.ord).Should(gomega.Equal(2))
 	g.Expect(grid.homeNumbers).Should(gomega.Equal([]int{1, 2, 3}))
 	g.Expect(grid.awayNumbers).Should(gomega.Equal([]int{4, 5, 6}))
@@ -91,10 +111,8 @@ func TestGrid(t *testing.T) {
 	g.Expect(grid.LoadSettings(context.Background())).Should(gomega.Succeed())
 	g.Expect(grid.settings).ShouldNot(gomega.BeNil())
 
-	grid.settings.SetHomeTeamName("my home team")
 	grid.settings.SetHomeTeamColor1("red")
 	grid.settings.SetHomeTeamColor2("white")
-	grid.settings.SetAwayTeamName("my away team")
 	grid.settings.SetAwayTeamColor1("yellow")
 	grid.settings.SetAwayTeamColor2("green")
 	grid.settings.SetNotes("my notes")
@@ -102,18 +120,14 @@ func TestGrid(t *testing.T) {
 
 	grid.settings = nil
 	g.Expect(grid.LoadSettings(context.Background())).Should(gomega.Succeed())
-	g.Expect(grid.settings.HomeTeamName()).Should(gomega.Equal("my home team"))
 	g.Expect(grid.settings.HomeTeamColor1()).Should(gomega.Equal("red"))
 	g.Expect(grid.settings.HomeTeamColor2()).Should(gomega.Equal("white"))
-	g.Expect(grid.settings.AwayTeamName()).Should(gomega.Equal("my away team"))
 	g.Expect(grid.settings.AwayTeamColor1()).Should(gomega.Equal("yellow"))
 	g.Expect(grid.settings.AwayTeamColor2()).Should(gomega.Equal("green"))
 	g.Expect(grid.settings.Notes()).Should(gomega.Equal("my notes"))
 
-	grid.Settings().SetHomeTeamName("")
 	grid.settings.SetHomeTeamColor1("")
 	grid.settings.SetHomeTeamColor2("")
-	grid.settings.SetAwayTeamName("")
 	grid.settings.SetAwayTeamColor1("")
 	grid.settings.SetAwayTeamColor2("")
 	grid.settings.SetNotes("")
@@ -121,10 +135,8 @@ func TestGrid(t *testing.T) {
 
 	grid.settings = nil
 	g.Expect(grid.LoadSettings(context.Background())).Should(gomega.Succeed())
-	g.Expect(grid.settings.HomeTeamName()).Should(gomega.Equal(DefaultHomeTeamName))
 	g.Expect(grid.settings.HomeTeamColor1()).Should(gomega.Equal(DefaultHomeTeamColor1))
 	g.Expect(grid.settings.HomeTeamColor2()).Should(gomega.Equal(DefaultHomeTeamColor2))
-	g.Expect(grid.settings.AwayTeamName()).Should(gomega.Equal(DefaultAwayTeamName))
 	g.Expect(grid.settings.AwayTeamColor1()).Should(gomega.Equal(DefaultAwayTeamColor1))
 	g.Expect(grid.settings.AwayTeamColor2()).Should(gomega.Equal(DefaultAwayTeamColor2))
 	g.Expect(grid.settings.Notes()).Should(gomega.Equal(""))

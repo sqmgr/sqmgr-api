@@ -108,14 +108,14 @@ func main() {
 		}
 
 		homeTeam := words.Create(2, " ")
-		grid.Settings().SetHomeTeamName(homeTeam)
+		grid.SetHomeTeamName(homeTeam)
 		grid.Settings().SetHomeTeamColor1(color())
 		grid.Settings().SetHomeTeamColor2(color())
 		awayTeam := words.Create(2, " ")
-		grid.Settings().SetAwayTeamName(awayTeam)
+		grid.SetAwayTeamName(awayTeam)
 		grid.Settings().SetAwayTeamColor1(color())
 		grid.Settings().SetAwayTeamColor2(color())
-		if err := pool.Save(context.Background()); err != nil {
+		if err := grid.Save(context.Background()); err != nil {
 			panic(err)
 		}
 

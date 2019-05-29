@@ -81,7 +81,7 @@ func TestPool(t *testing.T) {
 
 	grid, err := pool.DefaultGrid(context.Background())
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(grid.Name()).Should(gomega.Equal("My Pool"))
+	g.Expect(grid.Name()).Should(gomega.Equal("Away Team vs. Home Team"))
 
 	g.Expect(pool.id).Should(gomega.BeNumerically(">", 0))
 	g.Expect(pool.userID).Should(gomega.Equal(user.ID))

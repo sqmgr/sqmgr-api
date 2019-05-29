@@ -18,12 +18,43 @@ package server
 
 import (
 	"context"
+	"github.com/gorilla/mux"
 	"github.com/weters/sqmgr/internal/model"
 	"github.com/weters/sqmgr/internal/validator"
 	"net/http"
+	"strconv"
 )
 
 func (s *Server) poolHandler() http.HandlerFunc {
+	type data struct {
+		Pool    *model.Pool
+		Grids   []*model.Grid
+		IsAdmin bool
+		User    model.EffectiveUser
+	}
+
+	tpl := s.loadTemplate("pool.html")
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		pcd := ctx.Value(ctxKeyPool).(*poolContextData)
+
+		grids, err := pcd.Pool.Grids(ctx, 0, 100) // TODO
+		if err != nil {
+			s.Error(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		s.ExecuteTemplate(w, r, tpl, data{
+			Pool:    pcd.Pool,
+			Grids:   grids,
+			IsAdmin: pcd.IsAdmin,
+			User:    pcd.EffectiveUser,
+		})
+	}
+}
+
+func (s *Server) poolGridHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("grid.html")
 
 	type data struct {
@@ -40,9 +71,10 @@ func (s *Server) poolHandler() http.HandlerFunc {
 		pcd := ctx.Value(ctxKeyPool).(*poolContextData)
 
 		pool := pcd.Pool
-		grid, err := pool.DefaultGrid(r.Context())
+		gridID, _ := strconv.ParseInt(mux.Vars(r)["grid"], 10, 64)
+		grid, err := pool.GridByID(ctx, gridID)
 		if err != nil {
-			s.Error(w, r, http.StatusInternalServerError, err)
+			s.NoRowsOrError(w, r, err)
 			return
 		}
 
@@ -87,7 +119,6 @@ func (s *Server) poolCustomizeHandler() http.HandlerFunc {
 		Pool              *model.Pool
 		DidUpdate         bool
 		NotesMaxLength    int
-		NameMaxLength     int
 		TeamNameMaxLength int
 	}
 
@@ -111,14 +142,12 @@ func (s *Server) poolCustomizeHandler() http.HandlerFunc {
 			Pool:              pool,
 			FormValues:        formValues,
 			NotesMaxLength:    model.NotesMaxLength,
-			NameMaxLength:     maxNameLen,
 			TeamNameMaxLength: model.TeamNameMaxLength,
 		}
 
 		v := validator.New()
 
 		if r.Method == http.MethodPost {
-			formValues["Name"] = r.PostFormValue("name")
 			formValues["HomeTeamName"] = r.PostFormValue("home-team-name")
 			formValues["HomeTeamColor1"] = r.PostFormValue("home-team-color-1")
 			formValues["HomeTeamColor2"] = r.PostFormValue("home-team-color-2")
@@ -127,8 +156,6 @@ func (s *Server) poolCustomizeHandler() http.HandlerFunc {
 			formValues["AwayTeamColor2"] = r.PostFormValue("away-team-color-2")
 			formValues["Notes"] = r.PostFormValue("notes")
 
-			name := v.Printable("Name", r.PostFormValue("name"))
-			name = v.MaxLength("Name", name, maxNameLen)
 			homeTeamName := v.Printable("Home Team Name", r.PostFormValue("home-team-name"), true)
 			homeTeamName = v.MaxLength("Home Team Name", homeTeamName, model.TeamNameMaxLength)
 			homeTeamColor1 := v.Color("Home Team Colors", r.PostFormValue("home-team-color-1"), true)
@@ -141,12 +168,11 @@ func (s *Server) poolCustomizeHandler() http.HandlerFunc {
 			notes = v.MaxLength("Notes", notes, model.NotesMaxLength)
 
 			if v.OK() {
-				grid.SetName(name)
+				grid.SetHomeTeamName(homeTeamName)
+				grid.SetAwayTeamName(awayTeamName)
 				settings := grid.Settings()
-				settings.SetHomeTeamName(homeTeamName)
 				settings.SetHomeTeamColor1(homeTeamColor1)
 				settings.SetHomeTeamColor2(homeTeamColor2)
-				settings.SetAwayTeamName(awayTeamName)
 				settings.SetAwayTeamColor1(awayTeamColor1)
 				settings.SetAwayTeamColor2(awayTeamColor2)
 				settings.SetNotes(notes)
@@ -167,11 +193,10 @@ func (s *Server) poolCustomizeHandler() http.HandlerFunc {
 			tplData.FormErrors = v.Errors
 		} else {
 			settings := grid.Settings()
-			formValues["Name"] = grid.Name()
-			formValues["HomeTeamName"] = settings.HomeTeamName()
+			formValues["HomeTeamName"] = grid.HomeTeamName()
+			formValues["AwayTeamName"] = grid.AwayTeamName()
 			formValues["HomeTeamColor1"] = settings.HomeTeamColor1()
 			formValues["HomeTeamColor2"] = settings.HomeTeamColor2()
-			formValues["AwayTeamName"] = settings.AwayTeamName()
 			formValues["AwayTeamColor1"] = settings.AwayTeamColor1()
 			formValues["AwayTeamColor2"] = settings.AwayTeamColor2()
 			formValues["Notes"] = settings.Notes()

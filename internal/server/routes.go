@@ -53,6 +53,7 @@ func (s *Server) setupRoutes() {
 
 	// pools
 	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodGet).Handler(s.poolMemberHandler(true, false, s.poolHandler()))
+	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/game/{grid:[0-9]+}").Methods(http.MethodGet).Handler(s.poolMemberHandler(true, false, s.poolGridHandler()))
 	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/customize").Methods(http.MethodGet, http.MethodPost).Handler(s.poolMemberHandler(true, false, s.poolCustomizeHandler()))
 	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/join").Methods(http.MethodGet, http.MethodPost).Handler(s.poolMemberHandler(false, false, s.poolJoinHandler()))
 	// probably only necessary temporarily

@@ -64,6 +64,9 @@ var store *sessions.CookieStore
 
 var funcMap = template.FuncMap{
 	"Version": version,
+	"Add": func(i, j int) int {
+		return i + j
+	},
 }
 
 func init() {
@@ -184,6 +187,16 @@ func reload(t *template.Template, name string) *template.Template {
 
 	logrus.Debugf("reloaded templates %s", strings.Join(whatReloaded, ", "))
 	return newTemplate.Lookup("base.html")
+}
+
+// NoRowsOrError will serve a 404 if the err is a sql.ErrNoRows. If it isn't, it will send out a 500.
+func (s *Server) NoRowsOrError(w http.ResponseWriter, r *http.Request, err error) {
+	if err == sql.ErrNoRows {
+		s.Error(w, r, http.StatusNotFound)
+		return
+	}
+
+	s.Error(w, r, http.StatusInternalServerError, err)
 }
 
 // Error will serve a custom error page. err is a varargs and if supplied, will log the error.

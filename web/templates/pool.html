@@ -21,11 +21,20 @@ limitations under the License.
         <h3>{{.Local.Pool.Name}}</h3>
 
         <table>
+            <thead>
+            <tr>
+                <th>#</th>
+                <th>Game</th>
+                <th>Event Date</th>
+            </tr>
+            </thead>
             <tbody>
             {{ $token := .Local.Pool.Token }}
-            {{ range .Local.Grids }}
+            {{ range $i, $grid := .Local.Grids }}
                 <tr>
-                    <td><a href="/pool/{{$token}}/grid/{{.ID}}">{{.Name}}</a></td>
+                    <td>{{Add $i 1}}</td>
+                    <td><a href="/pool/{{$token}}/game/{{$grid.ID}}">{{$grid.Name}}</a></td>
+                    <td data-datetime="{{$grid.EventDate}}">{{$grid.EventDate}}</td>
                 </tr>
             {{ end }}
             </tbody>

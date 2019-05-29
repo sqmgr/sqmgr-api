@@ -49,10 +49,10 @@ limitations under the License.
         <div :class="`squares ${pool.gridType}`">
             <div class="spacer">&nbsp;</div>
 
-            <div class="team home-team" ref="home-team"><span>{{ grid.settings.homeTeamName }}</span></div>
+            <div class="team home-team" ref="home-team"><span>{{ grid.homeTeamName }}</span></div>
             <div v-for="n in 10" :class="`score home-score home-score-${n-1}`"></div>
 
-            <div class="team away-team" ref="away-team"><span>{{ grid.settings.awayTeamName }}</span></div>
+            <div class="team away-team" ref="away-team"><span>{{ grid.awayTeamName }}</span></div>
             <div v-for="n in 10" :class="`score away-score away-score-${n-1}`"></div>
 
             <template v-for="n in numSquares">

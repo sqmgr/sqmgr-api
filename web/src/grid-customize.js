@@ -15,11 +15,11 @@ limitations under the License.
 */
 
 window.addEventListener('load', function() {
-	var buffer = 100
-	var notes = document.getElementById('notes')
-	var remainingEl = null
-	var checkRemaining = function() {
-		var remainder = SqMGR.NotesMaxLength - this.value.length
+	const buffer = 100
+	const notes = document.getElementById('notes')
+	let remainingEl = null
+	const checkRemaining = function() {
+		const remainder = SqMGR.NotesMaxLength - this.value.length
 		if (remainder <= buffer) {
 			if (!remainingEl) {
 				remainingEl = document.createElement('div')
@@ -38,4 +38,12 @@ window.addEventListener('load', function() {
 
 	notes.onkeyup = notes.onpaste = checkRemaining
 	checkRemaining.apply(notes)
+
+	const homeTeamName = document.getElementById('home-team-name')
+	const awayTeamName = document.getElementById('away-team-name')
+    const gridName = document.getElementById('grid-name')
+    homeTeamName.oninput = awayTeamName.oninput = () => {
+	    gridName.textContent = awayTeamName.value + ' vs. ' + homeTeamName.value
+	}
+	homeTeamName.oninput(null)
 })

@@ -53,8 +53,9 @@ CREATE TABLE grids (
     id bigserial not null primary key,
     pool_id bigint not null references pools (id),
     ord int not null default 0,
-    name text not null,
+    home_team_name text null,
     home_numbers text[],
+    away_team_name text null,
     away_numbers text[],
     event_date timestamp,
     created timestamp not null default (now() at time zone 'utc'),
@@ -65,11 +66,9 @@ CREATE INDEX grids_pool_id_ord_idx ON grids(pool_id, ord);
 
 CREATE TABLE grid_settings (
     grid_id bigint not null primary key references grids (id),
-    home_team_name text,
     home_team_color_1 text,
     home_team_color_2 text,
     home_team_color_3 text,
-    away_team_name text,
     away_team_color_1 text,
     away_team_color_2 text,
     away_team_color_3 text,
@@ -231,14 +230,14 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION new_grid(_pool_id bigint, _name text) RETURNS grids
+CREATE FUNCTION new_grid(_pool_id bigint) RETURNS grids
     LANGUAGE plpgsql
     AS $$
     declare
         _row grids;
     begin
-        INSERT INTO grids (pool_id, name)
-        VALUES (_pool_id, _name)
+        INSERT INTO grids (pool_id)
+        VALUES (_pool_id)
         RETURNING * INTO _row;
 
         INSERT INTO grid_settings (grid_id)
@@ -269,14 +268,14 @@ BEGIN
         _counter := _counter + 1;
     END LOOP;
 
-    PERFORM new_grid(_row.id, _name);
+    PERFORM new_grid(_row.id);
 
     RETURN _row;
 END;
 $$;
 
 --rollback DROP FUNCTION new_pool(text, bigint, text, text, text, int);
---rollback DROP FUNCTION new_grid(bigint, text);
+--rollback DROP FUNCTION new_grid(bigint);
 --rollback DROP FUNCTION update_pool_square(bigint, square_states, text, bigint, text, text, text, boolean);
 --rollback DROP FUNCTION new_user(text, text);
 --rollback DROP FUNCTION set_user_confirmation(bigint, text);

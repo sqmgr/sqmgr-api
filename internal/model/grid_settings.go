@@ -26,17 +26,12 @@ import (
 const (
 	// NotesMaxLength is the maximum number of characters the notes can be
 	NotesMaxLength = 500
-
-	// TeamNameMaxLength is the maximum length of the team names
-	TeamNameMaxLength = 50
 )
 
 // constants for default colors
 const (
-	DefaultHomeTeamName   = "Home Team"
 	DefaultHomeTeamColor1 = "#00338d"
 	DefaultHomeTeamColor2 = "#c60c30"
-	DefaultAwayTeamName   = "Away Team"
 	DefaultAwayTeamColor1 = "#f3d03e"
 	DefaultAwayTeamColor2 = "#003087"
 )
@@ -45,10 +40,8 @@ const (
 // This object uses getters and setters to help guard against user input.
 type GridSettings struct {
 	gridID         int64
-	homeTeamName   *string
 	homeTeamColor1 *string
 	homeTeamColor2 *string
-	awayTeamName   *string
 	awayTeamColor1 *string
 	awayTeamColor2 *string
 	notes          *string
@@ -57,10 +50,8 @@ type GridSettings struct {
 
 // gridSettingsJSON is used for custom serialization
 type gridSettingsJSON struct {
-	HomeTeamName   string `json:"homeTeamName"`
 	HomeTeamColor1 string `json:"homeTeamColor1"`
 	HomeTeamColor2 string `json:"homeTeamColor2"`
-	AwayTeamName   string `json:"awayTeamName"`
 	AwayTeamColor1 string `json:"awayTeamColor1"`
 	AwayTeamColor2 string `json:"awayTeamColor2"`
 	Notes          string `json:"notes"`
@@ -69,10 +60,8 @@ type gridSettingsJSON struct {
 // MarshalJSON adds custom JSON marshalling support
 func (g GridSettings) MarshalJSON() ([]byte, error) {
 	return json.Marshal(gridSettingsJSON{
-		HomeTeamName:   g.HomeTeamName(),
 		HomeTeamColor1: g.HomeTeamColor1(),
 		HomeTeamColor2: g.HomeTeamColor2(),
-		AwayTeamName:   g.AwayTeamName(),
 		AwayTeamColor1: g.AwayTeamColor1(),
 		AwayTeamColor2: g.AwayTeamColor2(),
 		Notes:          g.Notes(),
@@ -83,20 +72,16 @@ func (g GridSettings) MarshalJSON() ([]byte, error) {
 func (g *GridSettings) Save(ctx context.Context, q executer) error {
 	_, err := q.ExecContext(ctx, `
 		UPDATE grid_settings SET
-			home_team_name = $1,
-			home_team_color_1 = $2,
-			home_team_color_2 = $3,
-			away_team_name = $4,
-			away_team_color_1 = $5,
-			away_team_color_2 = $6,
-			notes = $7,
+			home_team_color_1 = $1,
+			home_team_color_2 = $2,
+			away_team_color_1 = $3,
+			away_team_color_2 = $4,
+			notes = $5,
 			modified = (NOW() AT TIME ZONE 'utc')
-		WHERE grid_id = $8
+		WHERE grid_id = $6
 	`,
-		g.homeTeamName,
 		g.homeTeamColor1,
 		g.homeTeamColor2,
-		g.awayTeamName,
 		g.awayTeamColor1,
 		g.awayTeamColor2,
 		g.notes,
@@ -131,20 +116,6 @@ func (g *GridSettings) Notes() string {
 	return *g.notes
 }
 
-// SetHomeTeamName is a setter for the home team name
-func (g *GridSettings) SetHomeTeamName(name string) {
-	if name == "" {
-		g.homeTeamName = nil
-		return
-	}
-
-	if utf8.RuneCountInString(name) > TeamNameMaxLength {
-		name = string([]rune(name)[0:TeamNameMaxLength])
-	}
-
-	g.homeTeamName = &name
-}
-
 // SetHomeTeamColor1 is a setter for the home team primary color
 func (g *GridSettings) SetHomeTeamColor1(color string) {
 	if color == "" {
@@ -163,20 +134,6 @@ func (g *GridSettings) SetHomeTeamColor2(color string) {
 	}
 
 	g.homeTeamColor2 = &color
-}
-
-// SetAwayTeamName is a setter for the home team name
-func (g *GridSettings) SetAwayTeamName(name string) {
-	if name == "" {
-		g.awayTeamName = nil
-		return
-	}
-
-	if utf8.RuneCountInString(name) > TeamNameMaxLength {
-		name = string([]rune(name)[0:TeamNameMaxLength])
-	}
-
-	g.awayTeamName = &name
 }
 
 // SetAwayTeamColor1 is a setter for the away team primary color
@@ -199,15 +156,6 @@ func (g *GridSettings) SetAwayTeamColor2(color string) {
 	g.awayTeamColor2 = &color
 }
 
-// HomeTeamName is a getter for the home team name
-func (g *GridSettings) HomeTeamName() string {
-	if g.homeTeamName == nil {
-		return DefaultHomeTeamName
-	}
-
-	return *g.homeTeamName
-}
-
 // HomeTeamColor1 is a getter for the home team primary color
 func (g *GridSettings) HomeTeamColor1() string {
 	if g.homeTeamColor1 == nil {
@@ -224,15 +172,6 @@ func (g *GridSettings) HomeTeamColor2() string {
 	}
 
 	return *g.homeTeamColor2
-}
-
-// AwayTeamName is a getter for the home team name
-func (g *GridSettings) AwayTeamName() string {
-	if g.awayTeamName == nil {
-		return DefaultAwayTeamName
-	}
-
-	return *g.awayTeamName
 }
 
 // AwayTeamColor1 is a getter for the away team primary color

@@ -475,9 +475,9 @@ LIMIT $3
 }
 
 // NewGrid will create a new grid for the pool with some default settings
-func (p *Pool) NewGrid(ctx context.Context, name string) (*Grid, error) {
-	const query = `SELECT * FROM new_grid($1, $2)`
-	row := p.model.db.QueryRowContext(ctx, query, p.id, name)
+func (p *Pool) NewGrid(ctx context.Context) (*Grid, error) {
+	const query = `SELECT * FROM new_grid($1)`
+	row := p.model.db.QueryRowContext(ctx, query, p.id)
 	return p.model.gridByRow(row.Scan)
 }
 

@@ -25,48 +25,108 @@ import (
 	"github.com/lib/pq"
 	"math/big"
 	"time"
+	"unicode/utf8"
+)
+
+// TeamNameMaxLength is the maximum length of the team names
+const TeamNameMaxLength = 50
+
+const (
+	defaultHomeTeamName = "Home Team"
+	defaultAwayTeamName = "Away Team"
 )
 
 // Grid represents a single grid from a pool. A pool may contain more than one grid.
 type Grid struct {
 	model *Model
 
-	id          int64
-	poolID      int64
-	ord         int
-	name        string
-	homeNumbers []int
-	awayNumbers []int
-	eventDate   time.Time
-	created     time.Time
-	modified    time.Time
+	id           int64
+	poolID       int64
+	ord          int
+	homeTeamName *string
+	homeNumbers  []int
+	awayTeamName *string
+	awayNumbers  []int
+	eventDate    time.Time
+	created      time.Time
+	modified     time.Time
 
 	settings *GridSettings
 }
 
 type gridJSON struct {
-	ID          int64         `json:"id"`
-	Name        string        `json:"name"`
-	HomeNumbers []int         `json:"homeNumbers"`
-	AwayNumbers []int         `json:"awayNumbers"`
-	EventDate   time.Time     `json:"eventDate"`
-	Created     time.Time     `json:"created"`
-	Modified    time.Time     `json:"modified"`
-	Settings    *GridSettings `json:"settings"`
+	ID           int64         `json:"id"`
+	Name         string        `json:"name"`
+	HomeTeamName string        `json:"homeTeamName"`
+	HomeNumbers  []int         `json:"homeNumbers"`
+	AwayTeamName string        `json:"awayTeamName"`
+	AwayNumbers  []int         `json:"awayNumbers"`
+	EventDate    time.Time     `json:"eventDate"`
+	Created      time.Time     `json:"created"`
+	Modified     time.Time     `json:"modified"`
+	Settings     *GridSettings `json:"settings"`
 }
 
 // MarshalJSON will marshal the JSON using a custom marshaller
 func (g *Grid) MarshalJSON() ([]byte, error) {
 	return json.Marshal(gridJSON{
-		ID:          g.ID(),
-		Name:        g.Name(),
-		HomeNumbers: g.HomeNumbers(),
-		AwayNumbers: g.AwayNumbers(),
-		EventDate:   g.EventDate(),
-		Created:     g.Created(),
-		Modified:    g.modified,
-		Settings:    g.settings,
+		ID:           g.ID(),
+		Name:         g.Name(),
+		HomeTeamName: g.HomeTeamName(),
+		HomeNumbers:  g.HomeNumbers(),
+		AwayTeamName: g.AwayTeamName(),
+		AwayNumbers:  g.AwayNumbers(),
+		EventDate:    g.EventDate(),
+		Created:      g.Created(),
+		Modified:     g.modified,
+		Settings:     g.settings,
 	})
+}
+
+// AwayTeamName is a getter for the away team name
+func (g *Grid) AwayTeamName() string {
+	if g.awayTeamName == nil {
+		return defaultAwayTeamName
+	}
+
+	return *g.awayTeamName
+}
+
+// SetAwayTeamName is the setter for the away team name
+func (g *Grid) SetAwayTeamName(awayTeamName string) {
+	if awayTeamName == "" {
+		g.awayTeamName = nil
+		return
+	}
+
+	if utf8.RuneCountInString(awayTeamName) > TeamNameMaxLength {
+		awayTeamName = string([]rune(awayTeamName)[0:TeamNameMaxLength])
+	}
+
+	g.awayTeamName = &awayTeamName
+}
+
+// HomeTeamName is a getter for the home team name
+func (g *Grid) HomeTeamName() string {
+	if g.homeTeamName == nil {
+		return defaultHomeTeamName
+	}
+
+	return *g.homeTeamName
+}
+
+// SetHomeTeamName is a setter for the home team name
+func (g *Grid) SetHomeTeamName(homeTeamName string) {
+	if homeTeamName == "" {
+		g.homeTeamName = nil
+		return
+	}
+
+	if utf8.RuneCountInString(homeTeamName) > TeamNameMaxLength {
+		homeTeamName = string([]rune(homeTeamName)[0:TeamNameMaxLength])
+	}
+
+	g.homeTeamName = &homeTeamName
 }
 
 // ID returns the grid ID
@@ -98,13 +158,14 @@ func (g *Grid) HomeNumbers() []int {
 func (g *Grid) Save(ctx context.Context) error {
 	const query = `
 		UPDATE grids
-		SET name = $1,
-		    ord = $2,
+		SET ord = $1,
+		    home_team_name = $2,
 			home_numbers = $3,
-			away_numbers = $4,
-			event_date = $5,
+		    away_team_name = $4,
+			away_numbers = $5,
+			event_date = $6,
 			modified = (now() at time zone 'utc')
-		WHERE id = $6
+		WHERE id = $7
 	`
 
 	tx, err := g.model.db.BeginTx(ctx, nil)
@@ -127,7 +188,7 @@ func (g *Grid) Save(ctx context.Context) error {
 		eventDate = &g.eventDate
 	}
 
-	if _, err := tx.ExecContext(ctx, query, g.name, g.ord, pq.Array(g.homeNumbers), pq.Array(g.awayNumbers), eventDate, g.id); err != nil {
+	if _, err := tx.ExecContext(ctx, query, g.ord, g.homeTeamName, pq.Array(g.homeNumbers), g.awayTeamName, pq.Array(g.awayNumbers), eventDate, g.id); err != nil {
 		if err2 := tx.Rollback(); err2 != nil {
 			return fmt.Errorf("error found: %#v. Another error found when trying to rollback: %#v", err, err2)
 		}
@@ -143,14 +204,9 @@ func (g *Grid) Settings() *GridSettings {
 	return g.settings
 }
 
-// Name is a getter for the name attribute
+// Name returns the name of the grid
 func (g *Grid) Name() string {
-	return g.name
-}
-
-// SetName is a setter for the name attribute
-func (g *Grid) SetName(name string) {
-	g.name = name
+	return fmt.Sprintf("%s vs. %s", g.AwayTeamName(), g.HomeTeamName())
 }
 
 // SelectRandomNumbers will select random numbers for the home and away team
@@ -176,8 +232,8 @@ func (g *Grid) SelectRandomNumbers() error {
 func (g *Grid) LoadSettings(ctx context.Context) error {
 	row := g.model.db.QueryRowContext(ctx, `
 		SELECT grid_id,
-			   home_team_name, home_team_color_1, home_team_color_2,
-			   away_team_name, away_team_color_1, away_team_color_2,
+			   home_team_color_1, home_team_color_2,
+			   away_team_color_1, away_team_color_2,
 			   notes, modified
 		FROM grid_settings
 		WHERE grid_id = $1
@@ -189,10 +245,8 @@ func (g *Grid) LoadSettings(ctx context.Context) error {
 
 	return row.Scan(
 		&g.settings.gridID,
-		&g.settings.homeTeamName,
 		&g.settings.homeTeamColor1,
 		&g.settings.homeTeamColor2,
-		&g.settings.awayTeamName,
 		&g.settings.awayTeamColor1,
 		&g.settings.awayTeamColor2,
 		&g.settings.notes,
@@ -222,11 +276,10 @@ func randomNumbers() ([]int, error) {
 func (m *Model) gridByRow(scan scanFunc) (*Grid, error) {
 	grid := &Grid{model: m}
 
-	var homeNumbers []sql.NullInt64
-	var awayNumbers []sql.NullInt64
+	var homeNumbers, awayNumbers []sql.NullInt64
 	var eventDate *time.Time
 
-	if err := scan(&grid.id, &grid.poolID, &grid.ord, &grid.name, pq.Array(&homeNumbers), pq.Array(&awayNumbers), &eventDate, &grid.created, &grid.modified); err != nil {
+	if err := scan(&grid.id, &grid.poolID, &grid.ord, &grid.homeTeamName, pq.Array(&homeNumbers), &grid.awayTeamName, pq.Array(&awayNumbers), &eventDate, &grid.created, &grid.modified); err != nil {
 		return nil, err
 	}
 
