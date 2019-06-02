@@ -38,7 +38,7 @@ export class Modal {
         containerContent.classList.add('container-content')
 
         closeLink.appendChild(closeSpan)
-        modal.appendChild(closeLink)
+        container.appendChild(closeLink)
 
         containerContent.appendChild(childNode)
         container.appendChild(containerContent)
@@ -100,7 +100,11 @@ export class Modal {
         div.classList.add('error')
 
         if (errorMsg instanceof Error) {
-            div.textContent = errorMsg.message
+            if (errorMsg.response && errorMsg.response.data) {
+                div.textContent = errorMsg.response.data.error
+            } else {
+                div.textContent = errorMsg.message
+            }
         } else {
             div.textContent = errorMsg
         }

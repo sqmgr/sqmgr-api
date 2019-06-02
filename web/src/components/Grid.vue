@@ -16,6 +16,23 @@ limitations under the License.
 
 <template>
     <div>
+        <h3>{{ grid.name }}</h3>
+
+        <p class="pool-name">Squares Pool - {{ pool.name }}</p>
+
+        <template v-if="isAdmin">
+            <nav class="admin-menu">
+                <h4>Admin Menu</h4>
+
+                <ul>
+                    <li><a :href="`/pool/${ pool.token }/game/${ grid.id }/customize`">Customize</a></li>
+                    <template v-if="!numbersAreDrawn">
+                        <li><a href="#" @click.prevent="drawNumbersWasClicked">Draw Numbers</a></li>
+                    </template>
+                </ul>
+            </nav>
+        </template>
+
         <template v-if="grid.settings.notes">
             <div class="notes">{{ grid.settings.notes }}</div>
         </template>
@@ -26,6 +43,14 @@ limitations under the License.
                 <tr>
                     <td>ID</td>
                     <td>{{ pool.token }}</td>
+                </tr>
+                <tr>
+                    <td>Pool Name</td>
+                    <td><a :href="`/pool/${pool.token}`">{{ pool.name }}</a></td>
+                </tr>
+                <tr>
+                    <td>Event</td>
+                    <td>{{ grid.name }}</td>
                 </tr>
                 <tr>
                     <td>Event Date</td>
@@ -54,10 +79,10 @@ limitations under the License.
             <div class="spacer">&nbsp;</div>
 
             <div class="team home-team" ref="home-team"><span>{{ grid.homeTeamName }}</span></div>
-            <div v-for="n in 10" :class="`score home-score home-score-${n-1}`"></div>
+            <div v-for="n in 10" :class="`score home-score home-score-${n-1}`">{{score('home', n-1)}}</div>
 
             <div class="team away-team" ref="away-team"><span>{{ grid.awayTeamName }}</span></div>
-            <div v-for="n in 10" :class="`score away-score away-score-${n-1}`"></div>
+            <div v-for="n in 10" :class="`score away-score away-score-${n-1}`">{{score('away', n-1)}}</div>
 
             <template v-for="n in numSquares">
                 <Square :opaque-user-id="opaqueUserID" :sq-id="n" :square-data="squares[n] || {}"></Square>
@@ -76,6 +101,9 @@ limitations under the License.
     import api from '../models/api.js'
     import EventBus from '../models/EventBus'
     import Common from '../common'
+    import Vue from 'vue'
+    import Prompt from './Prompt.vue'
+    import modal from '../modal'
 
     api.token = SqMGR.gridConfig.pool.token
 
@@ -95,12 +123,16 @@ limitations under the License.
             return {
                 ...SqMGR.gridConfig,
                 numSquares: Config.Squares[SqMGR.gridConfig.pool.gridType],
-                squares: [],
+                squares: {},
                 logs: [],
             }
         },
         computed: {
             eventDate() {
+                if (new Date(this.grid.eventDate).getFullYear() === 0) {
+                    return "Not specified"
+                }
+
                 return Common.NewDateWithoutTimezone(this.grid.eventDate).toLocaleDateString("default", Common.DateOptions)
             },
             locks() {
@@ -112,6 +144,9 @@ limitations under the License.
             },
             isLocked() {
                 return this.locks && this.locks.getTime() < new Date().getTime()
+            },
+            numbersAreDrawn() {
+                return this.grid.homeNumbers || this.grid.awayNumbers
             }
         },
         beforeMount() {
@@ -128,6 +163,38 @@ limitations under the License.
             at.style.setProperty('--team-secondary', this.grid.settings.awayTeamColor2)
         },
         methods: {
+            drawNumbersWasClicked() {
+                let allClaimed = true
+                for (const key of Object.keys(this.squares)) {
+                    const square = this.squares[key]
+                    if (square.state === 'unclaimed') {
+                        allClaimed = false
+                        break
+                    }
+                }
+
+                const PromptComponent = Vue.extend(Prompt)
+                const comp = new PromptComponent({
+                    propsData: {
+                        title: 'Draw Numbers?',
+                        description: 'Do you want to draw the numbers for this game? This action cannot be undone.',
+                        buttonLabel: 'Draw',
+                        ...(!allClaimed && { warning: 'Not all squares have been claimed yet' })
+                    }
+                })
+
+                comp.$on('cancel-was-clicked', () => modal.close())
+                comp.$on('action-was-clicked', () => {
+                    api.drawNumbers(this.grid.id)
+                        .then(grid => {
+                            this.grid = grid
+                            modal.close()
+                        })
+                        .catch(err => modal.showError(err))
+                })
+
+                modal.show(comp.$mount().$el)
+            },
             loadData() {
                 api.getSquares()
                     .then(res => {
@@ -140,7 +207,70 @@ limitations under the License.
                             this.logs = res
                         })
                 }
+            },
+            score(team, index) {
+                const numbers = this.grid[`${team}Numbers`]
+                if (numbers === null) {
+                    return ''
+                }
+
+                return numbers[index]
             }
         }
     }
 </script>
+
+<style lang="scss" scoped>
+    .grid-metadata {
+        margin-bottom: var(--spacing);
+    }
+
+    nav.admin-menu {
+        border: 1px solid var(--border-color);
+        margin-bottom: var(--spacing);
+        padding: var(--spacing);
+
+        ul {
+            list-style: none;
+            margin: 0;
+
+            li {
+                margin: 0;
+                display: inline-block;
+
+                a {
+                    background-color: var(--primary);
+                    border-radius: 2px;
+                    border: 1px solid rgba(0, 0, 0, 0);
+                    color: #fff;
+                    font-weight: bold;
+                    display: block;
+                    padding: var(--minimal-spacing);
+                    position: relative;
+                    text-decoration: none;
+
+                    &:hover {
+                        border: 1px solid rgba(0, 0, 0, 0.2);
+                        top: -1px;
+                        left: -1px;
+                        box-shadow: 2px 2px 2px -1px rgba(0, 0, 0, 0.45);
+                        text-decoration: none;
+                    }
+
+                    &:active {
+                        box-shadow: none;
+                        top: 0;
+                        left: 0;
+                    }
+                }
+            }
+        }
+    }
+
+    h3 {
+        margin-bottom: 0;
+    }
+    p.pool-name {
+        color: var(--gray);
+    }
+</style>

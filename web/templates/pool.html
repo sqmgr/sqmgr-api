@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 
-{{ define "title" }}Pool - {{ end }}
+{{ define "title" }}{{.Local.Pool.Name}} - {{ end }}
 
 {{ define "content" }}
     <section class="pool">
-        <h3>{{.Local.Pool.Name}}</h3>
+        <h3>Squares Pool - {{.Local.Pool.Name}}</h3>
 
         <table>
             <thead>
@@ -35,7 +35,11 @@ limitations under the License.
                     <td>{{Add $i 1}}</td>
                     <td><a href="/pool/{{$token}}/game/{{$grid.ID}}">{{$grid.Name}}</a></td>
                     <!-- TODO  - rewrite in Vue -->
-                    <td>{{$grid.EventDate.Format "January 2, 2006"}}</td>
+                    {{ if $grid.EventDate.IsZero }}
+                        <td>Not specified</td>
+                    {{ else }}
+                        <td>{{$grid.EventDate.Format "January 2, 2006"}}</td>
+                    {{ end }}
                 </tr>
             {{ end }}
             </tbody>

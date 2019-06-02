@@ -25,7 +25,7 @@ limitations under the License.
 <section class="grid-customize">
 	<h3>Customize Game - <span id="grid-name">{{.Local.Grid.Name}}</span></h3>
 
-	<p><a href="/pool/{{.Local.Pool.Token}}">Back to squares pool</a>
+	<p><a href="/pool/{{.Local.Pool.Token}}/game/{{.Local.Grid.ID}}">Back to squares pool</a>
 
 	<form method="post">
 		{{ template "form-errors" . }}

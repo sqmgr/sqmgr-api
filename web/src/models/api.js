@@ -122,6 +122,12 @@ class API {
     setSquareState(squareID, state, note) {
         return this.updateSquare(squareID, {state, note})
     }
+
+    drawNumbers(gridID) {
+        return this.post(`/api/pool/${this.token}/game/${gridID}`, {
+            action: 'drawNumbers',
+        })
+    }
 }
 
 export default new API()

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 
-{{ define "title" }}{{.Local.Grid.Name}} - {{ end }}
+{{ define "title" }}{{ .Local.Pool.Name }} - {{.Local.Grid.Name}} - {{ end }}
 
 {{ define "header" }}
 <link href="/static/css/modal.css" rel="stylesheet">
@@ -24,12 +24,6 @@ limitations under the License.
 
 {{ define "content" }}
 <section class="grid">
-	<h3>{{.Local.Grid.Name}}</h3>
-
-	{{ if .Local.IsAdmin }}
-		<p class="customize"><a href="/pool/{{.Local.Pool.Token}}/customize">Configuration &amp; Customization</a>
-	{{ end }}
-
 	<div id="grid-container"></div>
 </section>
 {{ end }}

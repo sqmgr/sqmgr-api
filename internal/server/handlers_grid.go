@@ -107,7 +107,7 @@ func (s *Server) poolGridHandler() http.HandlerFunc {
 	}
 }
 
-func (s *Server) poolCustomizeHandler() http.HandlerFunc {
+func (s *Server) poolGridCustomizeHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("grid-customize.html", "form-errors.html")
 
 	const didUpdate = "didUpdate"
@@ -126,7 +126,8 @@ func (s *Server) poolCustomizeHandler() http.HandlerFunc {
 		poolCtxData := r.Context().Value(ctxKeyPool).(*poolContextData)
 
 		pool := poolCtxData.Pool
-		grid, err := pool.DefaultGrid(r.Context())
+		gridID, _ := strconv.ParseInt(mux.Vars(r)["grid"], 10, 64)
+		grid, err := pool.GridByID(r.Context(), gridID)
 		if err != nil {
 			s.Error(w, r, http.StatusInternalServerError, err)
 		}

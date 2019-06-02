@@ -177,3 +177,13 @@ func TestRandomNumbers(t *testing.T) {
 
 	g.Expect(diff).Should(gomega.BeTrue(), "random numbers generated different order")
 }
+
+func TestSelectRandomNumbers(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	grid := &Grid{}
+	g.Expect(grid.SelectRandomNumbers()).Should(gomega.Succeed())
+	g.Expect(grid.awayNumbers).ShouldNot(gomega.BeNil())
+	g.Expect(grid.homeNumbers).ShouldNot(gomega.BeNil())
+	g.Expect(grid.SelectRandomNumbers()).Should(gomega.Equal(ErrNumbersAlreadyDrawn))
+}

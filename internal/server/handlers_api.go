@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -40,7 +41,7 @@ func (s *Server) apiPoolLogsHandler() http.HandlerFunc {
 
 		}
 
-		grid, err := jcd.Grid.Logs(r.Context(), 0, 1000) // TODO: pagination???
+		grid, err := jcd.Pool.Logs(r.Context(), 0, 1000) // TODO: pagination???
 		if err != nil {
 			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 			return
@@ -60,7 +61,7 @@ func (s *Server) apiPoolSquaresHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jcd := r.Context().Value(ctxKeyJWT).(*jwtContextData)
 
-		squares, err := jcd.Grid.Squares()
+		squares, err := jcd.Pool.Squares()
 		if err != nil {
 			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 			return
@@ -85,7 +86,7 @@ func (s *Server) apiPoolSquaresSquareHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jcd := r.Context().Value(ctxKeyJWT).(*jwtContextData)
 		squareID, _ := strconv.Atoi(mux.Vars(r)["square"])
-		square, err := jcd.Grid.SquareBySquareID(squareID)
+		square, err := jcd.Pool.SquareBySquareID(squareID)
 		if err != nil {
 			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 			return
@@ -93,7 +94,7 @@ func (s *Server) apiPoolSquaresSquareHandler() http.HandlerFunc {
 
 		if r.Method == http.MethodPost {
 			// if the user isn't an admin and the grid is locked, do not let the user do anything
-			if !jcd.Claim.IsAdmin && jcd.Grid.IsLocked() {
+			if !jcd.Claim.IsAdmin && jcd.Pool.IsLocked() {
 				s.ServeJSONError(w, http.StatusForbidden, "The grid is locked")
 				return
 			}
@@ -181,11 +182,74 @@ func (s *Server) apiPoolSquaresSquareHandler() http.HandlerFunc {
 	}
 }
 
+func (s *Server) apiPoolGameHandler() http.HandlerFunc {
+	type postPayload struct {
+		Action string `json:"action"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		jcd := r.Context().Value(ctxKeyJWT).(*jwtContextData)
+		if !jcd.Claim.IsAdmin {
+			s.ServeJSONError(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+			return
+		}
+
+		var payload postPayload
+		dec := json.NewDecoder(r.Body)
+		if err := dec.Decode(&payload); err != nil {
+			s.ServeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		if payload.Action != "drawNumbers" {
+			s.ServeJSONError(w, http.StatusBadRequest, "unknown action")
+			return
+		}
+
+		gridID, _ := strconv.ParseInt(mux.Vars(r)["grid"], 10, 64)
+		grid, err := jcd.Pool.GridByID(r.Context(), gridID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				s.ServeJSONError(w, http.StatusNotFound, "")
+				return
+			}
+
+			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+
+		if err := grid.LoadSettings(r.Context()); err != nil {
+			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+
+		if err := grid.SelectRandomNumbers(); err != nil {
+			if err == model.ErrNumbersAlreadyDrawn {
+				s.ServeJSONError(w, http.StatusBadRequest, "The numbers have already been drawn")
+				return
+			}
+
+			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+
+		if err := grid.Save(r.Context()); err != nil {
+			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+
+		s.ServeJSON(w, http.StatusOK, jsonResponse{
+			Status: responseOK,
+			Result: grid,
+		})
+	}
+}
+
 /* context handlers */
 
 type jwtContextData struct {
 	Claim *tokenJWTClaim
-	Grid  *model.Pool
+	Pool  *model.Pool
 }
 
 func (s *Server) apiPoolJWTHandler(next http.Handler) http.HandlerFunc {
@@ -229,7 +293,7 @@ func (s *Server) apiPoolJWTHandler(next http.Handler) http.HandlerFunc {
 
 		newCtx := context.WithValue(r.Context(), ctxKeyJWT, &jwtContextData{
 			Claim: claims,
-			Grid:  grid,
+			Pool:  grid,
 		})
 
 		next.ServeHTTP(w, r.WithContext(newCtx))

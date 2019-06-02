@@ -54,7 +54,7 @@ func (s *Server) setupRoutes() {
 	// pools
 	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodGet).Handler(s.poolMemberHandler(true, false, s.poolHandler()))
 	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/game/{grid:[0-9]+}").Methods(http.MethodGet).Handler(s.poolMemberHandler(true, false, s.poolGridHandler()))
-	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/customize").Methods(http.MethodGet, http.MethodPost).Handler(s.poolMemberHandler(true, false, s.poolCustomizeHandler()))
+	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/game/{grid:[0-9]+}/customize").Methods(http.MethodGet, http.MethodPost).Handler(s.poolMemberHandler(true, false, s.poolGridCustomizeHandler()))
 	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/join").Methods(http.MethodGet, http.MethodPost).Handler(s.poolMemberHandler(false, false, s.poolJoinHandler()))
 	// probably only necessary temporarily
 	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/jwt").Methods(http.MethodGet).Handler(s.poolMemberHandler(false, false, s.poolJWTHandler()))
@@ -74,6 +74,7 @@ func (s *Server) setupRoutes() {
 
 	// API stuff
 	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/squares").Methods(http.MethodGet).Handler(s.apiPoolJWTHandler(s.apiPoolSquaresHandler()))
+	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/game/{grid:[0-9]+}").Methods(http.MethodPost).Handler(s.apiPoolJWTHandler(s.apiPoolGameHandler()))
 	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/logs").Methods(http.MethodGet).Handler(s.apiPoolJWTHandler(s.apiPoolLogsHandler()))
 	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/squares/{square:[0-9]{1,3}}").Methods(http.MethodGet, http.MethodPost).Handler(s.apiPoolJWTHandler(s.apiPoolSquaresSquareHandler()))
 

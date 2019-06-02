@@ -21,6 +21,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/lib/pq"
 	"math/big"
@@ -36,7 +37,10 @@ const (
 	defaultAwayTeamName = "Away Team"
 )
 
-// Grid represents a single grid from a pool. A pool may contain more than one grid.
+// ErrNumbersAlreadyDrawn happens when SelectRandomNumbers() is called multiple times
+var ErrNumbersAlreadyDrawn = errors.New("error: numbers have already been drawn")
+
+// Pool represents a single grid from a pool. A pool may contain more than one grid.
 type Grid struct {
 	model *Model
 
@@ -216,6 +220,10 @@ func (g *Grid) Name() string {
 
 // SelectRandomNumbers will select random numbers for the home and away team
 func (g *Grid) SelectRandomNumbers() error {
+	if g.homeNumbers != nil || g.awayNumbers != nil {
+		return ErrNumbersAlreadyDrawn
+	}
+
 	hNums, err := randomNumbers()
 	if err != nil {
 		return err
