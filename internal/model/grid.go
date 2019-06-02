@@ -40,7 +40,7 @@ const (
 // ErrNumbersAlreadyDrawn happens when SelectRandomNumbers() is called multiple times
 var ErrNumbersAlreadyDrawn = errors.New("error: numbers have already been drawn")
 
-// Pool represents a single grid from a pool. A pool may contain more than one grid.
+// Grid represents a single grid from a pool. A pool may contain more than one grid.
 type Grid struct {
 	model *Model
 
