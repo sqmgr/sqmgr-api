@@ -25,7 +25,7 @@ limitations under the License.
         </template>
         <template v-if="canUnclaim">
             <div class="buttons">
-                <button class="destructive" type="button" @click.prevent="unclaimSquare">Relinquish Claim</button>
+                <button type="button" class="destructive" @click.prevent="unclaimSquare">Relinquish Claim</button>
             </div>
         </template>
 

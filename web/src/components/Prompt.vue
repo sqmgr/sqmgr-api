@@ -27,8 +27,8 @@ limitations under the License.
         </template>
 
         <div class="buttons">
-            <button class="secondary" @click.prevent="$emit('cancel-was-clicked')">Cancel</button>
-            <button @click.prevent="$emit('action-was-clicked')">{{buttonLabel}}</button>
+            <button type="button" class="secondary" @click.prevent="$emit('cancel-was-clicked')">Cancel</button>
+            <button type="button" @click.prevent="$emit('action-was-clicked')">{{buttonLabel}}</button>
         </div>
     </div>
 </template>

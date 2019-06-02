@@ -22,7 +22,7 @@ limitations under the License.
         </div>
 
         <div class="buttons">
-            <button class="secondary" @click.prevent="Modal.close">Cancel</button>
+            <button type="button" class="secondary" @click.prevent="Modal.close()">Cancel</button>
             <button type="submit" name="submit" value="Claim">Claim</button>
         </div>
     </form>
