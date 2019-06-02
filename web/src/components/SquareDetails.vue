@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-   http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,10 +19,14 @@ limitations under the License.
         <h4>Square Details</h4>
 
         <template v-if="canClaim">
-            <p class="claim"><a href="#" @click.prevent="claimSquare">Claim this square!</a></p>
+            <div class="buttons">
+                <button type="button" @click.prevent="claimSquare">Claim</button>
+            </div>
         </template>
         <template v-if="canUnclaim">
-            <p class="unclaim"><a href="#" @click.prevent="unclaimSquare">Relinquish claim</a></p>
+            <div class="buttons">
+                <button class="destructive" type="button" @click.prevent="unclaimSquare">Relinquish Claim</button>
+            </div>
         </template>
 
         <table>
@@ -56,7 +60,8 @@ limitations under the License.
         </table>
 
         <template v-if="isAdmin">
-            <Logs @note-added="reloadData" :square-id="this.square.squareID" :logs="square.logs" :show-add-note="true"></Logs>
+            <Logs @note-added="reloadData" :square-id="this.square.squareID" :logs="square.logs"
+                  :show-add-note="true"></Logs>
         </template>
     </div>
 </template>
@@ -102,7 +107,6 @@ limitations under the License.
             },
             canUnclaim() {
                 if (this.square.state !== 'claimed') return false
-                if (this.isAdmin) return true
                 if (this.isLocked) return false
                 return this.square.opaqueUserID === this.opaqueUserID
             }
@@ -143,3 +147,10 @@ limitations under the License.
         }
     }
 </script>
+
+<style scoped lang="scss">
+    div.buttons {
+        margin-bottom: var(--spacing);
+        text-align: left;
+    }
+</style>
