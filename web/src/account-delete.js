@@ -24,7 +24,7 @@ window.addEventListener('load', function () {
         closeLink = modal.querySelector('a.close'),
         emailInput = modal.querySelector('input[name="email"]'),
         expectedEmail = modal.querySelector('input[name="expected-email"]').value,
-        submitButton = modal.querySelector('input[type="submit"]')
+        submitButton = modal.querySelector('button[type="submit"]')
 
     modal.remove()
     modal.style.display = 'block'

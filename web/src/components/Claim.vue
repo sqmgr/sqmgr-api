@@ -22,8 +22,8 @@ limitations under the License.
         </div>
 
         <div class="buttons">
-            <input type="submit" name="submit" value="Claim">
-            <a href="#" class="cancel" @click.prevent="Modal.close">Cancel</a>
+            <button class="secondary" @click.prevent="Modal.close">Cancel</button>
+            <button type="submit" name="submit" value="Claim">Claim</button>
         </div>
     </form>
 </template>
@@ -44,7 +44,8 @@ limitations under the License.
             }
 
             return {
-                name
+                name,
+                Modal,
             }
         },
         mounted() {

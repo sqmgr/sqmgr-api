@@ -14,34 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-div.buttons {
-	margin-top: var(--spacing);
-	text-align: center;
-}
-
 fieldset p {
 	margin: 0 0 var(--spacing);
-}
-
-button.destructive,
-input[type="submit"].destructive,
-button.destructive:disabled:hover,
-input[type="submit"].destructive:disabled:hover {
-	background-color: #eee;
-	border-color: rgba(0, 0, 0, 0.2);
-	color: var(--red);
-	font-weight: bold;
-}
-
-button.destructive:disabled,
-input[type="submit"].destructive:disabled {
-	opacity: 0.5;
-}
-
-button.destructive:hover,
-input[type="submit"].destructive:hover {
-	background-color: var(--red);
-	color: #fff;
 }
 
 div.modal {

@@ -229,42 +229,6 @@ limitations under the License.
         border: 1px solid var(--border-color);
         margin-bottom: var(--spacing);
         padding: var(--spacing);
-
-        ul {
-            list-style: none;
-            margin: 0;
-
-            li {
-                margin: 0;
-                display: inline-block;
-
-                a {
-                    background-color: var(--primary);
-                    border-radius: 2px;
-                    border: 1px solid rgba(0, 0, 0, 0);
-                    color: #fff;
-                    font-weight: bold;
-                    display: block;
-                    padding: var(--minimal-spacing);
-                    position: relative;
-                    text-decoration: none;
-
-                    &:hover {
-                        border: 1px solid rgba(0, 0, 0, 0.2);
-                        top: -1px;
-                        left: -1px;
-                        box-shadow: 2px 2px 2px -1px rgba(0, 0, 0, 0.45);
-                        text-decoration: none;
-                    }
-
-                    &:active {
-                        box-shadow: none;
-                        top: 0;
-                        left: 0;
-                    }
-                }
-            }
-        }
     }
 
     h3 {

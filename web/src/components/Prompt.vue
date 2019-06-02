@@ -27,7 +27,7 @@ limitations under the License.
         </template>
 
         <div class="buttons">
-            <button class="cancel" @click.prevent="$emit('cancel-was-clicked')">Cancel</button>
+            <button class="secondary" @click.prevent="$emit('cancel-was-clicked')">Cancel</button>
             <button @click.prevent="$emit('action-was-clicked')">{{buttonLabel}}</button>
         </div>
     </div>
@@ -46,15 +46,6 @@ limitations under the License.
 </script>
 
 <style lang="scss" scoped>
-    div.buttons {
-        text-align: right;
-
-        button {
-            display: inline-block;
-            margin-left: var(--minimal-spacing);
-        }
-    }
-
     div.warning {
         background-color: var(--warning);
         padding: var(--minimal-spacing);

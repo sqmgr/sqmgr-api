@@ -61,7 +61,6 @@ input[type="radio"] + label {
 
 input,
 select,
-button,
 textarea {
 	border-radius: 3px;
 	border: 1px solid var(--border-color);
@@ -95,41 +94,6 @@ fieldset.collapsed div.fields {
 
 fieldset.collapsed legend a {
 	font-size: 0.8em;
-}
-
-input[type="submit"],
-button,
-input[type="submit"]:hover:disabled,
-button:hover:disabled {
-	background-color: var(--primary);
-	border: 1px solid transparent;
-	box-shadow: none;
-	color: #fff;
-	left: 0;
-	padding: var(--minimal-spacing) var(--spacing);
-	position: relative;
-	top: 0;
-	width: auto;
-}
-
-button.cancel {
-	background-color: var(--light-gray);
-    color: var(--dark-gray);
-}
-
-input[type="submit"]:hover,
-button:hover {
-	border: 1px solid rgba(0, 0, 0, 0.2);
-	top: -1px;
-	left: -1px;
-	box-shadow: 2px 2px 2px -1px rgba(0, 0, 0, 0.45);
-}
-
-input[type="submit"]:active,
-button:active {
-	box-shadow: none;
-	top: 0;
-	left: 0;
 }
 
 p.requirement {
@@ -226,12 +190,61 @@ div.remaining {
 	font-weight: bold;
 }
 
-div.buttons a.cancel {
-	color: var(--dark-gray);
-	font-size: 0.8em;
-	margin-left: var(--minimal-spacing);
-	text-decoration: none;
+/* buttons */
+
+div.buttons {
+	text-align: right;
 }
-div.buttons a.cancel:hover {
+
+button {
+	background-color: var(--primary);
+    border-radius: 3px;
+    border: 1px solid transparent;
+	color: #fff;
+	font: 1em var(--font);
+	padding: calc(var(--minimal-spacing) + 3px) var(--spacing);
+}
+
+button.secondary {
+	background-color: transparent;
 	color: var(--primary);
+}
+
+button:hover {
+	background: var(--primary) linear-gradient(rgba(255, 255, 255, 0.2), transparent);
+}
+
+button.secondary:hover {
+	background-color: transparent;
+    border-color: var(--primary);
+}
+
+button:active {
+	background: var(--primary-darker);
+}
+
+button.secondary:active {
+	background: transparent;
+	border-color: var(--primary-darkest);
+	color: var(--primary-darkest);
+}
+
+button.destructive {
+	background-color: var(--red);
+}
+
+button.destructive:hover {
+    background: var(--red) linear-gradient(rgba(255, 255, 255, 0.2), transparent);
+}
+
+button.destructive:active {
+	background-color: var(--red-darker);
+}
+
+button[disabled],
+button[disabled]:hover,
+button[disabled]:active {
+	background: transparent;
+	border-color: var(--gray);
+	color: var(--gray);
 }

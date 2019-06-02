@@ -22,8 +22,8 @@ limitations under the License.
         </div>
 
         <div class="buttons">
-            <input type="submit" name="submit" value="Make Note">
-            <a href="#" class="cancel" @click.prevent="Modal.close()">Cancel</a>
+            <button type="button" class="secondary" @click.prevent="Modal.close()">Cancel</button>
+            <button type="submit" name="submit">Make Note</button>
         </div>
     </form>
 </template>

@@ -24,9 +24,12 @@ limitations under the License.
 	--gray: #bbb;
 	--dark-gray: #888;
 	--red: #f44336;
+	--red-darker: #e53935;
 	--border-color: #ccc;
 	--font: 'Roboto';
 	--primary: #4caf50;
+	--primary-darker: #43A047;
+    --primary-darkest: #1B5E20;
 	--success: #2196f3;
 	--warning: #fdd835;
 }
@@ -126,14 +129,6 @@ header nav ul li:first-child {
 header nav a {
 	color: #fff;
 	font-weight: bold;
-}
-header p a {
-	background-color: var(--primary);
-	border-radius: 2px;
-	color: #fff;
-	display: inline-block;
-	margin-right: var(--minimal-spacing);
-	padding: 5px 10px;
 }
 h1 {
 	font-family: 'Alfa Slab One', sans-serif;
@@ -354,6 +349,23 @@ div.loading-indicator span {
 }
 div.loading-indicator span::after {
 	content: 'S';
+}
+
+a.btn {
+    border-radius: 8px;
+	background-color: var(--primary);
+	color: #fff;
+    display: inline-block;
+	padding: calc(var(--minimal-spacing) + 3px);
+}
+
+a.btn:hover {
+	background: var(--primary) linear-gradient(rgba(255, 255, 255, 0.2), transparent);
+	text-decoration: none;
+}
+
+a.btn:active {
+	background: var(--primary-darker);
 }
 
 @keyframes spin {
