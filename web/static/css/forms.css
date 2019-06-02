@@ -64,7 +64,7 @@ select,
 textarea {
 	border-radius: 3px;
 	border: 1px solid var(--border-color);
-	font: 1em var(--font);
+	font: 1em var(--font), sans-serif;
 	padding: var(--minimal-spacing);
 	width: 100%;
 }
