@@ -30,10 +30,10 @@ const (
 
 // constants for default colors
 const (
-	DefaultHomeTeamColor1 = "#00338d"
-	DefaultHomeTeamColor2 = "#c60c30"
-	DefaultAwayTeamColor1 = "#f3d03e"
-	DefaultAwayTeamColor2 = "#003087"
+	DefaultHomeTeamColor1 = "#555555"
+	DefaultHomeTeamColor2 = "#999999"
+	DefaultAwayTeamColor1 = "#666666"
+	DefaultAwayTeamColor2 = "#333333"
 )
 
 // GridSettings will contain various user-defined settings
