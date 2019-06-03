@@ -24,12 +24,11 @@ limitations under the License.
             <nav class="admin-menu">
                 <h4>Admin Menu</h4>
 
-                <ul>
-                    <li><a :href="`/pool/${ pool.token }/game/${ grid.id }/customize`">Customize</a></li>
-                    <template v-if="!numbersAreDrawn">
-                        <li><a href="#" @click.prevent="drawNumbersWasClicked">Draw Numbers</a></li>
-                    </template>
-                </ul>
+                <button type="button" @click.prevent="customizeWasClicked">Customize</button>
+
+                <template v-if="!numbersAreDrawn">
+                    <button type="button" @click.prevent="drawNumbersWasClicked">Draw Numbers</button>
+                </template>
             </nav>
         </template>
 
@@ -100,6 +99,7 @@ limitations under the License.
     import Logs from './Logs.vue'
     import api from '../models/api.js'
     import EventBus from '../models/EventBus'
+    import GridCustomize from './GridCustomize.vue'
     import Common from '../common'
     import Vue from 'vue'
     import Prompt from './Prompt.vue'
@@ -113,6 +113,9 @@ limitations under the License.
             std25: 25,
         }
     }
+
+    const GridCustomizeComponent = Vue.extend(GridCustomize)
+
     export default {
         name: "Grid",
         components: {
@@ -152,17 +155,23 @@ limitations under the License.
         beforeMount() {
             this.loadData()
             EventBus.$on('data-updated', () => this.loadData())
+            EventBus.$on('grid-updated', () => this.loadGrid())
         },
         mounted() {
-            const ht = this.$refs["home-team"]
-            ht.style.setProperty('--team-primary', this.grid.settings.homeTeamColor1)
-            ht.style.setProperty('--team-secondary', this.grid.settings.homeTeamColor2)
-
-            const at = this.$refs["away-team"]
-            at.style.setProperty('--team-primary', this.grid.settings.awayTeamColor1)
-            at.style.setProperty('--team-secondary', this.grid.settings.awayTeamColor2)
+            this.updateTeamColors()
+        },
+        updated() {
+            this.updateTeamColors()
         },
         methods: {
+            customizeWasClicked() {
+                const vm = new GridCustomizeComponent({
+                    propsData: {
+                        gridID: this.grid.id,
+                    }
+                })
+                modal.show(vm.$mount().$el)
+            },
             drawNumbersWasClicked() {
                 let allClaimed = true
                 for (const key of Object.keys(this.squares)) {
@@ -179,7 +188,7 @@ limitations under the License.
                         title: 'Draw Numbers?',
                         description: 'Do you want to draw the numbers for this game? This action cannot be undone.',
                         buttonLabel: 'Draw',
-                        ...(!allClaimed && { warning: 'Not all squares have been claimed yet' })
+                        ...(!allClaimed && {warning: 'Not all squares have been claimed yet'})
                     }
                 })
 
@@ -208,6 +217,11 @@ limitations under the License.
                         })
                 }
             },
+            loadGrid() {
+                api.getGrid(this.grid.id)
+                    .then(grid => this.grid = grid)
+                    .catch(err => modal.showError(err))
+            },
             score(team, index) {
                 const numbers = this.grid[`${team}Numbers`]
                 if (numbers === null) {
@@ -215,7 +229,16 @@ limitations under the License.
                 }
 
                 return numbers[index]
-            }
+            },
+            updateTeamColors() {
+                const ht = this.$refs["home-team"]
+                ht.style.setProperty('--team-primary', this.grid.settings.homeTeamColor1)
+                ht.style.setProperty('--team-secondary', this.grid.settings.homeTeamColor2)
+
+                const at = this.$refs["away-team"]
+                at.style.setProperty('--team-primary', this.grid.settings.awayTeamColor1)
+                at.style.setProperty('--team-secondary', this.grid.settings.awayTeamColor2)
+            },
         }
     }
 </script>
@@ -229,11 +252,21 @@ limitations under the License.
         border: 1px solid var(--border-color);
         margin-bottom: var(--spacing);
         padding: var(--spacing);
+
+        ul {
+            list-style: none;
+            margin: 0;
+
+            li {
+                display: inline-block;
+            }
+        }
     }
 
     h3 {
         margin-bottom: 0;
     }
+
     p.pool-name {
         color: var(--gray);
     }

@@ -42,8 +42,19 @@ window.addEventListener('load', function() {
 	const homeTeamName = document.getElementById('home-team-name')
 	const awayTeamName = document.getElementById('away-team-name')
     const gridName = document.getElementById('grid-name')
-    homeTeamName.oninput = awayTeamName.oninput = () => {
+    homeTeamName.oninput = awayTeamName.oninput = element => {
 	    gridName.textContent = awayTeamName.value + ' vs. ' + homeTeamName.value
+
+		if (!element) {
+			return
+		}
+
+		const matchedTeams = TeamColors(element.target.value)
+		if (matchedTeams.length === 0) {
+			return
+		}
+
+       	console.log(TeamColors(element.target.value))
 	}
 	homeTeamName.oninput(null)
 })

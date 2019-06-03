@@ -183,26 +183,10 @@ func (s *Server) apiPoolSquaresSquareHandler() http.HandlerFunc {
 }
 
 func (s *Server) apiPoolGameHandler() http.HandlerFunc {
-	type postPayload struct {
-		Action string `json:"action"`
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 		jcd := r.Context().Value(ctxKeyJWT).(*jwtContextData)
 		if !jcd.Claim.IsAdmin {
 			s.ServeJSONError(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
-			return
-		}
-
-		var payload postPayload
-		dec := json.NewDecoder(r.Body)
-		if err := dec.Decode(&payload); err != nil {
-			s.ServeJSONError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-
-		if payload.Action != "drawNumbers" {
-			s.ServeJSONError(w, http.StatusBadRequest, "unknown action")
 			return
 		}
 
@@ -223,9 +207,47 @@ func (s *Server) apiPoolGameHandler() http.HandlerFunc {
 			return
 		}
 
-		if err := grid.SelectRandomNumbers(); err != nil {
-			if err == model.ErrNumbersAlreadyDrawn {
-				s.ServeJSONError(w, http.StatusBadRequest, "The numbers have already been drawn")
+		s.ServeJSON(w, http.StatusOK, jsonResponse{
+			Status: responseOK,
+			Result: grid,
+		})
+	}
+}
+
+func (s *Server) apiPoolGamePostHandler() http.HandlerFunc {
+	type postPayload struct {
+		Action string `json:"action"`
+		Data   *struct {
+			EventDate      string `json:"eventDate"`
+			Notes          string `json:"notes"`
+			HomeTeamName   string `json:"homeTeamName"`
+			HomeTeamColor1 string `json:"homeTeamColor1"`
+			HomeTeamColor2 string `json:"homeTeamColor2"`
+			AwayTeamName   string `json:"awayTeamName"`
+			AwayTeamColor1 string `json:"awayTeamColor1"`
+			AwayTeamColor2 string `json:"awayTeamColor2"`
+		} `json:"data,omitempty"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		jcd := r.Context().Value(ctxKeyJWT).(*jwtContextData)
+		if !jcd.Claim.IsAdmin {
+			s.ServeJSONError(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
+			return
+		}
+
+		var payload postPayload
+		dec := json.NewDecoder(r.Body)
+		if err := dec.Decode(&payload); err != nil {
+			s.ServeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		gridID, _ := strconv.ParseInt(mux.Vars(r)["grid"], 10, 64)
+		grid, err := jcd.Pool.GridByID(r.Context(), gridID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				s.ServeJSONError(w, http.StatusNotFound, "")
 				return
 			}
 
@@ -233,15 +255,84 @@ func (s *Server) apiPoolGameHandler() http.HandlerFunc {
 			return
 		}
 
-		if err := grid.Save(r.Context()); err != nil {
+		if err := grid.LoadSettings(r.Context()); err != nil {
 			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 			return
 		}
 
-		s.ServeJSON(w, http.StatusOK, jsonResponse{
-			Status: responseOK,
-			Result: grid,
-		})
+		switch payload.Action {
+		case "drawNumbers":
+			if err := grid.SelectRandomNumbers(); err != nil {
+				if err == model.ErrNumbersAlreadyDrawn {
+					s.ServeJSONError(w, http.StatusBadRequest, "The numbers have already been drawn")
+					return
+				}
+
+				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+				return
+			}
+
+			if err := grid.Save(r.Context()); err != nil {
+				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+				return
+			}
+
+			s.ServeJSON(w, http.StatusOK, jsonResponse{
+				Status: responseOK,
+				Result: grid,
+			})
+			return
+		case "save":
+			if payload.Data == nil {
+				s.ServeJSONError(w, http.StatusBadRequest, "missing data in payload")
+				return
+			}
+
+			v := validator.New()
+			eventDate := v.Datetime("Event Date", payload.Data.EventDate, "00:00", "0", true)
+			homeTeamName := v.Printable("Home Team Name", payload.Data.HomeTeamName, true)
+			homeTeamName = v.MaxLength("Home Team Name", homeTeamName, model.TeamNameMaxLength)
+			homeTeamColor1 := v.Color("Home Team Colors", payload.Data.HomeTeamColor1, true)
+			homeTeamColor2 := v.Color("Home Team Colors", payload.Data.HomeTeamColor2, true)
+			awayTeamName := v.Printable("Away Team Name", payload.Data.AwayTeamName, true)
+			awayTeamName = v.MaxLength("Away Team Name", awayTeamName, model.TeamNameMaxLength)
+			awayTeamColor1 := v.Color("Away Team Colors", payload.Data.AwayTeamColor1, true)
+			awayTeamColor2 := v.Color("Away Team Colors", payload.Data.AwayTeamColor2, true)
+			notes := v.PrintableWithNewline("Notes", payload.Data.Notes, true)
+			notes = v.MaxLength("Notes", notes, model.NotesMaxLength)
+
+			if !v.OK() {
+				s.ServeJSON(w, http.StatusBadRequest, jsonResponse{
+					Status: responseFail,
+					Error:  "one or more errors",
+					Result: v.Errors,
+				})
+				return
+			}
+
+			grid.SetEventDate(eventDate)
+			grid.SetHomeTeamName(homeTeamName)
+			grid.SetAwayTeamName(awayTeamName)
+			settings := grid.Settings()
+			settings.SetNotes(notes)
+			settings.SetHomeTeamColor1(homeTeamColor1)
+			settings.SetHomeTeamColor2(homeTeamColor2)
+			settings.SetAwayTeamColor1(awayTeamColor1)
+			settings.SetAwayTeamColor2(awayTeamColor2)
+
+			if err := grid.Save(r.Context()); err != nil {
+				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+				return
+			}
+
+			s.ServeJSON(w, http.StatusAccepted, jsonResponse{
+				Status: responseOK,
+			})
+			return
+		}
+
+		s.ServeJSONError(w, http.StatusBadRequest, "unknown action")
+		return
 	}
 }
 

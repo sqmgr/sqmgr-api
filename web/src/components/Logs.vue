@@ -86,3 +86,10 @@ limitations under the License.
         }
     }
 </script>
+
+<style scoped>
+section.audit-log {
+    border-top: 1px solid var(--hr-color);
+    padding-top: var(--spacing);
+}
+</style>

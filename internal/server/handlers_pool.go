@@ -36,6 +36,7 @@ type tokenJWTClaim struct {
 }
 
 const responseOK = "OK"
+const responseFail = "Fail"
 
 // ErrNotMember is an error when the user does not belong to the pool
 var ErrNotMember = errors.New("server: user does not belong to pool")

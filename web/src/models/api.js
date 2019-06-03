@@ -80,7 +80,7 @@ class API {
         })
     }
 
-    post(path, data) {
+    post(path, data, emitEvent = "data-updated") {
         return this.request({
             method: 'POST',
             url: path,
@@ -90,13 +90,24 @@ class API {
             data,
         })
             .then(res => {
-                EventBus.$emit('data-updated')
+                EventBus.$emit(emitEvent)
                 return res
             })
     }
 
     getSquares() {
         return this.get(`/api/pool/${this.token}/squares`)
+    }
+
+    getGrid(gridID) {
+        return this.get(`/api/pool/${this.token}/game/${gridID}`)
+    }
+
+    saveGrid(gridID, data) {
+        return this.post(`/api/pool/${this.token}/game/${gridID}`, {
+            action: 'save',
+            data,
+        }, 'grid-updated')
     }
 
     getSquare(sqId) {

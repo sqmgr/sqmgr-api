@@ -16,6 +16,7 @@
 
 files=$(
 	find . -type f \
+		\! -path '*/third-party/*' \
 		\! -path '*/node_modules/*' \
 		\! -path './.git/*' \
 		\! -path './vendor/*' \
