@@ -99,7 +99,7 @@ limitations under the License.
             grid(newValue) {
                 const date = newValue.eventDate.substr(0,10)
                 this.form.eventDate = date === '0001-01-01' ? '' : date
-                this.form.notes = newValue.notes
+                this.form.notes = newValue.settings.notes
                 this.form.awayTeam.name = newValue.awayTeamName
                 this.form.awayTeam.color1 = newValue.settings.awayTeamColor1
                 this.form.awayTeam.color2 = newValue.settings.awayTeamColor2
