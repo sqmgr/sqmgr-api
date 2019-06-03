@@ -201,6 +201,7 @@ func (s *Server) accountDeletedHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := s.Session(r)
 		didDelete := len(session.Flashes("account-deleted")) > 0
+		session.Logout()
 		session.Save()
 
 		if !didDelete {
