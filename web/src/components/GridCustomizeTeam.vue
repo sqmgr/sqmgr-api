@@ -140,7 +140,7 @@ limitations under the License.
                 setTimeout(() => {
                     this.suggestIdx = -1
                     this.suggestTeams = []
-                }, 100)
+                }, 250)
             }
         }
     }
