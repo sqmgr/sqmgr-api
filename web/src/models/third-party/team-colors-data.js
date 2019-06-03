@@ -1039,7 +1039,7 @@ export default [
     "name": "New York Jets",
     "league": "nfl",
     "colors" : {
-      "hex"   :   ["203731"],
+      "hex"   :   ["125740", "000000"],
       "rgb"   :   ["28 45 37"],
       "cmyk"  :   ["70 40 60 60"],
       "pms"   :   ["5535 C"]

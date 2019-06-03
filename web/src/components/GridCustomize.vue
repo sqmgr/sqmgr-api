@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// TODO - handle max lengths and notification
+
 <template>
     <section class="grid-customize">
         <h3>Customize Grid</h3>
