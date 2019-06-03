@@ -8,6 +8,7 @@ Get a working [Go](https://golang.org/doc/install) and [Docker](https://docs.doc
 $ make git-hooks   # install any necessary git-hooks
 $ make dev-db      # starts a local PostgreSQL database in docker
 $ make migrations  # runs db migrations
+$ make web         # builds static assets
 $ make run         # run the web server
 ```
 
