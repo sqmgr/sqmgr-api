@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-   http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,7 +26,8 @@ limitations under the License.
             <div v-show="suggestTeams.length > 0" class="suggest">
                 <div class="suggest-item" v-for="(team, idx) in suggestTeams"
                      v-bind:class="{ selected: idx === suggestIdx }">
-                    <a href="#" @click.prevent="selectTeam(team)" @mouseover="suggestIdx=idx">{{team.name}} ({{team.league}})</a>
+                    <a href="#" @click.prevent="selectTeam(team)" @mouseover="suggestIdx=idx">{{team.name}}
+                        ({{team.league}})</a>
                 </div>
             </div>
         </div>
@@ -83,7 +84,7 @@ limitations under the License.
             selectTeam(team) {
                 this.value.name = team.name
                 this.value.color1 = '#' + team.colors.hex[0]
-                this.value.color2 = '#' + team.colors.hex[1]
+                this.value.color2 = '#' + (team.colors.hex[1] || team.colors.hex[0])
                 setTimeout(() => this.suggestTeams = [], 1)
             },
             selectUp() {
@@ -136,7 +137,7 @@ limitations under the License.
             },
             hideSuggestions() {
                 // do this behind a timeout just in case user clicked something
-                setTimeout( () => {
+                setTimeout(() => {
                     this.suggestIdx = -1
                     this.suggestTeams = []
                 }, 100)

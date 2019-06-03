@@ -162,10 +162,10 @@ limitations under the License.
 <style scoped>
     section.grid-customize {
         position: relative;
-        width: 80vw;
+        width: 70vw;
 
         div.loading-indicator {
-            position: absolute;
+            position: static;
             bottom: var(--minimal-spacing);
             right: var(--minimal-spacing);
         }

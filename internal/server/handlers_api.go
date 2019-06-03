@@ -288,6 +288,8 @@ func (s *Server) apiPoolGamePostHandler() http.HandlerFunc {
 				return
 			}
 
+			fmt.Printf("%#v", *payload.Data)
+
 			v := validator.New()
 			eventDate := v.Datetime("Event Date", payload.Data.EventDate, "00:00", "0", true)
 			homeTeamName := v.Printable("Home Team Name", payload.Data.HomeTeamName, true)
