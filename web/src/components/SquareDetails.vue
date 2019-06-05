@@ -54,7 +54,7 @@ limitations under the License.
             </tr>
             <tr>
                 <td>Last Modified</td>
-                <td class="modified">{{square.modified}}</td>
+                <td class="modified">{{new Date(square.modified).toLocaleDateString('default', Common.DateTimeOptions)}}</td>
             </tr>
             </tbody>
         </table>
@@ -73,6 +73,7 @@ limitations under the License.
     import Claim from './Claim.vue'
     import Note from './Note.vue'
     import Vue from 'vue'
+    import Common from '../common'
 
     export default {
         name: "SquareDetails",
@@ -82,6 +83,7 @@ limitations under the License.
         },
         data() {
             return {
+                Common,
                 loadedData: null,
                 form: {
                     state: this.loadedData ? this.loadedData.state : this.data.state,
