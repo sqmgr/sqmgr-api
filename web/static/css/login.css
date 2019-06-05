@@ -23,3 +23,7 @@ input[type="checkbox"] {
 	display: inline-block;
 	width: auto;
 }
+
+section.login div.buttons {
+	text-align: left;
+}
