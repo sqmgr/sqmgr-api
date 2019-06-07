@@ -14,7 +14,7 @@ spec:
     spec:
       initContainers:
         - name: liquibase
-          image: reg.taproom.us/weters/sqmgr-lb
+          image: weters/sqmgr-lb
           imagePullPolicy: Always
           envFrom:
             - secretRef:
@@ -47,7 +47,7 @@ spec:
           value: /opt/sqmgr/jwt-keys/public.pem
         - name: JWT_PRIVATE_KEY
           value: /opt/sqmgr/jwt-keys/private.pem
-        image: reg.taproom.us/weters/sqmgrserver:latest
+        image: weters/sqmgrserver:latest
         imagePullPolicy: Always
         volumeMounts:
           - mountPath: /opt/sqmgr/jwt-keys
@@ -57,4 +57,4 @@ spec:
           secret:
             secretName: sqmgr-jwt-keys
       imagePullSecrets:
-      - name: taproom.us
+      - name: docker-hub

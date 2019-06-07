@@ -1,2 +1,2 @@
-FROM reg.taproom.us/pg-liquibase
+FROM weters/pg-liquibase
 COPY sql/ sql/

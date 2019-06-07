@@ -1,5 +1,5 @@
-IMG ?= "reg.taproom.us/weters/sqmgrserver"
-LB_IMG ?= "reg.taproom.us/weters/sqmgr-lb"
+IMG ?= "weters/sqmgrserver"
+LB_IMG ?= "weters/sqmgr-lb"
 BUILD_NUMBER ?= `date "+%y%m%d%H%M%S"`
 PG_HOST ?= "localhost"
 PG_PORT ?= "5432"
@@ -38,7 +38,7 @@ docker-push: docker-build
 
 .PHONY: k8s-deploy
 k8s-deploy: docker-push
-	kubectl set image deploy ${DEPLOY_NAME} sqmgr=$(shell docker inspect --format='{{index .RepoDigests 0}}' reg.taproom.us/weters/sqmgrserver:latest) --record
+	kubectl set image deploy ${DEPLOY_NAME} sqmgr=$(shell docker inspect --format='{{index .RepoDigests 0}}' $(IMG):latest) --record
 	kubectl rollout status deploy ${DEPLOY_NAME}
 
 .PHONY: test
