@@ -25,19 +25,35 @@ limitations under the License.
         </template>
 
         <div class="buttons">
-            <button type="button" class="secondary" @click.prevent="$emit('cancel-was-clicked')">Cancel</button>
-            <button type="button" @click.prevent="$emit('action-was-clicked')">{{buttonLabel}}</button>
+            <template v-if="dismissButton">
+                <button type="button" @click.prevent="ModalController.hide()">{{dismissButton}}</button>
+            </template>
+            <template v-else>
+                <button type="button" class="secondary" @click.prevent="$emit('cancel-was-clicked')">Cancel</button>
+                <button type="button" @click.prevent="$emit('action-was-clicked')">{{actionButton}}</button>
+            </template>
         </div>
     </div>
 </template>
 
 <script>
+    import ModalController from '@/controllers/ModalController'
+
     export default {
         name: "Prompt.vue",
         props: {
-            description: String,
-            buttonLabel: String,
+            description: {
+                type: String,
+                required: true,
+            },
+            actionButton: String,
+            dismissButton: String,
             warning: String
+        },
+        data() {
+            return {
+                ModalController
+            }
         }
     }
 </script>

@@ -25,18 +25,23 @@ const obj = {
     show() {
         bus.$emit('show', ...arguments)
     },
+    abort() {
+        bus.$emit('abort')
+    },
     hide() {
         bus.$emit('hide')
     },
     hideAll() {
         bus.$emit('hideAll')
     },
-    showPrompt(title, description, warning, buttonLabel, confirmAction = () => {}) {
+    showPrompt(title, description, opts = {}) {
+        const confirmAction = typeof(opts.action) === 'function' ? opts.action : () => {}
         obj.show(title, Prompt, {
             title,
             description,
-            buttonLabel,
-            warning,
+            actionButton: opts.actionButton,
+            dismissButton: opts.dismissButton,
+            warnings: opts.warning,
         }, {
             'action-was-clicked': confirmAction,
             'cancel-was-clicked': () => obj.hide(),

@@ -166,7 +166,16 @@ limitations under the License.
         },
         methods: {
             customizeWasClicked() {
-                ModalController.show('Customize Grid', GridCustomize, {gridID: this.grid.id})
+                ModalController.show('Customize Grid', GridCustomize, {
+                    gridID: this.grid.id,
+                }, {
+                    saved() {
+                        ModalController.hide()
+                        ModalController.showPrompt('Changes Saved', 'Changes saved successfully.', {
+                            dismissButton: 'OK',
+                        })
+                    }
+                })
             },
             drawNumbersWasClicked() {
                 let allClaimed = true
@@ -181,13 +190,18 @@ limitations under the License.
                 const description = 'Do you want to draw the numbers for this game? This action cannot be undone.'
                 const warning = !allClaimed && 'Not all squares have been claimed yet'
 
-                ModalController.showPrompt('Draw the Numbers', description, warning, 'Draw', () => api.drawNumbers(this.grid.id)
-                    .then(grid => {
-                        this.grid = grid
-                        ModalController.hide()
-                    })
-                    .catch(err => ModalController.showError(err))
-                )
+                ModalController.showPrompt('Draw the Numbers', description, {
+                    warning,
+                    actionButton: 'Draw',
+                    action: () => {
+                        api.drawNumbers(this.grid.id)
+                            .then(grid => {
+                                this.grid = grid
+                                ModalController.hide()
+                            })
+                            .catch(err => ModalController.showError(err))
+                    },
+                })
             },
             loadData() {
                 api.getSquares()

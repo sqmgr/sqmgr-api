@@ -17,8 +17,39 @@ limitations under the License.
 import axios from 'axios'
 import EventBus from './EventBus'
 import Loading from '../loading'
+import JWT from 'jsonwebtoken'
 
 class API {
+    constructor() {
+        this._axios = null
+        this._jwt = null
+        this._token = null
+    }
+
+    get jwt() {
+        if (this._jwt) {
+            return Promise.resolve(this._jwt)
+        }
+
+        return new Promise(resolve =>
+            axios.get(`/pool/${this.token}/jwt`)
+                .then(res => resolve(this._jwt = res.data.result))
+        )
+    }
+
+    get axios() {
+        if (this._axios) {
+            return Promise.resolve(this._axios)
+        }
+
+        return this.jwt
+            .then(jwt => {
+                return this._axios = axios.create({
+                    'headers': { 'Authorization': `Bearer ${this._jwt}` }
+                })
+            })
+    }
+
     get token() {
         if (!this._token) {
             throw new Error('must set token first')
@@ -31,30 +62,9 @@ class API {
         this._token = value;
     }
 
-    constructor() {
-        this._axios = null
-        this._token = null
-    }
-
-    axios() {
-        if (this._axios) {
-            return Promise.resolve(this._axios)
-        }
-
-        return axios.get(`/pool/${this.token}/jwt`)
-            .then(res => {
-                this._axios = axios.create({
-                    'headers': {
-                        'Authorization': `Bearer ${res.data.result}`
-                    }
-                })
-                return this._axios
-            })
-    }
-
     async request(config) {
         Loading.show()
-        return this.axios()
+        return this.axios
             .then(client => client.request(config))
             .catch(err => {
                 if (!err.response) {
@@ -65,8 +75,8 @@ class API {
                     return Promise.reject(err)
                 }
 
-                this._axios = null
-                return this.axios()
+                this.clearClient()
+                return this.axios
                     .then(client => client.request(config))
             })
             .then(res => res.data.status === "OK" ? res.data.result : Promise.reject(new Error('unknown status')))
@@ -161,6 +171,16 @@ class API {
         return this.post(`/api/pool/${this.token}/game/${gridID}`, {
             action: 'drawNumbers',
         })
+    }
+
+    clearClient() {
+        this._axios = null
+        this._jwt = null
+    }
+
+    decodedJWT() {
+        return this.jwt
+            .then(jwt => JWT.decode(jwt))
     }
 }
 

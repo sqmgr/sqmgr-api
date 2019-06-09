@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-   http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,7 +26,8 @@ limitations under the License.
 
                         <a class="close" href="#" @click.prevent="close"><span>Close</span></a>
                         <div class="content">
-                            <component :is="component.component" v-bind="component.props" v-on="component.on"></component>
+                            <component :is="component.component" v-bind="component.props"
+                                       v-on="component.on"></component>
                         </div>
                     </div>
                 </transition>
@@ -54,15 +55,32 @@ limitations under the License.
                 on,
             }))
 
-            ModalController.bus.$on('hide', () => this.components.pop())
+            const fireEvent = (c, event) => {
+                if (typeof (c.on[event]) === 'function') {
+                    c.on[event]()
+                }
+            }
 
-            ModalController.bus.$on('hideAll', () => this.components = [])
+            ModalController.bus.$on('abort', () => fireEvent(this.components.pop(), 'modal-aborted'))
 
-            window.addEventListener('keyup', e => this.components.length > 0 && e.key === 'Escape' && this.components.pop())
+            ModalController.bus.$on('hide', () => fireEvent(this.components.pop(), 'modal-closed'))
+
+            ModalController.bus.$on('hideAll', () => {
+                let c
+                while (undefined !== (c = this.components.pop())) {
+                    fireEvent(c, 'modal-closed')
+                }
+            })
+
+            window.addEventListener('keyup', e => {
+                if (this.components.length > 0 && e.key === 'Escape') {
+                    fireEvent(this.components.pop(), 'modal-aborted')
+                }
+            })
         },
         methods: {
             close() {
-                ModalController.hide()
+                ModalController.abort()
             }
         }
     }

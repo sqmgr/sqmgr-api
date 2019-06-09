@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-   http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,7 +27,7 @@ limitations under the License.
                             <th>Game</th>
                             <th>Date of Game</th>
                             <th>Numbers Drawn?</th>
-                            <th>&nbsp;</th>
+                            <th v-if="jwt.IsAdmin">&nbsp;</th>
                         </tr>
                         </thead>
                         <tbody v-if="grids">
@@ -39,7 +39,7 @@ limitations under the License.
                                 <i v-if="!grid.homeNumbers" class="fas fa-times"></i>
                             </td>
 
-                            <td class="actions">
+                            <td class="actions" v-if="jwt.IsAdmin">
                                 <button type="submit" class="destructive" @click.prevent="confirmDelete(grid)">Delete
                                 </button>
                             </td>
@@ -47,12 +47,14 @@ limitations under the License.
                         </tbody>
                     </table>
 
-                    <div class="buttons">
+                    <div class="buttons" v-if="jwt.IsAdmin">
                         <button type="button" @click.prevent="createGrid">Create Game</button>
                     </div>
                 </div>
 
                 <div class="col-1">
+                    <h4>Pool Settings</h4>
+
                     <table>
                         <tbody>
                         <tr>
@@ -95,11 +97,15 @@ limitations under the License.
                 token: window.location.pathname.substr(6, 8),
                 pool: {},
                 grids: [],
+                jwt: {},
             }
         },
         components: {Modal},
         mounted() {
             api.token = this.token
+
+            api.decodedJWT()
+                .then(jwt => this.jwt = jwt)
 
             api.getPool()
                 .then(res => this.pool = res)
@@ -112,46 +118,36 @@ limitations under the License.
         methods: {
             createGrid() {
                 api.createGrid()
-                    .then(res => {
-                        this.grids.push(res)
-
+                    .then(grid => {
                         ModalController.show('Customize Grid', GridCustomize, {
-                            gridID: res.id,
+                            gridID: grid.id,
                         }, {
-                            'canceled': () => {
-                                console.log("DID CLICK CANCEL")
+                            'modal-aborted': () => {
+                                api.deleteGrid(grid.id)
+                                    .catch(err => ModalController.showError(err))
                             },
                             'saved': grid => {
-                                let index = -1
-                                for (let i = 0; i < this.grids.length; i++) {
-                                    if (this.grids[i].id === grid.id) {
-                                        index = i
-                                        break
-                                    }
-                                }
-
-                                if (index < 0) {
-                                    throw new Error("could not find grid in grids list")
-                                }
-
-                                this.grids.splice(index, 1, grid)
+                                ModalController.hide()
+                                this.grids.push(grid)
                             }
                         })
                     })
                     .catch(err => ModalController.showError(err))
             },
             confirmDelete(grid) {
-                ModalController.showPrompt('Are you sure?', `Do you really want to delete "${grid.name}"`, null, 'Delete It', () => {
-                    api.deleteGrid(grid.id)
-                        .then(() => {
-                            const index = this.grids.indexOf(grid)
-                            if (index >= 0) {
-                                this.grids.splice(index, 1)
-                            }
-
-                            ModalController.hide()
-                        })
-                        .catch(err => ModalController.showError(err))
+                ModalController.showPrompt('Are you sure?', `Do you really want to delete "${grid.name}"`, {
+                    actionButton: 'Delete It',
+                    action: () => {
+                        api.deleteGrid(grid.id)
+                            .then(() => {
+                                const index = this.grids.indexOf(grid)
+                                if (index >= 0) {
+                                    this.grids.splice(index, 1)
+                                }
+                                ModalController.hide()
+                            })
+                            .catch(err => ModalController.showError(err))
+                    }
                 })
 
                 return false
@@ -176,14 +172,13 @@ limitations under the License.
     }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
     section.pool table {
         width: 100%;
 
-    td.actions {
-        text-align: center;
-    }
-
+        td.actions {
+            text-align: center;
+        }
     }
 
     div.buttons {

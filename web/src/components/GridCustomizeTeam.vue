@@ -35,9 +35,9 @@ limitations under the License.
         <div class="field">
             <label :for="`color-1-${id}`">{{name}} Colors</label>
             <input type="color" :id="`color-1-${id}`" :name="`color-1-${id}`" placeholder="#000000"
-                   v-model="value.color1">
+                   v-model="value.color1" tabindex="-1">
             <input type="color" :id="`color-2-${id}`" :name="`color-2-${id}`" placeholder="#000000"
-                   v-model="value.color2">
+                   v-model="value.color2" tabindex="-1">
         </div>
     </div>
 </template>

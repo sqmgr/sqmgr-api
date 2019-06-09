@@ -18,14 +18,7 @@ limitations under the License.
 
 <template>
     <section class="grid-customize">
-        <template v-if="saved">
-            <p>Your changes have been saved</p>
-
-            <div class="buttons">
-                <button type="button" @click.prevent="ModalController.hide()">Dismiss</button>
-            </div>
-        </template>
-        <template v-else-if="grid">
+        <template v-if="grid">
             <form @submit.prevent="submit">
                 <template v-if="errors">
                     <template v-for="(errList, errKey) in errors">
@@ -112,7 +105,6 @@ limitations under the License.
             return {
                 ModalController,
                 errors: null,
-                saved: null,
                 grid: null,
                 teamNameMaxLength: 50, // TODO
                 notesMaxLength: 200, // TODO
@@ -146,7 +138,7 @@ limitations under the License.
                     awayTeamColor1: this.form.awayTeam.color1,
                     awayTeamColor2: this.form.awayTeam.color2,
                 })
-                    .then(grid => { this.$emit('saved', grid); this.saved = true })
+                    .then(grid => { this.$emit('saved', grid) })
                     .catch(err => {
                         if (err.response && err.response.data && err.response.data.result) {
                             this.errors = err.response.data.result
@@ -157,7 +149,7 @@ limitations under the License.
             },
             didClickCancel() {
                 this.$emit('canceled')
-                ModalController.hide()
+                ModalController.abort()
             }
         },
     }
