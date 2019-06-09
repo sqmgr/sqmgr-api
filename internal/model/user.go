@@ -40,19 +40,7 @@ var ErrUserExists = errors.New("model: user already exists")
 // ErrUserNotFound is when the user is not found in the database
 var ErrUserNotFound = errors.New("model: user not found")
 
-// State represents the state of the user
-type State string
 
-const (
-	// Active means the user is active
-	Active State = "active"
-
-	// Pending is when the account is waiting the user to verify the email
-	Pending State = "pending"
-
-	// Disabled is when the user disabled their account
-	Disabled State = "disabled"
-)
 
 // durationBeforeReauth is a maximum duration allowed before a user is required to resupply their credentials
 // before doing some potentially destructive operation
@@ -238,7 +226,7 @@ func (u *User) Delete() error {
 
 	u.Email = email
 	u.PasswordHash = passwordHash
-	u.State = Disabled
+	u.State = Deleted
 
 	return nil
 }

@@ -57,6 +57,57 @@ func (s *Server) apiPoolLogsHandler() http.HandlerFunc {
 	}
 }
 
+func (s *Server) apiPoolHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		jcd := r.Context().Value(ctxKeyJWT).(*jwtContextData)
+
+		s.ServeJSON(w, http.StatusOK, jsonResponse{
+			Status: responseOK,
+			Result: jcd.Pool,
+		})
+	}
+}
+
+func (s *Server) apiPoolGamesPostHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		jcd := r.Context().Value(ctxKeyJWT).(*jwtContextData)
+
+		if !jcd.Claim.IsAdmin {
+			s.ServeJSONError(w, http.StatusForbidden, "")
+			return
+		}
+
+		grid, err := jcd.Pool.NewGrid(r.Context())
+		if err != nil {
+			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+
+		s.ServeJSON(w, http.StatusCreated, jsonResponse{
+			Status: responseOK,
+			Result: grid,
+		})
+	}
+}
+
+func (s *Server) apiPoolGamesHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		jcd := r.Context().Value(ctxKeyJWT).(*jwtContextData)
+
+		// TODO support pagination
+		grids, err := jcd.Pool.Grids(r.Context(), 0, 100)
+		if err != nil {
+			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+
+		s.ServeJSON(w, http.StatusOK, jsonResponse{
+			Status: responseOK,
+			Result: grids,
+		})
+	}
+}
+
 func (s *Server) apiPoolSquaresHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jcd := r.Context().Value(ctxKeyJWT).(*jwtContextData)
@@ -214,6 +265,37 @@ func (s *Server) apiPoolGameHandler() http.HandlerFunc {
 	}
 }
 
+func (s *Server) apiPoolGameDeleteHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		jcd := r.Context().Value(ctxKeyJWT).(*jwtContextData)
+		if !jcd.Claim.IsAdmin {
+			s.ServeJSONError(w, http.StatusForbidden, "")
+			return
+		}
+
+		gridID, _ := strconv.ParseInt(mux.Vars(r)["grid"], 10, 64)
+		grid, err := jcd.Pool.GridByID(r.Context(), gridID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				s.ServeJSONError(w, http.StatusNotFound, "")
+				return
+			}
+
+			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+
+		if err := grid.Delete(r.Context()); err != nil {
+			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+
+		s.ServeJSON(w, http.StatusOK, jsonResponse{
+			Status: responseOK,
+		})
+	}
+}
+
 func (s *Server) apiPoolGamePostHandler() http.HandlerFunc {
 	type postPayload struct {
 		Action string `json:"action"`
@@ -327,6 +409,7 @@ func (s *Server) apiPoolGamePostHandler() http.HandlerFunc {
 
 			s.ServeJSON(w, http.StatusAccepted, jsonResponse{
 				Status: responseOK,
+				Result: grid,
 			})
 			return
 		}

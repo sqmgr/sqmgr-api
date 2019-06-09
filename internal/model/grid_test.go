@@ -187,3 +187,40 @@ func TestSelectRandomNumbers(t *testing.T) {
 	g.Expect(grid.homeNumbers).ShouldNot(gomega.BeNil())
 	g.Expect(grid.SelectRandomNumbers()).Should(gomega.Equal(ErrNumbersAlreadyDrawn))
 }
+
+func TestGridDelete(t *testing.T) {
+	if len(os.Getenv("INTEGRATION")) == 0 {
+		t.Skip("skipping. to run, use -integration flag")
+	}
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+
+	pool := getPool(m)
+	grids, err := pool.Grids(context.Background(), 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(grids)).Should(gomega.Equal(1))
+
+	g.Expect(grids[0].Delete(context.Background())).Should(gomega.Succeed())
+	grids, err = pool.Grids(context.Background(), 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(grids)).Should(gomega.Equal(0))
+
+	grids, err = pool.Grids(context.Background(), 0, 10, true)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(grids)).Should(gomega.Equal(1))
+}
+
+func getPool(m *Model) *Pool {
+	user, err := m.NewUser(randString()+"@sqmgr.com", "my-password")
+	if err != nil {
+		panic(err)
+	}
+
+	pool, err := m.NewPool(context.Background(), user.ID, "Test Pool", GridTypeStd25, "my-password")
+	if err != nil {
+		panic(err)
+	}
+
+	return pool
+}

@@ -16,8 +16,6 @@ limitations under the License.
 
 <template>
     <div>
-        <h4>{{title}}</h4>
-
         <p>{{description}}</p>
 
         <template v-if="warning">
@@ -37,7 +35,6 @@ limitations under the License.
     export default {
         name: "Prompt.vue",
         props: {
-            title: String,
             description: String,
             buttonLabel: String,
             warning: String

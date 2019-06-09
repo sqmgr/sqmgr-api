@@ -65,7 +65,7 @@ limitations under the License.
                 </fieldset>
 
                 <div class="buttons">
-                    <button type="button" class="secondary" @click.prevent="ModalController.hide()">Cancel</button>
+                    <button type="button" class="secondary" @click.prevent="didClickCancel">Cancel</button>
                     <button type="submit" name="submit">Save</button>
                 </div>
             </form>
@@ -112,7 +112,7 @@ limitations under the License.
             return {
                 ModalController,
                 errors: null,
-                saved: false,
+                saved: null,
                 grid: null,
                 teamNameMaxLength: 50, // TODO
                 notesMaxLength: 200, // TODO
@@ -146,7 +146,7 @@ limitations under the License.
                     awayTeamColor1: this.form.awayTeam.color1,
                     awayTeamColor2: this.form.awayTeam.color2,
                 })
-                    .then(() => this.saved = true)
+                    .then(grid => { this.$emit('saved', grid); this.saved = true })
                     .catch(err => {
                         if (err.response && err.response.data && err.response.data.result) {
                             this.errors = err.response.data.result
@@ -154,8 +154,12 @@ limitations under the License.
 
                         ModalController.showError(err)
                     })
+            },
+            didClickCancel() {
+                this.$emit('canceled')
+                ModalController.hide()
             }
-        }
+        },
     }
 </script>
 

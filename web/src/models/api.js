@@ -80,6 +80,13 @@ class API {
         })
     }
 
+    delete(url) {
+        return this.request({
+            method: 'DELETE',
+            url,
+        })
+    }
+
     post(path, data, emitEvent = "data-updated") {
         return this.request({
             method: 'POST',
@@ -97,6 +104,22 @@ class API {
 
     getSquares() {
         return this.get(`/api/pool/${this.token}/squares`)
+    }
+
+    getPool() {
+        return this.get(`/api/pool/${this.token}`)
+    }
+
+    getPoolGrids() {
+        return this.get(`/api/pool/${this.token}/game`)
+    }
+
+    createGrid() {
+        return this.post(`/api/pool/${this.token}/game`)
+    }
+
+    deleteGrid(gridID) {
+        return this.delete(`/api/pool/${this.token}/game/${gridID}`)
     }
 
     getGrid(gridID) {

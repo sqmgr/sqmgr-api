@@ -29,6 +29,7 @@ module.exports = {
         'account': path.resolve(__dirname, 'src', 'account.js'),
         'grid-customize': path.resolve(__dirname, 'src', 'grid-customize.js'),
         'grid': path.resolve(__dirname, 'src', 'grid.js'),
+        'pool': path.resolve(__dirname, 'src', 'pool.js'),
     },
     output: {
         filename: '[name].js',

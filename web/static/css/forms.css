@@ -22,7 +22,7 @@ form {
 	padding: var(--spacing);
 }
 
-div.modal form {
+form.standalone {
     background-color: transparent;
 	border: none;
 	padding: 0;
@@ -250,7 +250,7 @@ button.destructive:active {
 button[disabled],
 button[disabled]:hover,
 button[disabled]:active {
-	background: transparent;
+	background: var(--light-gray);
 	border-color: var(--gray);
 	color: var(--gray);
 }

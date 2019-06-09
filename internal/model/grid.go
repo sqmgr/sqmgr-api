@@ -52,6 +52,7 @@ type Grid struct {
 	awayTeamName *string
 	awayNumbers  []int
 	eventDate    time.Time
+	state        State
 	created      time.Time
 	modified     time.Time
 
@@ -66,6 +67,7 @@ type gridJSON struct {
 	AwayTeamName string        `json:"awayTeamName"`
 	AwayNumbers  []int         `json:"awayNumbers"`
 	EventDate    time.Time     `json:"eventDate"`
+	State        State         `json:"state"`
 	Created      time.Time     `json:"created"`
 	Modified     time.Time     `json:"modified"`
 	Settings     *GridSettings `json:"settings"`
@@ -81,10 +83,21 @@ func (g *Grid) MarshalJSON() ([]byte, error) {
 		AwayTeamName: g.AwayTeamName(),
 		AwayNumbers:  g.AwayNumbers(),
 		EventDate:    g.EventDate(),
+		State:        g.State(),
 		Created:      g.Created(),
 		Modified:     g.modified,
 		Settings:     g.settings,
 	})
+}
+
+// State is a getter for the state
+func (g *Grid) State() State {
+	return g.state
+}
+
+// SetState will set the state
+func (g *Grid) SetState(state State) {
+	g.state = state
 }
 
 // SetEventDate is a setter for the event date
@@ -173,8 +186,9 @@ func (g *Grid) Save(ctx context.Context) error {
 		    away_team_name = $4,
 			away_numbers = $5,
 			event_date = $6,
+		    state = $7,
 			modified = (now() at time zone 'utc')
-		WHERE id = $7
+		WHERE id = $8
 	`
 
 	tx, err := g.model.db.BeginTx(ctx, nil)
@@ -197,7 +211,7 @@ func (g *Grid) Save(ctx context.Context) error {
 		eventDate = &g.eventDate
 	}
 
-	if _, err := tx.ExecContext(ctx, query, g.ord, g.homeTeamName, pq.Array(g.homeNumbers), g.awayTeamName, pq.Array(g.awayNumbers), eventDate, g.id); err != nil {
+	if _, err := tx.ExecContext(ctx, query, g.ord, g.homeTeamName, pq.Array(g.homeNumbers), g.awayTeamName, pq.Array(g.awayNumbers), eventDate, g.state, g.id); err != nil {
 		if err2 := tx.Rollback(); err2 != nil {
 			return fmt.Errorf("error found: %#v. Another error found when trying to rollback: %#v", err, err2)
 		}
@@ -239,6 +253,13 @@ func (g *Grid) SelectRandomNumbers() error {
 	g.awayNumbers = aNums
 
 	return nil
+}
+
+// Delete the grid. By delete, we mean set the row to 'deleted'
+func (g *Grid) Delete(ctx context.Context) error {
+	const query = "UPDATE grids SET state = 'deleted', modified = (now() at time zone 'utc') WHERE id = $1"
+	_, err := g.model.db.ExecContext(ctx, query, g.id)
+	return err
 }
 
 // LoadSettings will load the settings
@@ -292,7 +313,7 @@ func (m *Model) gridByRow(scan scanFunc) (*Grid, error) {
 	var homeNumbers, awayNumbers []sql.NullInt64
 	var eventDate *time.Time
 
-	if err := scan(&grid.id, &grid.poolID, &grid.ord, &grid.homeTeamName, pq.Array(&homeNumbers), &grid.awayTeamName, pq.Array(&awayNumbers), &eventDate, &grid.created, &grid.modified); err != nil {
+	if err := scan(&grid.id, &grid.poolID, &grid.ord, &grid.homeTeamName, pq.Array(&homeNumbers), &grid.awayTeamName, pq.Array(&awayNumbers), &eventDate, &grid.state, &grid.created, &grid.modified); err != nil {
 		return nil, err
 	}
 

@@ -444,13 +444,20 @@ func (p *Pool) DefaultGrid(ctx context.Context) (*Grid, error) {
 	return grids[0], nil
 }
 
-// Grids returns all grids assigned to the pool
-func (p *Pool) Grids(ctx context.Context, offset, limit int) ([]*Grid, error) {
-	const query = `
+// Grids returns all grids assigned to the pool. By default, this will only return "active" grids. Pass true to as the allStates
+// argument to return grids with all states
+func (p *Pool) Grids(ctx context.Context, offset, limit int, allStates ...bool) ([]*Grid, error) {
+	activeOnly := len(allStates) == 0 || !allStates[0]
+	stateClause := ""
+	if activeOnly {
+		stateClause = " AND state = 'active'"
+	}
+
+	query := `
 SELECT *
 FROM grids
-WHERE pool_id = $1
-ORDER BY ord ASC
+WHERE pool_id = $1` + stateClause + `
+ORDER BY ord, id
 OFFSET $2
 LIMIT $3
 `
@@ -483,7 +490,7 @@ func (p *Pool) NewGrid(ctx context.Context) (*Grid, error) {
 
 // GridByID will return a grid by its ID and ensures that it belongs to the pool
 func (p *Pool) GridByID(ctx context.Context, id int64) (*Grid, error) {
-	const query = `SELECT * FROM grids WHERE id = $1 AND pool_id = $2`
+	const query = `SELECT * FROM grids WHERE id = $1 AND pool_id = $2 AND state = 'active'`
 	row := p.model.db.QueryRowContext(ctx, query, id, p.id)
 	return p.model.gridByRow(row.Scan)
 }

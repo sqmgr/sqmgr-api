@@ -52,7 +52,7 @@ limitations under the License.
                     <td>{{ grid.name }}</td>
                 </tr>
                 <tr>
-                    <td>Event Date</td>
+                    <td>Date of Game</td>
                     <td>{{ eventDate }}</td>
                 </tr>
                 <tr>
@@ -92,7 +92,7 @@ limitations under the License.
             <Logs :show-add-note="false" :logs="logs"/>
         </template>
 
-        <Modal />
+        <Modal/>
     </div>
 </template>
 
@@ -103,7 +103,6 @@ limitations under the License.
     import EventBus from '../models/EventBus'
     import GridCustomize from './GridCustomize.vue'
     import Common from '../common'
-    import Prompt from './Prompt.vue'
 
     import Modal from '@/components/Modal'
     import ModalController from '@/controllers/ModalController'
@@ -167,7 +166,7 @@ limitations under the License.
         },
         methods: {
             customizeWasClicked() {
-                ModalController.show('Customize Grid', GridCustomize, { gridID: this.grid.id })
+                ModalController.show('Customize Grid', GridCustomize, {gridID: this.grid.id})
             },
             drawNumbersWasClicked() {
                 let allClaimed = true
@@ -179,24 +178,16 @@ limitations under the License.
                     }
                 }
 
-                const propsData = {
-                    title: 'Draw Numbers?',
-                    description: 'Do you want to draw the numbers for this game? This action cannot be undone.',
-                    buttonLabel: 'Draw',
-                    ...(!allClaimed && {warning: 'Not all squares have been claimed yet'})
-                }
+                const description = 'Do you want to draw the numbers for this game? This action cannot be undone.'
+                const warning = !allClaimed && 'Not all squares have been claimed yet'
 
-                ModalController.show('Draw the Numbers', Prompt, propsData, {
-                    'cancel-was-clicked': () => ModalController.hide(),
-                    'action-was-clicked': () => {
-                        api.drawNumbers(this.grid.id)
-                            .then(grid => {
-                                this.grid = grid
-                                ModalController.hide()
-                            })
-                            .catch(err => ModalController.showError(err))
-                    }
-                })
+                ModalController.showPrompt('Draw the Numbers', description, warning, 'Draw', () => api.drawNumbers(this.grid.id)
+                    .then(grid => {
+                        this.grid = grid
+                        ModalController.hide()
+                    })
+                    .catch(err => ModalController.showError(err))
+                )
             },
             loadData() {
                 api.getSquares()
@@ -240,6 +231,12 @@ limitations under the License.
 <style lang="scss" scoped>
     .grid-metadata {
         margin-bottom: var(--spacing);
+
+        table {
+            td:first-child {
+                white-space: nowrap;
+            }
+        }
     }
 
     nav.admin-menu {

@@ -20,7 +20,7 @@ CREATE TABLE tokens (
 	token text NOT NULL PRIMARY KEY
 );
 
-CREATE TYPE states AS ENUM ('active', 'pending', 'disabled');
+CREATE TYPE states AS ENUM ('active', 'pending', 'deleted', 'disabled');
 
 CREATE TABLE users (
 	id bigserial NOT NULL PRIMARY KEY,
@@ -58,6 +58,7 @@ CREATE TABLE grids (
     away_team_name text null,
     away_numbers text[],
     event_date timestamp,
+    state states not null default 'active',
     created timestamp not null default (now() at time zone 'utc'),
     modified timestamp not null default (now() at time zone 'utc')
 );
@@ -125,7 +126,6 @@ CREATE INDEX pool_squares_logs_pool_square_id_idx ON pool_squares_logs (pool_squ
 --rollback DROP TABLE tokens;
 --rollback DROP TYPE square_states;
 --rollback DROP TYPE states;
-
 
 --changeset weters:2 splitStatements:false
 

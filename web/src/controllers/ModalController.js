@@ -16,6 +16,7 @@ limitations under the License.
 
 import Vue from 'vue'
 import Error from '@/components/Error'
+import Prompt from "@/components/Prompt";
 
 const bus = new Vue()
 
@@ -29,6 +30,17 @@ const obj = {
     },
     hideAll() {
         bus.$emit('hideAll')
+    },
+    showPrompt(title, description, warning, buttonLabel, confirmAction = () => {}) {
+        obj.show(title, Prompt, {
+            title,
+            description,
+            buttonLabel,
+            warning,
+        }, {
+            'action-was-clicked': confirmAction,
+            'cancel-was-clicked': () => obj.hide(),
+        })
     },
     showError(err) {
         obj.show('Error', Error, {
