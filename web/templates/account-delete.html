@@ -22,6 +22,11 @@ limitations under the License.
 {{ end }}
 
 {{ define "javascripts" }}
+<script>
+	const SqMGR = {
+		ExpectedEmail: {{.Local.Email}}
+	}
+</script>
 <script src="/static/dist/account-delete.js"></script>
 {{ end }}
 
@@ -36,24 +41,6 @@ limitations under the License.
 			<button type="button" class="destructive">Delete My Account</button>
 		</div>
 	</div>
-
-	<div class="modal">
-		<form method="post">
-			<h3>Are you sure?</h3>
-
-			<a class="close" href="#"><span>Close</span></a>
-
-			<p>This action <strong>cannot</strong> be undone. Please type your email address to confirm.
-
-			<div class="field">
-				<input type="email" name="email" autocomplete="off">
-				<input type="hidden" name="expected-email" value="{{.Local.Email}}">
-			</div>
-
-			<div class="buttons">
-				<button type="submit" name="submit" class="destructive" disabled>I understand the consequences; delete my account</button>
-			</div>
-		</form>
-	</div>
 </section>
+<div id="modal"></div>
 {{ end }}

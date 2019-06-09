@@ -49,10 +49,9 @@ limitations under the License.
 
 <script>
     import Note from './Note.vue'
-    import Vue from 'vue'
-    import Modal from '../modal'
     import api from '../models/api'
     import Common from '../common'
+    import ModalController from '@/controllers/ModalController'
 
     export default {
         name: "Logs",
@@ -63,22 +62,21 @@ limitations under the License.
         },
         methods: {
             addNote() {
-                const vm = new (Vue.extend(Note))
-                vm.$on('submit', note => {
-                    if (note) {
-                        api.updateSquare(this.squareId, {note})
-                            .then(() => {
-                                Modal.close()
-                                this.$emit('note-added')
-                            })
-                            .catch(err => Modal.showError(err))
-                        return
+                ModalController.show('Add Note', Note, {}, {
+                    submit: note => {
+                        if (note) {
+                            api.updateSquare(this.squareId, {note})
+                                .then(() => {
+                                    ModalController.hide()
+                                    this.$emit('note-added')
+                                })
+                                .catch(err => ModalController.showError(err))
+                            return
+                        }
+
+                        ModalController.hide()
                     }
-
-                    Modal.close()
                 })
-
-                Modal.show(vm.$mount().$el)
             },
             datetime(dt) {
                 return new Date(dt).toLocaleDateString('default', Common.DateTimeOptions)

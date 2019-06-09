@@ -18,13 +18,11 @@ limitations under the License.
 
 <template>
     <section class="grid-customize">
-        <h3>Customize Grid</h3>
-
         <template v-if="saved">
             <p>Your changes have been saved</p>
 
             <div class="buttons">
-                <button type="button" @click.prevent="modal.close()">Dismiss</button>
+                <button type="button" @click.prevent="ModalController.hide()">Dismiss</button>
             </div>
         </template>
         <template v-else-if="grid">
@@ -67,7 +65,7 @@ limitations under the License.
                 </fieldset>
 
                 <div class="buttons">
-                    <button type="button" class="secondary" @click.prevent="modal.close()">Cancel</button>
+                    <button type="button" class="secondary" @click.prevent="ModalController.hide()">Cancel</button>
                     <button type="submit" name="submit">Save</button>
                 </div>
             </form>
@@ -81,7 +79,7 @@ limitations under the License.
 <script>
     import GridCustomizeTeam from './GridCustomizeTeam.vue'
     import api from '../models/api'
-    import modal from '../modal'
+    import ModalController from '@/controllers/ModalController'
 
     export default {
         name: "GridCustomize",
@@ -95,7 +93,7 @@ limitations under the License.
         beforeMount() {
             api.getGrid(this.gridID)
                 .then(grid => this.grid = grid)
-                .catch(err => modal.showError(err))
+                .catch(err => ModalController.showError(err))
         },
         watch: {
             grid(newValue) {
@@ -112,7 +110,7 @@ limitations under the License.
         },
         data() {
             return {
-                modal,
+                ModalController,
                 errors: null,
                 saved: false,
                 grid: null,
@@ -154,7 +152,7 @@ limitations under the License.
                             this.errors = err.response.data.result
                         }
 
-                        modal.showError(err)
+                        ModalController.showError(err)
                     })
             }
         }

@@ -91,6 +91,8 @@ limitations under the License.
         <template v-if="isAdmin">
             <Logs :show-add-note="false" :logs="logs"/>
         </template>
+
+        <Modal />
     </div>
 </template>
 
@@ -101,9 +103,10 @@ limitations under the License.
     import EventBus from '../models/EventBus'
     import GridCustomize from './GridCustomize.vue'
     import Common from '../common'
-    import Vue from 'vue'
     import Prompt from './Prompt.vue'
-    import modal from '../modal'
+
+    import Modal from '@/components/Modal'
+    import ModalController from '@/controllers/ModalController'
 
     api.token = SqMGR.gridConfig.pool.token
 
@@ -114,13 +117,12 @@ limitations under the License.
         }
     }
 
-    const GridCustomizeComponent = Vue.extend(GridCustomize)
-
     export default {
         name: "Grid",
         components: {
             Square,
             Logs,
+            Modal,
         },
         data() {
             return {
@@ -165,12 +167,7 @@ limitations under the License.
         },
         methods: {
             customizeWasClicked() {
-                const vm = new GridCustomizeComponent({
-                    propsData: {
-                        gridID: this.grid.id,
-                    }
-                })
-                modal.show(vm.$mount().$el)
+                ModalController.show('Customize Grid', GridCustomize, { gridID: this.grid.id })
             },
             drawNumbersWasClicked() {
                 let allClaimed = true
@@ -182,27 +179,24 @@ limitations under the License.
                     }
                 }
 
-                const PromptComponent = Vue.extend(Prompt)
-                const comp = new PromptComponent({
-                    propsData: {
-                        title: 'Draw Numbers?',
-                        description: 'Do you want to draw the numbers for this game? This action cannot be undone.',
-                        buttonLabel: 'Draw',
-                        ...(!allClaimed && {warning: 'Not all squares have been claimed yet'})
+                const propsData = {
+                    title: 'Draw Numbers?',
+                    description: 'Do you want to draw the numbers for this game? This action cannot be undone.',
+                    buttonLabel: 'Draw',
+                    ...(!allClaimed && {warning: 'Not all squares have been claimed yet'})
+                }
+
+                ModalController.show('Draw the Numbers', Prompt, propsData, {
+                    'cancel-was-clicked': () => ModalController.hide(),
+                    'action-was-clicked': () => {
+                        api.drawNumbers(this.grid.id)
+                            .then(grid => {
+                                this.grid = grid
+                                ModalController.hide()
+                            })
+                            .catch(err => ModalController.showError(err))
                     }
                 })
-
-                comp.$on('cancel-was-clicked', () => modal.close())
-                comp.$on('action-was-clicked', () => {
-                    api.drawNumbers(this.grid.id)
-                        .then(grid => {
-                            this.grid = grid
-                            modal.close()
-                        })
-                        .catch(err => modal.showError(err))
-                })
-
-                modal.show(comp.$mount().$el)
             },
             loadData() {
                 api.getSquares()
@@ -220,7 +214,7 @@ limitations under the License.
             loadGrid() {
                 api.getGrid(this.grid.id)
                     .then(grid => this.grid = grid)
-                    .catch(err => modal.showError(err))
+                    .catch(err => ModalController.showError(err))
             },
             score(team, index) {
                 const numbers = this.grid[`${team}Numbers`]

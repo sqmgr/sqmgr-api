@@ -16,19 +16,6 @@ limitations under the License.
 
 <template>
     <div class="square-details">
-        <h4>Square Details</h4>
-
-        <template v-if="canClaim">
-            <div class="buttons">
-                <button type="button" @click.prevent="claimSquare">Claim</button>
-            </div>
-        </template>
-        <template v-if="canUnclaim">
-            <div class="buttons">
-                <button type="button" class="destructive" @click.prevent="unclaimSquare">Relinquish Claim</button>
-            </div>
-        </template>
-
         <table>
             <tbody>
             <tr>
@@ -59,6 +46,17 @@ limitations under the License.
             </tbody>
         </table>
 
+        <template v-if="canClaim">
+            <div class="buttons">
+                <button type="button" @click.prevent="claimSquare">Claim</button>
+            </div>
+        </template>
+        <template v-if="canUnclaim">
+            <div class="buttons">
+                <button type="button" class="destructive" @click.prevent="unclaimSquare">Relinquish Claim</button>
+            </div>
+        </template>
+
         <template v-if="isAdmin">
             <Logs @note-added="reloadData" :square-id="this.square.squareID" :logs="square.logs"
                   :show-add-note="true"></Logs>
@@ -69,11 +67,10 @@ limitations under the License.
 <script>
     import Logs from './Logs.vue'
     import api from '../models/api'
-    import Modal from '../modal'
     import Claim from './Claim.vue'
     import Note from './Note.vue'
-    import Vue from 'vue'
     import Common from '../common'
+    import ModalController from '@/controllers/ModalController'
 
     export default {
         name: "SquareDetails",
@@ -115,32 +112,24 @@ limitations under the License.
         },
         methods: {
             claimSquare() {
-                const Component = Vue.extend(Claim)
-                const vm = new Component({
-                    propsData: {
-                        squareId: this.square.squareID,
-                    }
-                })
-
-                Modal.show(vm.$mount().$el)
+                ModalController.show('Claim Square', Claim, { squareId: this.square.squareID })
             },
             unclaimSquare() {
                 api.unclaimSquare(this.square.squareID)
-                    .then(() => Modal.close())
-                    .catch(err => Modal.showError(err))
+                    .then(() => ModalController.hide())
+                    .catch(err => ModalController.showError(err))
             },
             stateDidChange() {
-                const vm = new (Vue.extend(Note))
-                vm.$on('submit', note => {
-                    api.setSquareState(this.square.squareID, this.form.state, note)
-                        .then(() => {
-                            Modal.close()
-                            this.reloadData()
-                        })
-                        .catch(err => Modal.showError(err.message))
+                ModalController.show('Note', Note, {}, {
+                    submit: note => {
+                        api.setSquareState(this.square.squareID, this.form.state, note)
+                            .then(() => {
+                                ModalController.hide()
+                                this.reloadData()
+                            })
+                            .catch(err => ModalController.showError(err.message))
+                    },
                 })
-
-                Modal.show(vm.$mount().$el)
             },
             reloadData() {
                 api.getSquare(this.square.squareID)
@@ -151,8 +140,16 @@ limitations under the License.
 </script>
 
 <style scoped lang="scss">
+    table {
+        width: 100%;
+
+        td:last-child {
+            font-weight: bold;
+            text-align: right;
+        }
+    }
     div.buttons {
-        margin-bottom: var(--spacing);
+        margin-top: var(--spacing);
         text-align: left;
     }
 </style>

@@ -14,23 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import SetupForm from './setup-form'
 import Vue from 'vue'
-import Modal from '@/components/Modal'
-import ModalController from '@/controllers/ModalController'
-import AccountDeleteConfirmation from '@/components/AccountDeleteConfirmation'
+import Error from '@/components/Error'
 
-window.addEventListener('load', function () {
-    SetupForm()
+const bus = new Vue()
 
-    new Vue({
-        render: h => h(Modal),
-        el: '#modal'
-    })
-
-    document.querySelector('button.destructive').onclick = () => {
-        ModalController.show('Are you sure?', AccountDeleteConfirmation, {
-            expectedEmail: SqMGR.ExpectedEmail,
+const obj = {
+    bus,
+    show() {
+        bus.$emit('show', ...arguments)
+    },
+    hide() {
+        bus.$emit('hide')
+    },
+    hideAll() {
+        bus.$emit('hideAll')
+    },
+    showError(err) {
+        obj.show('Error', Error, {
+            error: err,
         })
     }
-})
+}
+
+export default obj

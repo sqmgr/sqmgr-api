@@ -22,6 +22,12 @@ form {
 	padding: var(--spacing);
 }
 
+div.modal form {
+    background-color: transparent;
+	border: none;
+	padding: 0;
+}
+
 fieldset {
 	border: none;
 }

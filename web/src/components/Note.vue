@@ -22,18 +22,19 @@ limitations under the License.
         </div>
 
         <div class="buttons">
-            <button type="button" class="secondary" @click.prevent="Modal.close()">Cancel</button>
+            <button type="button" class="secondary" @click.prevent="ModalController.hide()">Cancel</button>
             <button type="submit" name="submit">Make Note</button>
         </div>
     </form>
 </template>
 
 <script>
-    import Modal from '../modal'
+    import ModalController from '@/controllers/ModalController'
     export default {
         name: "Note.vue",
         data() {
             return {
+                ModalController,
                 form: {
                     note: null
                 }
@@ -41,9 +42,6 @@ limitations under the License.
         },
         mounted() {
             setTimeout(() => this.$refs.name.focus(), 1)
-        },
-        computed: {
-            Modal: () => Modal,
         }
     }
 </script>

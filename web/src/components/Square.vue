@@ -28,8 +28,7 @@ limitations under the License.
 <script>
     import api from '../models/api'
     import SquareDetails from './SquareDetails.vue'
-    import Vue from 'vue'
-    import Modal from '../modal'
+    import ModalController from '@/controllers/ModalController'
 
     export default {
         name: "Square.vue",
@@ -42,14 +41,7 @@ limitations under the License.
             didClickSquare() {
                 api.getSquare(this.sqId)
                     .then(data => {
-                        const Component = Vue.extend(SquareDetails)
-                        const vm = new Component({
-                            propsData: {
-                                data,
-                            }
-                        })
-
-                        Modal.show(vm.$mount().$el)
+                        ModalController.show('Square Details', SquareDetails, { data })
                     })
             }
         }

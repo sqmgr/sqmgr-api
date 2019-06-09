@@ -22,7 +22,7 @@ limitations under the License.
         </div>
 
         <div class="buttons">
-            <button type="button" class="secondary" @click.prevent="Modal.close()">Cancel</button>
+            <button type="button" class="secondary" @click.prevent="ModalController.hide()">Cancel</button>
             <button type="submit" name="submit" value="Claim">Claim</button>
         </div>
     </form>
@@ -30,7 +30,7 @@ limitations under the License.
 
 <script>
     import api from '../models/api'
-    import Modal from '../modal'
+    import ModalController from '@/controllers/ModalController'
 
     export default {
         name: "Claim.vue",
@@ -45,7 +45,7 @@ limitations under the License.
 
             return {
                 name,
-                Modal,
+                ModalController,
             }
         },
         mounted() {
@@ -62,8 +62,8 @@ limitations under the License.
                 }
 
                 api.claimSquare(this.squareId, this.name)
-                    .then(() => Modal.closeAll())
-                    .catch(err => Modal.showError(err))
+                    .then(() => ModalController.hideAll())
+                    .catch(err => ModalController.showError(err))
             }
         }
     }

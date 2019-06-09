@@ -14,6 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-fieldset p {
-	margin: 0 0 var(--spacing);
-}
+<template>
+    <p>{{error}}</p>
+</template>
+
+<script>
+    export default {
+        name: "Error",
+        props: {
+            error: {
+                type: Error,
+                required: true,
+            }
+        }
+    }
+</script>
+
+<style scoped>
+
+</style>
