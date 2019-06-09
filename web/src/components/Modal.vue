@@ -104,7 +104,11 @@ limitations under the License.
         left: 50%;
         transform: translate(-50%, -50%);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-        min-width: 200px;
+        min-width: 90vw;
+
+        @media (min-width: 600px) {
+            min-width: 400px;
+        }
 
         h2 {
             background-color: #f3f3f3;
@@ -142,7 +146,7 @@ limitations under the License.
         div.content {
             overflow: auto;
             padding: 20px 20px 0;
-            max-width: 75vw;
+            max-width: 95vw;
             max-height: calc(75vh - 46px);
 
             & > *:last-child {
