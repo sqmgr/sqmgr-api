@@ -132,6 +132,7 @@ func (s *Server) apiPoolSquaresSquareHandler() http.HandlerFunc {
 		State    model.PoolSquareState `json:"state"`
 		Note     string                `json:"note"`
 		Unclaim  bool                  `json:"unclaim"`
+		Rename   bool                  `json:"rename"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -142,6 +143,8 @@ func (s *Server) apiPoolSquaresSquareHandler() http.HandlerFunc {
 			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 			return
 		}
+
+		lr := logrus.WithField("square-id", squareID)
 
 		if r.Method == http.MethodPost {
 			// if the user isn't an admin and the grid is locked, do not let the user do anything
@@ -164,7 +167,40 @@ func (s *Server) apiPoolSquaresSquareHandler() http.HandlerFunc {
 				userID = int64(val)
 			}
 
-			if len(payload.Claimant) > 0 {
+			if payload.Rename {
+				if !jcd.Claim.IsAdmin {
+					s.ServeJSONError(w, http.StatusForbidden, "")
+					return
+				}
+
+				v := validator.New()
+				claimant := v.Printable("name", payload.Claimant)
+				claimant = v.ContainsWordChar("name", claimant)
+
+				if claimant == square.Claimant {
+					v.AddError("claimant", "must be a different name")
+				}
+
+				if !v.OK() {
+					s.ServeJSONError(w, http.StatusBadRequest, v.String())
+					return
+				}
+
+				oldClaimant := square.Claimant
+				square.Claimant = claimant
+				lr.WithFields(logrus.Fields{
+					"oldClaimant": oldClaimant,
+					"claimant":    claimant,
+				}).Info("renaming sqaure")
+
+				if err := square.Save(r.Context(), true, model.PoolSquareLog{
+					RemoteAddr: r.RemoteAddr,
+					Note:       fmt.Sprintf("admin: changed claimant from %s", oldClaimant),
+				}); err != nil {
+					s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+					return
+				}
+			} else if len(payload.Claimant) > 0 {
 				// making a claim
 				v := validator.New()
 				claimant := v.Printable("name", payload.Claimant)
@@ -179,7 +215,7 @@ func (s *Server) apiPoolSquaresSquareHandler() http.HandlerFunc {
 				square.State = model.PoolSquareStateClaimed
 				square.SetUserIdentifier(userID)
 
-				logrus.WithField("claimant", payload.Claimant).Info("claiming square")
+				lr.WithField("claimant", payload.Claimant).Info("claiming square")
 				if err := square.Save(r.Context(), false, model.PoolSquareLog{
 					RemoteAddr: r.RemoteAddr,
 					Note:       "user: initial claim",
@@ -213,7 +249,7 @@ func (s *Server) apiPoolSquaresSquareHandler() http.HandlerFunc {
 					return
 				}
 			} else {
-				logrus.WithField("remoteAddr", r.RemoteAddr).Warn("non-admin tried to administer squares")
+				lr.WithField("remoteAddr", r.RemoteAddr).Warn("non-admin tried to administer squares")
 				s.ServeJSONError(w, http.StatusForbidden, "")
 				return
 			}

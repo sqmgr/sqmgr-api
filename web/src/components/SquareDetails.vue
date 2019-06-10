@@ -24,7 +24,23 @@ limitations under the License.
             </tr>
             <tr>
                 <td>Claimant</td>
-                <td class="claimant">{{square.claimant}}</td>
+                <td class="claimant">
+                    <template v-if="editClaimant">
+                        <form @submit.prevent="saveNewClaimant" class="standalone">
+                            <input type="text"
+                                   v-model="newClaimant"
+                                   ref="claimantInput"
+                                   @keyup="onKeyup($event)"
+                            >
+                        </form>
+                    </template>
+                    <template v-else-if="isAdmin">
+                        <a href="#" @click.prevent="editClaimant=true">{{square.claimant}}</a>
+                    </template>
+                    <template v-else>
+                        <span>{{square.claimant}}</span>
+                    </template>
+                </td>
             </tr>
             <tr>
                 <td>State</td>
@@ -41,7 +57,9 @@ limitations under the License.
             </tr>
             <tr>
                 <td>Last Modified</td>
-                <td class="modified">{{new Date(square.modified).toLocaleDateString('default', Common.DateTimeOptions)}}</td>
+                <td class="modified">{{new Date(square.modified).toLocaleDateString('default',
+                    Common.DateTimeOptions)}}
+                </td>
             </tr>
             </tbody>
         </table>
@@ -81,6 +99,8 @@ limitations under the License.
         data() {
             return {
                 Common,
+                editClaimant: false,
+                newClaimant: null,
                 loadedData: null,
                 form: {
                     state: this.loadedData ? this.loadedData.state : this.data.state,
@@ -112,7 +132,7 @@ limitations under the License.
         },
         methods: {
             claimSquare() {
-                ModalController.show('Claim Square', Claim, { squareId: this.square.squareID })
+                ModalController.show('Claim Square', Claim, {squareId: this.square.squareID})
             },
             unclaimSquare() {
                 api.unclaimSquare(this.square.squareID)
@@ -134,6 +154,35 @@ limitations under the License.
             reloadData() {
                 api.getSquare(this.square.squareID)
                     .then(res => this.loadedData = res)
+            },
+            onKeyup(event) {
+                if (event.key === 'Escape') {
+                    event.stopPropagation()
+                    this.editClaimant = false
+                }
+            },
+            saveNewClaimant() {
+                if (this.newClaimant === this.square.claimant) {
+                    this.editClaimant = false
+                    return
+                }
+
+                if (this.newClaimant.match(/\w/)) {
+                    api.renameSquare(this.square.squareID, this.newClaimant)
+                        .then(res => { this.loadedData = res; this.editClaimant = false })
+                        .catch(err => ModalController.showError(err))
+                }
+            }
+        },
+        watch: {
+            editClaimant(newVal) {
+                if (newVal) {
+                    this.newClaimant = this.square.claimant
+                    this.$nextTick()
+                        .then(() => {
+                            this.$refs.claimantInput.select()
+                        })
+                }
             }
         }
     }
@@ -148,6 +197,7 @@ limitations under the License.
             text-align: right;
         }
     }
+
     div.buttons {
         margin-top: var(--spacing);
         text-align: left;

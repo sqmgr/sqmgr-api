@@ -167,6 +167,13 @@ class API {
         return this.updateSquare(squareID, {state, note})
     }
 
+    renameSquare(squareID, claimant) {
+        return this.updateSquare(squareID, {
+            claimant,
+            rename: true,
+        })
+    }
+
     drawNumbers(gridID) {
         return this.post(`/api/pool/${this.token}/game/${gridID}`, {
             action: 'drawNumbers',
