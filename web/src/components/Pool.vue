@@ -34,6 +34,7 @@ limitations under the License.
                             <td><a :href="`/pool/${token}/game/${grid.id}`">{{ grid.name }}</a></td>
                             <td>{{ ymd(grid.eventDate) }}</td>
                             <td class="actions" v-if="jwt.IsAdmin">
+                                <button type="submit" @click.prevent="customizeGrid(grid)"><i class="fas fa-cog"></i></button>
                                 <button type="submit" class="destructive" @click.prevent="confirmDelete(grid)"><i class="fas fa-trash-alt"></i></button>
                             </td>
                         </tr>
@@ -127,6 +128,25 @@ limitations under the License.
                     })
                     .catch(err => ModalController.showError(err))
             },
+            customizeGrid(grid) {
+                ModalController.show('Customize Grid', GridCustomize, {
+                    gridID: grid.id
+                }, {
+                    'saved': grid => {
+                        ModalController.hide()
+                        let index = -1
+                        for (let i = 0; i < this.grids.length; i++) {
+                            if (this.grids[i].id === grid.id) {
+                                index = i
+                            }
+                        }
+
+                        if (index >= 0) {
+                            this.grids.splice(index, 1, grid)
+                        }
+                    }
+                })
+            },
             confirmDelete(grid) {
                 ModalController.showPrompt('Are you sure?', `Do you really want to delete "${grid.name}"`, {
                     actionButton: 'Delete It',
@@ -170,7 +190,7 @@ limitations under the License.
         width: 100%;
 
         td.actions {
-            text-align: center;
+            text-align: right;
         }
     }
 
