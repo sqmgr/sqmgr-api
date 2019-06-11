@@ -53,6 +53,10 @@ header {
 	padding: var(--spacing) 0;
 }
 
+header h1 a:hover {
+	text-decoration: none;
+}
+
 main {
 	background-color: #fff;
 	min-height: 400px;

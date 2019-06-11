@@ -25,8 +25,7 @@ limitations under the License.
                         <thead>
                         <tr>
                             <th>Game</th>
-                            <th>Date of Game</th>
-                            <th>Numbers Drawn?</th>
+                            <th>Date</th>
                             <th v-if="jwt.IsAdmin">&nbsp;</th>
                         </tr>
                         </thead>
@@ -34,14 +33,8 @@ limitations under the License.
                         <tr v-for="grid in grids">
                             <td><a :href="`/pool/${token}/game/${grid.id}`">{{ grid.name }}</a></td>
                             <td>{{ ymd(grid.eventDate) }}</td>
-                            <td class="numbers-drawn">
-                                <i v-if="grid.homeNumbers" class="fas fa-check"></i>
-                                <i v-if="!grid.homeNumbers" class="fas fa-times"></i>
-                            </td>
-
                             <td class="actions" v-if="jwt.IsAdmin">
-                                <button type="submit" class="destructive" @click.prevent="confirmDelete(grid)">Delete
-                                </button>
+                                <button type="submit" class="destructive" @click.prevent="confirmDelete(grid)"><i class="fas fa-trash-alt"></i></button>
                             </td>
                         </tr>
                         </tbody>
