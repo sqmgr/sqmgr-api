@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func (s *Server) apiPoolLogsHandler() http.HandlerFunc {
@@ -65,6 +66,48 @@ func (s *Server) apiPoolHandler() http.HandlerFunc {
 			Status: responseOK,
 			Result: jcd.Pool,
 		})
+	}
+}
+
+func (s *Server) apiPoolPostHandler() http.HandlerFunc {
+	type Action string
+	const ActionLock Action = "LOCK"
+
+	type postPayload struct {
+		Action Action `json:"action"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		jcd := r.Context().Value(ctxKeyJWT).(*jwtContextData)
+		if !jcd.Claim.IsAdmin {
+			s.ServeJSONError(w, http.StatusForbidden, "")
+			return
+		}
+
+		dec := json.NewDecoder(r.Body)
+		var p postPayload
+		if err := dec.Decode(&p); err != nil {
+			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+
+		switch p.Action {
+		case ActionLock:
+			jcd.Pool.SetLocks(time.Now())
+			if err := jcd.Pool.Save(r.Context()); err != nil {
+				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+				return
+			}
+		default:
+			s.ServeJSONError(w, http.StatusBadRequest, fmt.Sprintf("unknown action: %s", p.Action))
+			return
+		}
+
+		s.ServeJSON(w, http.StatusOK, jsonResponse{
+			Status: responseOK,
+			Result: jcd.Pool,
+		})
+		return
 	}
 }
 

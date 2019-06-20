@@ -116,10 +116,11 @@ limitations under the License.
                 return SqMGR.gridConfig.isAdmin
             },
             isLocked() {
-                return SqMGR.gridConfig.pool.isLocked
+                const locks = new Date(SqMGR.gridConfig.pool.locks)
+                return locks.getFullYear() > 1 && locks.getTime() < new Date().getTime()
             },
             canClaim() {
-                return this.square.state === 'unclaimed' && !this.isLocked
+                return this.square.state === 'unclaimed' && ( !this.isLocked || this.isAdmin )
             },
             opaqueUserID() {
                 return SqMGR.gridConfig.opaqueUserID

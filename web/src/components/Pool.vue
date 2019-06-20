@@ -34,8 +34,8 @@ limitations under the License.
                             <td><a :href="`/pool/${token}/game/${grid.id}`">{{ grid.name }}</a></td>
                             <td>{{ ymd(grid.eventDate) }}</td>
                             <td class="actions" v-if="jwt.IsAdmin">
-                                <button type="submit" @click.prevent="customizeGrid(grid)"><i class="fas fa-cog"></i></button>
-                                <button type="submit" class="destructive" @click.prevent="confirmDelete(grid)"><i class="fas fa-trash-alt"></i></button>
+                                <button type="button" @click.prevent="customizeGrid(grid)"><i class="fas fa-cog"></i></button>
+                                <button type="button" class="destructive" @click.prevent="confirmDelete(grid)"><i class="fas fa-trash-alt"></i></button>
                             </td>
                         </tr>
                         </tbody>
@@ -60,8 +60,16 @@ limitations under the License.
                             <td>{{ pool.gridType }}</td>
                         </tr>
                         <tr>
-                            <td>Locks</td>
-                            <td>{{ date(pool.locks) }}</td>
+                            <td>Squares Locked</td>
+                            <td>
+                                <template v-if="isLocked">
+                                    {{ date(pool.locks) }}
+                                    <i class="fas fa-lock"></i>
+                                </template>
+                                <template v-else>
+                                    <button type="button" @click="lockSquares">Lock Squares</button>
+                                </template>
+                            </td>
                         </tr>
                         <tr>
                             <td>Created</td>
@@ -108,6 +116,12 @@ limitations under the License.
             api.getPoolGrids()
                 .then(res => this.grids = res)
                 .catch(err => ModalController.showError(err))
+        },
+        computed: {
+            isLocked() {
+                const locks = new Date(this.pool.locks)
+                return locks.getFullYear() > 1 && locks.getTime() < new Date().getTime()
+            }
         },
         methods: {
             createGrid() {
@@ -180,6 +194,29 @@ limitations under the License.
                 }
 
                 return d.toLocaleString(Common.DateTimeOptions)
+            },
+            lockSquares() {
+                api.getSquares()
+                    .then(squares => {
+                        const promptOpts = {
+                            actionButton: "Lock Squares",
+                            action: () => {
+                                ModalController.hide()
+
+                                api.lockPool()
+                                    .then(pool => this.pool = pool)
+                                    .catch(err => ModalController.showError(err))
+                            }
+                        }
+
+                        const unclaimedSquares = Object.values(squares).filter(s => s.state === 'unclaimed')
+                        if (unclaimedSquares.length > 0) {
+                            promptOpts.warning = "There are still unclaimed squares."
+                        }
+
+                        ModalController.showPrompt("Lock the squares?", "Are you sure you want to lock the squares? Users will no longer be allowed to claim any open squares.", promptOpts)
+                    })
+                    .catch(err => ModalController.showError(err))
             }
         }
     }

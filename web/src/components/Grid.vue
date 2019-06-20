@@ -60,15 +60,9 @@ limitations under the License.
                     <td>{{ pool.gridType }}</td>
                 </tr>
                 <tr>
-                    <td>Lock Date</td>
-                    <td>{{ locksFormatted }}</td>
-                </tr>
-                <tr>
-                    <td>Is Locked</td>
-                    <td>
-                        <template v-if="isLocked">Yes</template>
-                        <template v-else>No</template>
-                    </td>
+                    <td>Squares Locked</td>
+                    <td v-if="isLocked"><i class="fas fa-lock"></i> Locked</td>
+                    <td v-else><i class="fas fa-lock-open"></i> Unlocked</td>
                 </tr>
                 </tbody>
             </table>
@@ -141,7 +135,7 @@ limitations under the License.
             },
             locks() {
                 const locks = new Date(this.pool.locks)
-                return locks.getFullYear() > 0 ? locks : null
+                return locks.getFullYear() > 1 ? locks : null
             },
             locksFormatted() {
                 return this.locks ? this.locks.toLocaleDateString('default', Common.DateTimeOptions) : null

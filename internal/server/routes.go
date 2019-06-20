@@ -73,6 +73,7 @@ func (s *Server) setupRoutes() {
 
 	// API stuff
 	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodGet).Handler(s.apiPoolJWTHandler(s.apiPoolHandler()))
+	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodPost).Handler(s.apiPoolJWTHandler(s.apiPoolPostHandler()))
 	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/squares").Methods(http.MethodGet).Handler(s.apiPoolJWTHandler(s.apiPoolSquaresHandler()))
 	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/game").Methods(http.MethodGet).Handler(s.apiPoolJWTHandler(s.apiPoolGamesHandler()))
 	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/game").Methods(http.MethodPost).Handler(s.apiPoolJWTHandler(s.apiPoolGamesPostHandler()))

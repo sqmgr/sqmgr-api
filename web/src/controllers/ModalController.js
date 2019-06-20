@@ -41,7 +41,7 @@ const obj = {
             description,
             actionButton: opts.actionButton,
             dismissButton: opts.dismissButton,
-            warnings: opts.warning,
+            warning: opts.warning,
         }, {
             'action-was-clicked': confirmAction,
             'cancel-was-clicked': () => obj.hide(),

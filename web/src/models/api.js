@@ -180,6 +180,12 @@ class API {
         })
     }
 
+    lockPool() {
+        return this.post(`/api/pool/${this.token}`, {
+            action: 'LOCK',
+        })
+    }
+
     clearClient() {
         this._axios = null
         this._jwt = null

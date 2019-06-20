@@ -293,9 +293,15 @@ func (p *Pool) SetPassword(password string) error {
 
 // Save will save the pool
 func (p *Pool) Save(ctx context.Context) error {
-	const query = `UPDATE pools SET name = $1, grid_type = $2, password_hash = $3, modified = (NOW() AT TIME ZONE 'utc')  WHERE id = $4`
+	const query = `UPDATE pools SET name = $1, grid_type = $2, password_hash = $3, locks = $4, modified = (NOW() AT TIME ZONE 'utc')  WHERE id = $5`
 
-	_, err := p.model.db.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, p.id)
+	var locks *time.Time
+	if !p.locks.IsZero() {
+		locksInUTC := p.locks.UTC()
+		locks = &locksInUTC
+	}
+
+	_, err := p.model.db.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.id)
 	return err
 }
 
