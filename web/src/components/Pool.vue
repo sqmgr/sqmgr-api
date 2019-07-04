@@ -34,8 +34,10 @@ limitations under the License.
                             <td><a :href="`/pool/${token}/game/${grid.id}`">{{ grid.name }}</a></td>
                             <td>{{ ymd(grid.eventDate) }}</td>
                             <td class="actions" v-if="jwt.IsAdmin">
-                                <button type="button" @click.prevent="customizeGrid(grid)"><i class="fas fa-cog"></i></button>
-                                <button type="button" class="destructive" @click.prevent="confirmDelete(grid)"><i class="fas fa-trash-alt"></i></button>
+                                <button type="button" @click.prevent="customizeGrid(grid)"><i class="fas fa-cog"></i>
+                                </button>
+                                <button type="button" class="destructive" @click.prevent="confirmDelete(grid)"><i
+                                        class="fas fa-trash-alt"></i></button>
                             </td>
                         </tr>
                         </tbody>
@@ -60,20 +62,22 @@ limitations under the License.
                             <td>{{ pool.gridType }}</td>
                         </tr>
                         <tr>
-                            <td>Squares Locked</td>
+                            <td>State</td>
                             <td>
                                 <template v-if="isLocked">
-                                    {{ date(pool.locks) }}
-                                    <i class="fas fa-lock"></i>
+                                    Locked ({{ date(pool.locks, false) }})<br>
+                                    <button type="button" @click="unlockSquares"><i class="fas fa-lock"></i></button>
+
                                 </template>
                                 <template v-else>
-                                    <button type="button" @click="lockSquares">Lock Squares</button>
+                                    Unlocked<br>
+                                    <button type="button" @click="lockSquares"><i class="fas fa-lock-open"></i></button>
                                 </template>
                             </td>
                         </tr>
                         <tr>
                             <td>Created</td>
-                            <td>{{ date(pool.created) }}</td>
+                            <td>{{ date(pool.created, true) }}</td>
                         </tr>
                         </tbody>
                     </table>
@@ -187,13 +191,27 @@ limitations under the License.
 
                 return d.toLocaleDateString(Common.DateOptions)
             },
-            date(date) {
+            date(date, includeTime) {
                 const d = new Date(date)
                 if (d.getFullYear() <= 1) {
                     return ''
                 }
 
-                return d.toLocaleString(Common.DateTimeOptions)
+                return includeTime ? d.toLocaleString(Common.DateTimeOptions) : d.toLocaleDateString(Common.DateTimeOptions)
+            },
+            unlockSquares() {
+                const promptOpts = {
+                    actionButton: "Unlock Squares",
+                    action: () => {
+                        ModalController.hide()
+
+                        api.unlockPool()
+                            .then(pool => this.pool = pool)
+                            .catch(err => ModalController.showError(err))
+                    }
+                }
+
+                ModalController.showPrompt("Unlock the squares?", "Are you sure you want to open the squares back up again for users to claim?", promptOpts)
             },
             lockSquares() {
                 api.getSquares()

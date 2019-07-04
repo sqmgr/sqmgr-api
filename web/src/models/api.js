@@ -186,6 +186,12 @@ class API {
         })
     }
 
+    unlockPool() {
+        return this.post(`/api/pool/${this.token}`, {
+            action: 'UNLOCK',
+        })
+    }
+
     clearClient() {
         this._axios = null
         this._jwt = null

@@ -72,6 +72,7 @@ func (s *Server) apiPoolHandler() http.HandlerFunc {
 func (s *Server) apiPoolPostHandler() http.HandlerFunc {
 	type Action string
 	const ActionLock Action = "LOCK"
+	const ActionUnlock Action = "UNLOCK"
 
 	type postPayload struct {
 		Action Action `json:"action"`
@@ -94,6 +95,12 @@ func (s *Server) apiPoolPostHandler() http.HandlerFunc {
 		switch p.Action {
 		case ActionLock:
 			jcd.Pool.SetLocks(time.Now())
+			if err := jcd.Pool.Save(r.Context()); err != nil {
+				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+				return
+			}
+		case ActionUnlock:
+			jcd.Pool.SetLocks(time.Time{})
 			if err := jcd.Pool.Save(r.Context()); err != nil {
 				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 				return
