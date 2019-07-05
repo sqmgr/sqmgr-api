@@ -29,7 +29,6 @@ limitations under the License.
                 <th>Time</th>
                 <th>State</th>
                 <th>Claimant</th>
-                <th>Remote Addr</th>
                 <th>Note</th>
             </tr>
             </thead>
@@ -39,7 +38,6 @@ limitations under the License.
                 <td class="created">{{ datetime(log.created) }}</td>
                 <td class="state">{{ log.state }}</td>
                 <td class="claimant">{{ log.claimant }}</td>
-                <td class="remote-addr">{{ log.remoteAddr }}</td>
                 <td class="note">{{ log.note }}</td>
             </tr>
             </tbody>

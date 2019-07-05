@@ -150,7 +150,6 @@ type poolSquareLogJSON struct {
 	SquareID   int             `json:"squareID"`
 	State      PoolSquareState `json:"state"`
 	Claimant   string          `json:"claimant"`
-	RemoteAddr string          `json:"remoteAddr"`
 	Note       string          `json:"note"`
 	Created    time.Time       `json:"created"`
 }
@@ -161,7 +160,6 @@ func (p *PoolSquareLog) MarshalJSON() ([]byte, error) {
 		SquareID:   p.SquareID(),
 		State:      p.State(),
 		Claimant:   p.Claimant(),
-		RemoteAddr: p.RemoteAddr,
 		Note:       p.Note,
 		Created:    p.Created(),
 	})
