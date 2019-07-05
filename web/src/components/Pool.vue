@@ -34,8 +34,7 @@ limitations under the License.
                             <td><a :href="`/pool/${token}/game/${grid.id}`">{{ grid.name }}</a></td>
                             <td>{{ ymd(grid.eventDate) }}</td>
                             <td class="actions" v-if="jwt.IsAdmin">
-                                <button type="button" @click.prevent="customizeGrid(grid)"><i class="fas fa-cog"></i>
-                                </button>
+                                <button type="button" @click.prevent="customizeGrid(grid)"><i class="fas fa-cog"></i></button>
                                 <button type="button" class="destructive" @click.prevent="confirmDelete(grid)"><i
                                         class="fas fa-trash-alt"></i></button>
                             </td>
@@ -65,13 +64,11 @@ limitations under the License.
                             <td>State</td>
                             <td>
                                 <template v-if="isLocked">
-                                    Locked ({{ date(pool.locks, false) }})<br>
-                                    <button type="button" @click="unlockSquares"><i class="fas fa-lock"></i></button>
+                                    <i class="fas fa-lock"></i> Locked ({{ date(pool.locks, false) }})<br>
 
                                 </template>
                                 <template v-else>
-                                    Unlocked<br>
-                                    <button type="button" @click="lockSquares"><i class="fas fa-lock-open"></i></button>
+                                    <i class="fas fa-lock-open"></i> Open<br>
                                 </template>
                             </td>
                         </tr>
@@ -81,6 +78,11 @@ limitations under the License.
                         </tr>
                         </tbody>
                     </table>
+
+                    <div class="buttons">
+                        <button v-if="isLocked" type="button" @click="unlockSquares">Open Squares</button>
+                        <button v-else type="button" @click="lockSquares">Lock Squares</button>
+                    </div>
                 </div>
             </div>
         </template>

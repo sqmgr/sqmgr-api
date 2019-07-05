@@ -60,9 +60,9 @@ limitations under the License.
                     <td>{{ pool.gridType }}</td>
                 </tr>
                 <tr>
-                    <td>Squares Locked</td>
-                    <td v-if="isLocked"><i class="fas fa-lock"></i> Locked</td>
-                    <td v-else><i class="fas fa-lock-open"></i> Unlocked</td>
+                    <td>State</td>
+                    <td v-if="isLocked"><i class="fas fa-lock"></i> Squares are locked</td>
+                    <td v-else><i class="fas fa-lock-open"></i> Squares are open</td>
                 </tr>
                 </tbody>
             </table>
