@@ -16,7 +16,12 @@ limitations under the License.
 
 package config
 
-import "os"
+import (
+	"fmt"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+	"os"
+)
 
 type config struct {
 	url         string
@@ -65,4 +70,75 @@ func GetFromAddress() string {
 	}
 
 	return conf.fromAddress
+}
+
+var instance *Config
+
+type Config struct {
+	recaptchaEnabled bool
+	recaptchaSiteKey string
+	recaptchaSecretKey string
+}
+
+func RecaptchaEnabled() bool {
+	if instance == nil {
+		panic("Setup() not called")
+	}
+
+	return instance.recaptchaEnabled
+}
+
+func RecaptchaSecretKey() string {
+	if instance == nil {
+		panic("Setup() not called")
+	}
+
+	return instance.recaptchaSecretKey
+}
+
+func RecaptchaSiteKey() string {
+	if instance == nil {
+		panic("Setup() not called")
+	}
+
+	return instance.recaptchaSiteKey
+}
+
+
+// Setup will setup viper config
+func Setup() error {
+	viper.SetConfigName("config")
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("/etc/sqmgr")
+	viper.SetEnvPrefix("sqmgr_conf")
+	viper.BindEnv("recaptcha_site_key")
+	viper.BindEnv("recaptcha_secret_key")
+	viper.BindEnv("recaptcha_enabled")
+
+	viper.SetDefault("recaptcha_enabled", true)
+
+	if err := viper.ReadInConfig(); err != nil {
+		if _, isNotFoundError := err.(viper.ConfigFileNotFoundError); !isNotFoundError {
+			return fmt.Errorf("could not read config file: %#v", err)
+		}
+
+		logrus.Warn(err)
+	}
+
+	instance = &Config{
+		recaptchaEnabled: viper.GetBool("recaptcha_enabled"),
+		recaptchaSiteKey: viperGetStringOrWarn("recaptcha_site_key"),
+		recaptchaSecretKey: viperGetStringOrWarn("recaptcha_secret_key"),
+	}
+
+	return nil
+}
+
+func viperGetStringOrWarn(key string) string {
+	val := viper.GetString(key)
+	if val == "" {
+		logrus.WithField("key", key).Warn("configuration key not specified")
+	}
+
+	return val
 }

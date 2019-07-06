@@ -11,6 +11,7 @@ require (
 	github.com/lib/pq v1.1.1
 	github.com/onsi/gomega v1.5.0
 	github.com/sirupsen/logrus v1.4.1
+	github.com/spf13/viper v1.4.0
 	github.com/synacor/argon2id v0.0.0-20190318165710-18569dfc600b
 	github.com/weters/pwned v1.0.0
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4 // indirect

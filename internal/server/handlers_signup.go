@@ -18,19 +18,32 @@ package server
 
 import (
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	"github.com/weters/sqmgr/internal/config"
 	"github.com/weters/sqmgr/internal/model"
 	"github.com/weters/sqmgr/internal/validator"
 	"net/http"
+	"net/url"
+	"strings"
+	"time"
 )
 
+const recaptchaURL = "https://www.google.com/recaptcha/api/siteverify"
 const minPasswordLen = 8
+
+var recaptchaClient = &http.Client{
+	Timeout: time.Second * 2,
+}
 
 func (s *Server) signupHandler() http.HandlerFunc {
 	tpl := s.loadTemplate("signup.html", "form-errors.html")
 
 	type data struct {
+		RecaptchaEnabled bool
+		SiteKey string
 		MinPasswordLen int
 		FormData       struct {
 			Email string
@@ -39,7 +52,11 @@ func (s *Server) signupHandler() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		tplData := data{MinPasswordLen: minPasswordLen}
+		tplData := data{
+			RecaptchaEnabled: config.RecaptchaEnabled(),
+			SiteKey: config.RecaptchaSiteKey(),
+			MinPasswordLen: minPasswordLen,
+		}
 
 		if r.Method == http.MethodPost {
 			session := s.Session(r)
@@ -47,11 +64,21 @@ func (s *Server) signupHandler() http.HandlerFunc {
 			email := r.PostFormValue("email")
 			password := r.PostFormValue("password")
 			confirmPassword := r.PostFormValue("confirm-password")
+			recaptchaResponse := r.PostFormValue("recaptcha-token")
 
 			v := validator.New()
 			v.Email("email", email)
 			v.Password("password", password, confirmPassword, minPasswordLen)
 			v.NotPwnedPassword("password", password)
+
+
+			if config.RecaptchaEnabled() && v.OK() {
+				if recaptchaResponse == "" {
+					v.AddError("recaptcha", "You apparently tried to circumvent the robot check")
+				} else if err := validateRecaptcha(r, recaptchaResponse); err != nil {
+					v.AddError("recaptcha", err.Error())
+				}
+			}
 
 			if v.OK() {
 				if user, err := s.model.NewUser(email, password); err != nil {
@@ -236,4 +263,39 @@ func (s *Server) signupVerifyHandler() http.HandlerFunc {
 
 		s.ExecuteTemplate(w, r, tpl, user)
 	}
+}
+
+type recaptchaResponse struct {
+	Success bool `json:"success"`
+	ChallengeTS time.Time `json:"challenge_ts"`
+	Hostname string `json:"hostname"`
+	ErrorCodes []string `json:"error-codes"`
+}
+
+func validateRecaptcha(r *http.Request, token string) error {
+	values := url.Values{}
+	values.Set("secret", config.RecaptchaSecretKey())
+	values.Set("response", token)
+	values.Set("remoteip", r.RemoteAddr)
+	resp, err := http.PostForm(recaptchaURL, values)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	dec := json.NewDecoder(resp.Body)
+	var rr recaptchaResponse
+	if err := dec.Decode(&rr); err != nil {
+		return err
+	}
+
+	if rr.Success {
+		return nil
+	}
+
+	if rr.ErrorCodes != nil {
+		return errors.New(strings.Join(rr.ErrorCodes, ", "))
+	}
+
+	return errors.New("recaptcha validation failed")
 }

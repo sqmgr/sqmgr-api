@@ -17,42 +17,76 @@ limitations under the License.
 {{ define "title" }}Sign-up - {{ end }}
 
 {{ define "header" }}
-<link href="/static/css/forms.css" rel="stylesheet">
+    <link href="/static/css/forms.css" rel="stylesheet">
 {{ end }}
 
 {{ define "javascripts" }}
-<script src="/static/dist/generic-forms.js"></script>
+    <script src="/static/dist/generic-forms.js"></script>
+    {{ if .Local.RecaptchaEnabled }}
+        <script>
+            window.addEventListener('load', () => {
+                const form = document.getElementById('signup')
+                form.onsubmit = e => {
+                    e.preventDefault()
+                    grecaptcha.ready(() => {
+                        grecaptcha
+                            .execute({{.Local.SiteKey}}, {action: 'signup'})
+                            .then(token => {
+                                if (token) {
+                                    let input = document.getElementById('recaptcha-token')
+                                    if (!input) {
+                                        input = document.createElement('input')
+                                        form.appendChild(input)
+                                        input.type = 'hidden'
+                                        input.id = input.name = 'recaptcha-token'
+                                    }
+
+                                    input.value = token
+
+                                    form.submit()
+                                }
+                            })
+                    })
+                }
+            })
+        </script>
+        <script src="https://www.google.com/recaptcha/api.js?render={{.Local.SiteKey}}" async defer></script>
+    {{ end }}
 {{ end }}
 
 {{ define "content" }}
-<section class="signup">
-	<form class="small" method="post">
-		{{ template "form-errors" . }}
-		<fieldset>
-			<legend>Sign up for SqMGR</legend>
+    <section class="signup">
+        <form id="signup" class="small" method="post">
+            {{ template "form-errors" . }}
+            <fieldset>
+                <legend>Sign up for SqMGR</legend>
 
-			<div class="field">
-				<label for="email">Email Address</label>
-				<input type="email" id="email" name="email" placeholder="Email Address" required value="{{.Local.FormData.Email}}">
-			</div>
+                <div class="field">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" placeholder="Email Address" required
+                           value="{{.Local.FormData.Email}}">
+                </div>
 
-			<div class="field">
-				<label for="password">Password</label>
-				<p class="requirement">Must be at least {{.Local.MinPasswordLen}} characters
-				<div class="password">
-					<input type="password" id="password" name="password" placeholder="Password" value="" pattern=".{{"{"}}{{.Local.MinPasswordLen}},}" required>
-					<input type="password" id="confirm-password" name="confirm-password" placeholder="Confirm Password" value="" required>
-				</div>
-			</div>
+                <div class="field">
+                    <label for="password">Password</label>
+                    <p class="requirement">Must be at least {{.Local.MinPasswordLen}} characters
+                    <div class="password">
+                        <input type="password" id="password" name="password" placeholder="Password" value=""
+                               pattern=".{{"{"}}{{.Local.MinPasswordLen}},}" required>
+                        <input type="password" id="confirm-password" name="confirm-password"
+                               placeholder="Confirm Password" value="" required>
+                    </div>
+                </div>
 
-			<div class="buttons">
-				<button type="submit" name="submit">Register</button>
-			</div>
+                <div class="buttons">
+                    <button type="submit" name="register" id="register">Register</button>
+                </div>
 
-			<p>Have an account? <a href="/login">Log in</a>
+                <p>Have an account? <a href="/login">Log in</a>
 
-			<p class="note">Note: Your email address will <strong>never</strong> be visible to any users of this site. We also <strong>will not</strong> share your email address with any third-parties.
-		</fieldset>
-	</form>
-</section>
+                <p class="note">Note: Your email address will <strong>never</strong> be visible to any users of this
+                    site. We also <strong>will not</strong> share your email address with any third-parties.
+            </fieldset>
+        </form>
+    </section>
 {{ end }}

@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"flag"
+	"github.com/weters/sqmgr/internal/config"
 	"net/http"
 	"os"
 	"os/signal"
@@ -43,6 +44,9 @@ const (
 
 func main() {
 	flag.Parse()
+	if err := config.Setup(); err != nil {
+		logrus.Fatalf("could not load config: %v", err)
+	}
 
 	db, err := database.Open()
 	if err != nil {
