@@ -150,13 +150,17 @@ func Load() error {
 
 	instance = &config{
 		dsn:                viper.GetString("dsn"),
-		recaptchaEnabled:   viper.GetBool("recaptcha_enabled"),
-		recaptchaSiteKey:   viperGetStringOrWarn("recaptcha_site_key"),
-		recaptchaSecretKey: viperGetStringOrWarn("recaptcha_secret_key"),
-		jwtPublicKey:       viperGetStringOrFatal("jwt_public_key"),
+		fromAddress:        viper.GetString("from_address"),
 		jwtPrivateKey:      viperGetStringOrFatal("jwt_private_key"),
+		jwtPublicKey:       viperGetStringOrFatal("jwt_public_key"),
+		opaqueSalt:         viper.GetString("opaque_salt"),
+		recaptchaEnabled:   viper.GetBool("recaptcha_enabled"),
+		recaptchaSecretKey: viperGetStringOrWarn("recaptcha_secret_key"),
+		recaptchaSiteKey:   viperGetStringOrWarn("recaptcha_site_key"),
 		sessionAuthKey:     viperGetStringOrFatal("session_auth_key"),
 		sessionEncKey:      viperGetStringOrFatal("session_enc_key"),
+		smtp:               viper.GetString("smtp"),
+		url:                viper.GetString("url"),
 	}
 
 	return nil
