@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/smtp"
+	"net/url"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -189,8 +190,18 @@ func (u *User) SendVerificationEmail(tpl *template.Template) error {
 		return nil
 	}
 
+	siteURL, err := url.Parse(config.URL())
+	if err != nil {
+		return err
+	}
+
+	siteURL, err = siteURL.Parse("/signup/verify/" + url.PathEscape(token))
+	if err != nil {
+		return err
+	}
+
 	tpl.Execute(w, map[string]string{
-		"VerificationLink": config.GetURL("/signup/verify/" + token),
+		"VerificationLink": siteURL.String(),
 	})
 
 	body := fmt.Sprintf(`To: %s
@@ -198,9 +209,9 @@ From: %s
 Subject: %s
 Content-Type: text/html; charset=utf-8
 
-%s`, u.Email, config.GetFromAddress(), "SqMGR - Account Verification", w.String())
+%s`, u.Email, config.FromAddress(), "SqMGR - Account Verification", w.String())
 
-	if err := smtp.SendMail(config.GetSMTP(), nil, config.GetFromAddress(), []string{u.Email}, []byte(body)); err != nil {
+	if err := smtp.SendMail(config.SMTP(), nil, config.FromAddress(), []string{u.Email}, []byte(body)); err != nil {
 		logrus.WithError(err).WithField("email", u.Email).Errorln("could not send email")
 		return err
 	}

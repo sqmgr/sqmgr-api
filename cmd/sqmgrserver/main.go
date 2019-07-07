@@ -44,7 +44,7 @@ const (
 
 func main() {
 	flag.Parse()
-	if err := config.Setup(); err != nil {
+	if err := config.Load(); err != nil {
 		logrus.Fatalf("could not load config: %v", err)
 	}
 

@@ -18,12 +18,6 @@ DEPLOY_NAME ?= "sqmgr-dev"
 
 .PHONY: run
 run: .keys/private.pem .keys/public.pem
-	# these keys MUST never be used outside of a dev environment
-	SESSION_AUTH_KEY=dev-session-auth-key---X2xr5nJgD2eetKHZoYOoh00otckwU8mmB3jEvTBhc \
-	SESSION_ENC_KEY=dev-session-enc-key---Bgvp9YxwQT \
-	JWT_PRIVATE_KEY=.keys/private.pem \
-	JWT_PUBLIC_KEY=.keys/public.pem \
-	OPAQUE_SALT=V45ixWTj \
 	go run cmd/sqmgrserver/*.go -dev
 
 .PHONY: docker-build

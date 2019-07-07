@@ -20,6 +20,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"github.com/weters/sqmgr/internal/config"
 	"github.com/weters/sqmgr/pkg/smjwt"
 	"html/template"
 	"net/http"
@@ -33,7 +34,6 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/sirupsen/logrus"
 	"github.com/weters/sqmgr/internal/model"
-	"github.com/weters/sqmgr/pkg/tokengen"
 )
 
 // Version is the current version of the server application
@@ -69,33 +69,6 @@ var funcMap = template.FuncMap{
 	},
 }
 
-func init() {
-	sessionAuthKey := os.Getenv("SESSION_AUTH_KEY")
-	sessionEncKey := os.Getenv("SESSION_ENC_KEY")
-
-	if sessionAuthKey == "" {
-		var err error
-		sessionAuthKey, err = tokengen.Generate(64)
-		if err != nil {
-			panic(err)
-		}
-
-		logrus.WithField("SESSION_AUTH_KEY", sessionAuthKey).Warnln("no SESSION_AUTH_KEY specified, using random value")
-	}
-
-	if sessionEncKey == "" {
-		var err error
-		sessionEncKey, err = tokengen.Generate(32)
-		if err != nil {
-			panic(err)
-		}
-
-		logrus.WithField("SESSION_ENC_KEY", sessionEncKey).Warnln("no SESSION_ENC_KEY specified, using random value")
-	}
-
-	store = sessions.NewCookieStore([]byte(sessionAuthKey), []byte(sessionEncKey))
-}
-
 // Server represents the server application
 type Server struct {
 	*mux.Router
@@ -108,6 +81,9 @@ type Server struct {
 
 // New instantiates a new Server object.
 func New(db *sql.DB) *Server {
+	if store == nil {
+		store = sessions.NewCookieStore([]byte(config.SessionAuthKey()), []byte(config.SessionEncKey()))
+	}
 
 	tpl := template.Must(
 		template.New("").Funcs(funcMap).ParseFiles(filepath.Join(templatesDir, "base.html")),
@@ -351,20 +327,12 @@ func version() string {
 
 func buildSMJWT() *smjwt.SMJWT {
 	s := smjwt.New()
-	if filename := os.Getenv("JWT_PUBLIC_KEY"); filename != "" {
-		if err := s.LoadPublicKey(filename); err != nil {
-			logrus.WithError(err).Fatal("could not load public key for JWT")
-		}
-	} else {
-		logrus.Fatal("JWT_PUBLIC_KEY not specified")
+	if err := s.LoadPublicKey(config.JWTPublicKey()); err != nil {
+		logrus.WithError(err).Fatal("could not load public key for JWT")
 	}
 
-	if filename := os.Getenv("JWT_PRIVATE_KEY"); filename != "" {
-		if err := s.LoadPrivateKey(filename); err != nil {
-			logrus.WithError(err).Fatal("could not load private key for JWT")
-		}
-	} else {
-		logrus.Fatal("JWT_PRIVATE_KEY not specified")
+	if err := s.LoadPrivateKey(config.JWTPrivateKey()); err != nil {
+		logrus.WithError(err).Fatal("could not load private key for JWT")
 	}
 
 	return s

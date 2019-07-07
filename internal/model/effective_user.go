@@ -21,19 +21,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/sirupsen/logrus"
-	"os"
+	"github.com/weters/sqmgr/internal/config"
 	"strconv"
 )
-
-var opaqueSalt = os.Getenv("OPAQUE_SALT")
-
-func init() {
-	if len(opaqueSalt) == 0 {
-		opaqueSalt = "SqMGR-salt"
-		logrus.WithField("salt", opaqueSalt).Warn("no OPAQUE_SALT specified, using default")
-	}
-}
 
 // EffectiveUser provides common user functionality
 type EffectiveUser interface {
@@ -56,7 +46,7 @@ func opaqueID(userIdentifier interface{}) (string, error) {
 	}
 
 	hasher := sha256.New()
-	_, err := hasher.Write([]byte(opaqueSalt + id))
+	_, err := hasher.Write([]byte(config.OpaqueSalt() + id))
 	if err != nil {
 		return "", err
 	}

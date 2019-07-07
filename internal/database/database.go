@@ -18,17 +18,12 @@ package database
 
 import (
 	"database/sql"
-	"os"
+	"github.com/weters/sqmgr/internal/config"
 )
 
 // Open will open a database based on an environment variable DSN
 func Open() (*sql.DB, error) {
-	dsn := os.Getenv("DSN")
-	if dsn == "" {
-		dsn = "host=localhost port=5432 user=postgres sslmode=disable"
-	}
-
-	db, err := sql.Open("postgres", dsn)
+	db, err := sql.Open("postgres", config.DSN())
 	if err != nil {
 		return nil, err
 	}

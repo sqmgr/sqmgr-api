@@ -35,17 +35,17 @@ spec:
           - secretRef:
               name: sqmgr-config
         env:
-        - name: SMTP
+        - name: SQMGR_CONF_SMTP
           value: 10.1.1.1:25
-        - name: FROM_ADDRESS
+        - name: SQMGR_CONF_FROM_ADDRESS
           value: no-reply@sqmgr.com
-        - name: URL
+        - name: SQMGR_CONF_URL
           value: https://sqmgr.com
-        - name: DSN
+        - name: SQMGR_CONF_DSN
           value: 'dbname=$(PG_DBNAME) host=$(PG_HOST) port=$(PG_PORT) user=$(PG_USER) sslmode=$(PG_SSLMODE) password=$(PG_PASSWORD)'
-        - name: JWT_PUBLIC_KEY
+        - name: SQMGR_CONF_JWT_PUBLIC_KEY
           value: /opt/sqmgr/jwt-keys/public.pem
-        - name: JWT_PRIVATE_KEY
+        - name: SQMGR_CONF_JWT_PRIVATE_KEY
           value: /opt/sqmgr/jwt-keys/private.pem
         image: weters/sqmgrserver:latest
         imagePullPolicy: Always

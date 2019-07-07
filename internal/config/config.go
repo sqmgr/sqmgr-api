@@ -20,102 +20,125 @@ import (
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"os"
 )
 
 type config struct {
-	url         string
-	smtp        string
-	fromAddress string
-}
-
-var conf = config{
-	url:         "http://localhost:8080",
-	smtp:        "localhost:25",
-	fromAddress: "weters19@gmail.com",
-}
-
-// Load will load the config
-func Load() error {
-	return nil
-}
-
-// GetURL will get the URL to the site
-func GetURL(optionalPath ...string) string {
-	url := os.Getenv("URL")
-	if len(url) == 0 {
-		url = conf.url
-	}
-
-	if len(optionalPath) > 0 {
-		return url + optionalPath[0]
-	}
-
-	return url + "/"
-}
-
-// GetSMTP will load the SMTP configuration
-func GetSMTP() string {
-	if smtp := os.Getenv("SMTP"); len(smtp) > 0 {
-		return smtp
-	}
-
-	return conf.smtp
-}
-
-// GetFromAddress will get the address emails should appear from
-func GetFromAddress() string {
-	if from := os.Getenv("FROM_ADDRESS"); len(from) > 0 {
-		return from
-	}
-
-	return conf.fromAddress
-}
-
-var instance *Config
-
-type Config struct {
-	recaptchaEnabled bool
-	recaptchaSiteKey string
+	dsn                string
+	fromAddress        string
+	jwtPrivateKey      string
+	jwtPublicKey       string
+	opaqueSalt         string
+	recaptchaEnabled   bool
 	recaptchaSecretKey string
+	recaptchaSiteKey   string
+	sessionAuthKey     string
+	sessionEncKey      string
+	smtp               string
+	url                string
 }
 
-func RecaptchaEnabled() bool {
-	if instance == nil {
-		panic("Setup() not called")
-	}
+var instance *config
 
+// URL is the public facing URL of the site
+func URL() string {
+	mustHaveInstance()
+	return instance.url
+}
+
+// SMTP returns the location of an smtp server
+func SMTP() string {
+	mustHaveInstance()
+	return instance.smtp
+}
+
+// FromAddress will return the email address used in the "from" field in any SqMGR-sent emails
+func FromAddress() string {
+	mustHaveInstance()
+	return instance.fromAddress
+}
+
+// SessionAuthKey returns a 64-byte string used for authentication sessions
+func SessionAuthKey() string {
+	mustHaveInstance()
+	return instance.sessionAuthKey
+}
+
+// SessionEncKey returns a 32-byte string used for encrypting sessions
+func SessionEncKey() string {
+	mustHaveInstance()
+	return instance.sessionEncKey
+}
+
+// DSN returns a database's data source name
+func DSN() string {
+	mustHaveInstance()
+	return instance.dsn
+}
+
+// OpaqueSalt returns a salt that is used for obfuscating user IDs
+func OpaqueSalt() string {
+	mustHaveInstance()
+	return instance.opaqueSalt
+}
+
+// JWTPublicKey returns the path to a PEM encoded public key
+func JWTPublicKey() string {
+	mustHaveInstance()
+	return instance.jwtPublicKey
+}
+
+// JWTPrivateKey returns the path to a PEM encoded private key
+func JWTPrivateKey() string {
+	mustHaveInstance()
+	return instance.jwtPrivateKey
+}
+
+// RecaptchaEnabled returns whether recaptcha is currently enabled
+func RecaptchaEnabled() bool {
+	mustHaveInstance()
 	return instance.recaptchaEnabled
 }
 
+// RecaptchaSecretKey returns the Google secret key used for reCAPTCHA v3
 func RecaptchaSecretKey() string {
-	if instance == nil {
-		panic("Setup() not called")
-	}
-
+	mustHaveInstance()
 	return instance.recaptchaSecretKey
 }
 
+// RecaptchaSiteKey returns the Google site key used for reCAPTCHA v3
 func RecaptchaSiteKey() string {
-	if instance == nil {
-		panic("Setup() not called")
-	}
-
+	mustHaveInstance()
 	return instance.recaptchaSiteKey
 }
 
+func mustHaveInstance() {
+	if instance == nil {
+		panic("config: must call Load() first")
+	}
+}
 
-// Setup will setup viper config
-func Setup() error {
+// Load will setup viper config
+func Load() error {
 	viper.SetConfigName("config")
 	viper.AddConfigPath(".")
 	viper.AddConfigPath("/etc/sqmgr")
 	viper.SetEnvPrefix("sqmgr_conf")
+	viper.BindEnv("dsn")
 	viper.BindEnv("recaptcha_site_key")
 	viper.BindEnv("recaptcha_secret_key")
 	viper.BindEnv("recaptcha_enabled")
+	viper.BindEnv("jwt_public_key")
+	viper.BindEnv("jwt_private_key")
+	viper.BindEnv("opaque_salt")
+	viper.BindEnv("session_auth_key")
+	viper.BindEnv("session_enc_key")
 
+	viper.SetDefault("dsn", "host=localhost port=5432 user=postgres sslmode=disable")
 	viper.SetDefault("recaptcha_enabled", true)
+	viper.SetDefault("opaque_salt", "SqMGR-salt")
+	viper.SetDefault("url", "http://localhost:8080")
+	viper.SetDefault("from_address", "weters19@gmail.com")
+	viper.SetDefault("smtp", "localhost:25")
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, isNotFoundError := err.(viper.ConfigFileNotFoundError); !isNotFoundError {
@@ -125,10 +148,15 @@ func Setup() error {
 		logrus.Warn(err)
 	}
 
-	instance = &Config{
-		recaptchaEnabled: viper.GetBool("recaptcha_enabled"),
-		recaptchaSiteKey: viperGetStringOrWarn("recaptcha_site_key"),
+	instance = &config{
+		dsn:                viper.GetString("dsn"),
+		recaptchaEnabled:   viper.GetBool("recaptcha_enabled"),
+		recaptchaSiteKey:   viperGetStringOrWarn("recaptcha_site_key"),
 		recaptchaSecretKey: viperGetStringOrWarn("recaptcha_secret_key"),
+		jwtPublicKey:       viperGetStringOrFatal("jwt_public_key"),
+		jwtPrivateKey:      viperGetStringOrFatal("jwt_private_key"),
+		sessionAuthKey:     viperGetStringOrFatal("session_auth_key"),
+		sessionEncKey:      viperGetStringOrFatal("session_enc_key"),
 	}
 
 	return nil
@@ -138,6 +166,15 @@ func viperGetStringOrWarn(key string) string {
 	val := viper.GetString(key)
 	if val == "" {
 		logrus.WithField("key", key).Warn("configuration key not specified")
+	}
+
+	return val
+}
+
+func viperGetStringOrFatal(key string) string {
+	val := viper.GetString(key)
+	if val == "" {
+		logrus.WithField("key", key).Fatal("configuration key not specified")
 	}
 
 	return val
