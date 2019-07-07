@@ -21,6 +21,6 @@ COPY --from=build-go /usr/share/zoneinfo/America/New_York /usr/share/zoneinfo/Am
 COPY --from=build-go /etc/ssl/certs/ /etc/ssl/certs/
 COPY --from=build-node /build/web/static/ web/static/
 COPY web/templates/ web/templates/
-ARG BUILD_NUMBER
-ENV BUILD_NUMBER=${BUILD_NUMBER}
+ARG VERSION
+ENV SQMGR_VERSION=${VERSION}
 ENTRYPOINT [ "/bin/sqmgrserver" ]

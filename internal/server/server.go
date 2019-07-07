@@ -36,9 +36,6 @@ import (
 	"github.com/weters/sqmgr/internal/model"
 )
 
-// Version is the current version of the server application
-var Version = "0.1"
-
 type ctxKey int
 
 // TemplateData represents data that will be sent to an HTML template
@@ -317,12 +314,11 @@ func (s *Server) middleware(h http.Handler) http.Handler {
 }
 
 func version() string {
-	ver := Version
-	if build := os.Getenv("BUILD_NUMBER"); build != "" {
-		ver += "-" + build
+	if ver := os.Getenv("SQMGR_VERSION"); ver != "" {
+		return ver
 	}
 
-	return ver
+	return "dev"
 }
 
 func buildSMJWT() *smjwt.SMJWT {

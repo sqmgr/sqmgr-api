@@ -1,7 +1,6 @@
 IMG ?= "weters/sqmgrserver"
 LB_IMG ?= "weters/sqmgr-lb"
 VERSION ?= $(shell git describe --always)
-BUILD_NUMBER ?= `date "+%y%m%d%H%M%S"`
 PG_HOST ?= "localhost"
 PG_PORT ?= "5432"
 PG_USERNAME ?= "postgres"
@@ -23,7 +22,7 @@ run: .keys/private.pem .keys/public.pem
 
 .PHONY: docker-build
 docker-build: test-integration
-	docker build -t ${IMG} --build-arg BUILD_NUMBER=${BUILD_NUMBER} .
+	docker build -t ${IMG} --build-arg VERSION=${VERSION} .
 	docker build -t ${LB_IMG} -f Dockerfile-liquibase .
 
 .PHONY: docker-tag
