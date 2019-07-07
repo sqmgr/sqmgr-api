@@ -27,7 +27,7 @@ The following options can be set:
 Key | Description
 --- | ---
 `dsn` | Database DSN. Default is `host=localhost port=5432 user=postgres sslmode=disable`
-`from_address` | Email to use as from address. Default is `weters19@gmail.com`
+`from_address` | Email to use as from address. Default is `no-reply@sqmgr.com`
 `jwt_private_key` | Required. Path to a PEM private key
 `jwt_public_key` | Required. Path to a PEM public key
 `opaque_salt` | Used as the salt when hashing user IDs
@@ -37,5 +37,4 @@ Key | Description
 `session_auth_key` | Key used for authenticating sessions. Should be 64 bytes
 `session_enc_key ` | Key used for encrypting sessions. Should be 32 bytes
 `smtp` | Address of an SMTP server
-`url` | Public address of the server
-
+`url` | Public address of the server. Default is `http://localhost:8080`

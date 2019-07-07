@@ -137,7 +137,7 @@ func Load() error {
 	viper.SetDefault("recaptcha_enabled", true)
 	viper.SetDefault("opaque_salt", "SqMGR-salt")
 	viper.SetDefault("url", "http://localhost:8080")
-	viper.SetDefault("from_address", "weters19@gmail.com")
+	viper.SetDefault("from_address", "no-reply@sqmgr.com")
 	viper.SetDefault("smtp", "localhost:25")
 
 	if err := viper.ReadInConfig(); err != nil {
