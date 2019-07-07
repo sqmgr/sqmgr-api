@@ -29,6 +29,17 @@ spec:
             - '--changeLogFile'
             - './sql/migrations.sql'
             - 'update'
+        - name: certs
+          image: alpine
+          volumeMounts:
+            - mountPath: /etc/ssl/certs
+              name: certs
+            - mountPath: /etc/sqmgr
+              name: mail-cert
+          command:
+            - sh
+            - '-c'
+            - 'apk add ca-certificates && cat /etc/sqmgr/sqmgr-mail.crt >> /etc/ssl/certs/ca-certificates.crt'
       containers:
       - name: sqmgr
         envFrom:
@@ -52,7 +63,14 @@ spec:
         volumeMounts:
           - mountPath: /opt/sqmgr/jwt-keys
             name: jwt-keys
+          - mountPath: /etc/ssl/certs
+            name: certs
       volumes:
+        - name: certs
+          emptyDir: {}
+        - name: mail-cert
+          configMap:
+            name: sqmgr-mail-cert
         - name: jwt-keys
           secret:
             secretName: sqmgr-jwt-keys
