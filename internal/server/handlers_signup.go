@@ -165,7 +165,7 @@ func (s *Server) signupResendPostHandler() http.HandlerFunc {
 		}
 
 		if err := user.SendVerificationEmail(emailTpl); err != nil {
-			logrus.WithError(err).Errorf("could not send verification email to %s", err)
+			logrus.WithError(err).Errorf("could not send verification email to %s", user.Email)
 		}
 
 		sess := s.Session(r)
@@ -222,7 +222,7 @@ func (s *Server) signupCompleteHandler() http.HandlerFunc {
 		}
 
 		if err := user.SendVerificationEmail(emailTpl); err != nil {
-			logrus.WithError(err).Errorf("could not send verification email to %s", err)
+			logrus.WithError(err).Errorf("could not send verification email to %s", user.Email)
 		}
 
 		s.ExecuteTemplate(w, r, tpl, data{email})
