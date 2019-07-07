@@ -34,8 +34,8 @@ limitations under the License.
                             <td><a :href="`/pool/${token}/game/${grid.id}`">{{ grid.name }}</a></td>
                             <td>{{ ymd(grid.eventDate) }}</td>
                             <td class="actions" v-if="jwt.IsAdmin">
-                                <button type="button" @click.prevent="customizeGrid(grid)"><i class="fas fa-cog"></i></button>
-                                <button type="button" class="destructive" @click.prevent="confirmDelete(grid)"><i
+                                <button type="button" class="icon" @click.prevent="customizeGrid(grid)"><i class="fas fa-cog"></i><span>Customize</span></button>
+                                <button type="button" class="icon destructive" @click.prevent="confirmDelete(grid)"><span>Delete</span><i
                                         class="fas fa-trash-alt"></i></button>
                             </td>
                         </tr>
@@ -253,5 +253,9 @@ limitations under the License.
 
     div.buttons {
         margin-top: var(--spacing);
+    }
+
+    button.icon span {
+        display: none;
     }
 </style>
