@@ -1,5 +1,6 @@
 IMG ?= "weters/sqmgrserver"
 LB_IMG ?= "weters/sqmgr-lb"
+VERSION ?= $(shell git describe --always)
 BUILD_NUMBER ?= `date "+%y%m%d%H%M%S"`
 PG_HOST ?= "localhost"
 PG_PORT ?= "5432"
@@ -25,14 +26,21 @@ docker-build: test-integration
 	docker build -t ${IMG} --build-arg BUILD_NUMBER=${BUILD_NUMBER} .
 	docker build -t ${LB_IMG} -f Dockerfile-liquibase .
 
+.PHONY: docker-tag
+docker-tag:
+	docker tag ${IMG} ${IMG}:${VERSION}
+	docker tag ${LB_IMG} ${LB_IMG}:${VERSION}
+
 .PHONY: docker-push
-docker-push: docker-build
-	docker push ${IMG}
-	docker push ${LB_IMG}
+docker-push: docker-build docker-tag
+	docker push ${IMG}:latest
+	docker push ${IMG}:${VERSION}
+	docker push ${LB_IMG}:latest
+	docker push ${LB_IMG}:${VERSION}
 
 .PHONY: k8s-deploy
 k8s-deploy: docker-push
-	kubectl set image deploy ${DEPLOY_NAME} sqmgr=$(shell docker inspect --format='{{index .RepoDigests 0}}' $(IMG):latest) --record
+	kubectl set image deploy ${DEPLOY_NAME} sqmgr=$(IMG):${VERSION} --record
 	kubectl rollout status deploy ${DEPLOY_NAME}
 
 .PHONY: test

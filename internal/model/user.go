@@ -212,7 +212,6 @@ Content-Type: text/html; charset=utf-8
 %s`, u.Email, config.FromAddress(), "SqMGR - Account Verification", w.String())
 
 	if err := smtp.SendMail(config.SMTP(), nil, config.FromAddress(), []string{u.Email}, []byte(body)); err != nil {
-		logrus.WithError(err).WithField("email", u.Email).Errorln("could not send email")
 		return err
 	}
 
