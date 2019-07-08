@@ -97,6 +97,11 @@ limitations under the License.
             </div>
         </template>
 
+        <h4>Help</h4>
+
+        <p>SqMGR allows you to create multiple games or events within a single squares pool. People will claim a square and then use that same square for all games in the pool. Each game will draw unique numbers.</p>
+
+        <p>For example, Ted might claim square 5 for an entire football season, but each week he'll have a different set of numbers for that square (e.g., 0 and 7 for week 1, 8 and 8 for week 2, etc.).</p>
         <Modal/>
     </section>
 </template>
@@ -284,10 +289,14 @@ limitations under the License.
     }
 
     div.grid-row {
+        align-items: center;
         display: grid;
         grid-template-columns: 100px 1fr;
-        align-items: center;
         padding: calc(2 * var(--minimal-spacing));
+
+        &:not(.header) {
+            border-bottom: 1px solid var(--border-color);
+        }
 
         &:nth-child(odd) {
             background-color: var(--light-gray);
