@@ -73,9 +73,11 @@ func (s *Server) apiPoolPostHandler() http.HandlerFunc {
 	type Action string
 	const ActionLock Action = "LOCK"
 	const ActionUnlock Action = "UNLOCK"
+	const ActionReorderGrids Action = "REORDER_GRIDS"
 
 	type postPayload struct {
 		Action Action `json:"action"`
+		IDs []int64 `json:"ids"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -102,6 +104,11 @@ func (s *Server) apiPoolPostHandler() http.HandlerFunc {
 		case ActionUnlock:
 			jcd.Pool.SetLocks(time.Time{})
 			if err := jcd.Pool.Save(r.Context()); err != nil {
+				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+				return
+			}
+		case ActionReorderGrids:
+			if err := jcd.Pool.SetGridsOrder(r.Context(), p.IDs); err != nil {
 				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 				return
 			}

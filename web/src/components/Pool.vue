@@ -15,32 +15,42 @@ limitations under the License.
 */
 
 <template>
-    <section class="pool">
+    <section class="pool" :class="{ admin: jwt.IsAdmin }">
         <template v-if="pool">
             <h3>Squares Pool - {{ this.pool.name }}</h3>
 
             <div class="columns">
                 <div class="col-3">
-                    <table>
-                        <thead>
-                        <tr>
-                            <th>Game</th>
-                            <th>Date</th>
-                            <th v-if="jwt.IsAdmin">&nbsp;</th>
-                        </tr>
-                        </thead>
-                        <tbody v-if="grids">
-                        <tr v-for="grid in grids">
-                            <td><a :href="`/pool/${token}/game/${grid.id}`">{{ grid.name }}</a></td>
-                            <td>{{ ymd(grid.eventDate) }}</td>
-                            <td class="actions" v-if="jwt.IsAdmin">
-                                <button type="button" class="icon" @click.prevent="customizeGrid(grid)"><i class="fas fa-cog"></i><span>Customize</span></button>
-                                <button type="button" class="icon destructive" @click.prevent="confirmDelete(grid)"><span>Delete</span><i
-                                        class="fas fa-trash-alt"></i></button>
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
+                    <h4>Games in Pool</h4>
+
+                    <div class="grids">
+                        <div class="grid-row header">
+                            <div>Event Date</div>
+                            <div>Game</div>
+                        </div>
+
+                        <draggable v-model="grids" @start="drag=true" @end="drag=false" :disabled="!jwt.IsAdmin"
+                                   handle=".handle" @change="change">
+                            <div class="grid-row" v-for="grid in grids" :key="grid.id">
+                                <span v-if="jwt.IsAdmin" class="handle"><i class="fas fa-grip-lines"></i> <span>=</span></span>
+
+                                <div class="event-date">
+                                    <span v-if="ymd(grid.eventDate)">{{ ymd(grid.eventDate) }}</span>
+                                    <span v-else class="unknown">0/0/0000</span>
+                                </div>
+
+                                <a :href="`/pool/${token}/game/${grid.id}`">{{ grid.name }}</a>
+
+                                <div v-if="jwt.IsAdmin" class="actions">
+                                    <button type="button" class="icon" @click.prevent="customizeGrid(grid)"><i
+                                            class="fas fa-cog"></i><span>Customize</span></button>
+                                    <button type="button" class="icon destructive" @click.prevent="confirmDelete(grid)">
+                                        <span>Delete</span><i
+                                            class="fas fa-trash-alt"></i></button>
+                                </div>
+                            </div>
+                        </draggable>
+                    </div>
 
                     <div class="buttons" v-if="jwt.IsAdmin">
                         <button type="button" @click.prevent="createGrid">Create Game</button>
@@ -97,6 +107,7 @@ limitations under the License.
     import Modal from "@/components/Modal";
     import GridCustomize from '@/components/GridCustomize'
     import Common from '@/common'
+    import draggable from 'vuedraggable'
 
     export default {
         name: "Pool",
@@ -108,7 +119,7 @@ limitations under the License.
                 jwt: {},
             }
         },
-        components: {Modal},
+        components: {Modal, draggable},
         mounted() {
             api.token = this.token
 
@@ -188,7 +199,7 @@ limitations under the License.
             ymd(eventDate) {
                 const d = Common.NewDateWithoutTimezone(eventDate)
                 if (d.getFullYear() <= 1) {
-                    return 'Not specified'
+                    return ''
                 }
 
                 return d.toLocaleDateString(Common.DateOptions)
@@ -237,6 +248,10 @@ limitations under the License.
                         ModalController.showPrompt("Lock the squares?", "Are you sure you want to lock the squares? Users will no longer be allowed to claim any open squares.", promptOpts)
                     })
                     .catch(err => ModalController.showError(err))
+            },
+            change() {
+                api.reorderGrids(this.grids.map(g => g.id))
+                    .catch(err => ModalController.showError(err))
             }
         }
     }
@@ -257,5 +272,72 @@ limitations under the License.
 
     button.icon span {
         display: none;
+    }
+
+    .handle {
+        color: #aaa;
+        cursor: move;
+
+        span {
+            display: none;
+        }
+    }
+
+    div.grid-row {
+        display: grid;
+        grid-template-columns: 100px 1fr;
+        align-items: center;
+        padding: calc(2 * var(--minimal-spacing));
+
+        &:nth-child(odd) {
+            background-color: var(--light-gray);
+        }
+
+        &.header {
+            font-weight: bold;
+            background-color: var(--midnight-gray);
+            color: #fff;
+
+            & > div {
+                justify-self: stretch;
+            }
+
+        }
+
+        span.unknown {
+            color: var(--gray);
+        }
+    }
+
+    .admin {
+        div.grid-row {
+            grid-template-columns: 40px 100px 1fr auto;
+
+            & > :first-child {
+                justify-self: center;
+            }
+
+            @media(max-width: 600px) {
+                & > :nth-child(4) {
+                    grid-column: 1 / 5;
+                    padding-top: var(--minimal-spacing);
+                    text-align: right;
+                }
+            }
+
+            &.header {
+                & > div {
+                    justify-self: stretch;
+                }
+
+                & > :first-child {
+                    grid-column: 2 / 3;
+                }
+
+                & > :nth-child(2) {
+                    grid-column: 3 / 5;
+                }
+            }
+        }
     }
 </style>

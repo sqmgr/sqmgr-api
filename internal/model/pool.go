@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 	"unicode/utf8"
@@ -485,6 +486,70 @@ LIMIT $3
 	}
 
 	return grids, nil
+}
+
+func (p *Pool) SetGridsOrder(ctx context.Context, gridIDs []int64) error {
+	tx, err := p.model.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	rollback := func() {
+		if err := tx.Rollback(); err != nil {
+			logrus.WithError(err).Warn("could not rollback transaction")
+		}
+	}
+
+	rows, err := tx.QueryContext(ctx, "SELECT id, ord FROM grids WHERE pool_id = $1", p.id)
+	if err != nil {
+		rollback()
+		return err
+	}
+	defer rows.Close()
+
+	id2ord := make(map[int64]int)
+	for rows.Next() {
+		var id int64
+		var ord int
+		if err := rows.Scan(&id, &ord); err != nil {
+			rollback()
+			return err
+		}
+
+		id2ord[id] = ord
+	}
+
+	// pool_id is present to ensure user has access (prevents us from having to check the owner of every grid)
+	stmt, err := tx.PrepareContext(ctx, "UPDATE grids SET ord = $1, modified = (NOW() at time zone 'UTC') WHERE id = $2 AND pool_id = $3")
+	if err != nil {
+		return err
+	}
+
+	for ord, id := range gridIDs {
+		l := logrus.WithFields(logrus.Fields{"pool_id":p.id, "grid_id":id})
+		curOrd, ok := id2ord[id]
+		if !ok {
+			l.Warn("could not find grid in pool")
+		}
+
+		if ord != curOrd {
+			result, err := stmt.ExecContext(ctx, ord, id, p.id)
+			if err != nil {
+				rollback()
+				return err
+			}
+
+			rowsAffected, _ := result.RowsAffected()
+
+			if rowsAffected == 0 {
+				l.Warn("no rows affected")
+				rollback()
+				return errors.New("no rows affected")
+			}
+		}
+	}
+
+	return tx.Commit()
 }
 
 // NewGrid will create a new grid for the pool with some default settings

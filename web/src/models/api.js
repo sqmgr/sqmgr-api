@@ -192,6 +192,13 @@ class API {
         })
     }
 
+    reorderGrids(ids) {
+        return this.post(`/api/pool/${this.token}`, {
+            action: 'REORDER_GRIDS',
+            ids,
+        })
+    }
+
     clearClient() {
         this._axios = null
         this._jwt = null
