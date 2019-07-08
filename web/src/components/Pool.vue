@@ -25,8 +25,8 @@ limitations under the License.
 
                     <div class="grids">
                         <div class="grid-row header">
-                            <div>Event Date</div>
                             <div>Game</div>
+                            <div>Event Date</div>
                         </div>
 
                         <draggable v-model="grids" @start="drag=true" @end="drag=false" :disabled="!jwt.IsAdmin"
@@ -34,12 +34,12 @@ limitations under the License.
                             <div class="grid-row" v-for="grid in grids" :key="grid.id">
                                 <span v-if="jwt.IsAdmin" class="handle"><i class="fas fa-grip-lines"></i> <span>=</span></span>
 
+                                <a :href="`/pool/${token}/game/${grid.id}`">{{ grid.name }}</a>
+
                                 <div class="event-date">
                                     <span v-if="ymd(grid.eventDate)">{{ ymd(grid.eventDate) }}</span>
                                     <span v-else class="unknown">0/0/0000</span>
                                 </div>
-
-                                <a :href="`/pool/${token}/game/${grid.id}`">{{ grid.name }}</a>
 
                                 <div v-if="jwt.IsAdmin" class="actions">
                                     <button type="button" class="icon" @click.prevent="customizeGrid(grid)"><i
@@ -263,14 +263,6 @@ limitations under the License.
 </script>
 
 <style lang="scss" scoped>
-    section.pool table {
-        width: 100%;
-
-        td.actions {
-            text-align: right;
-        }
-    }
-
     div.buttons {
         margin-top: var(--spacing);
     }
@@ -291,7 +283,7 @@ limitations under the License.
     div.grid-row {
         align-items: center;
         display: grid;
-        grid-template-columns: 100px 1fr;
+        grid-template-columns: 1fr 100px;
         padding: calc(2 * var(--minimal-spacing));
 
         &:not(.header) {
@@ -320,10 +312,14 @@ limitations under the License.
 
     .admin {
         div.grid-row {
-            grid-template-columns: 40px 100px 1fr auto;
+            grid-template-columns: 40px 1fr 100px 130px;
 
             & > :first-child {
                 justify-self: center;
+            }
+
+            div.actions {
+                text-align: right;
             }
 
             @media(max-width: 600px) {
