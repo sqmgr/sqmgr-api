@@ -76,7 +76,6 @@ func (s *Server) setupRoutes() {
 	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodPost).Handler(s.apiPoolJWTHandler(s.apiPoolPostHandler()))
 	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/squares").Methods(http.MethodGet).Handler(s.apiPoolJWTHandler(s.apiPoolSquaresHandler()))
 	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/game").Methods(http.MethodGet).Handler(s.apiPoolJWTHandler(s.apiPoolGamesHandler()))
-	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/game").Methods(http.MethodPost).Handler(s.apiPoolJWTHandler(s.apiPoolGamesPostHandler()))
 	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/game/{grid:[0-9]+}").Methods(http.MethodGet).Handler(s.apiPoolJWTHandler(s.apiPoolGameHandler()))
 	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/game/{grid:[0-9]+}").Methods(http.MethodPost).Handler(s.apiPoolJWTHandler(s.apiPoolGamePostHandler()))
 	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/game/{grid:[0-9]+}").Methods(http.MethodDelete).Handler(s.apiPoolJWTHandler(s.apiPoolGameDeleteHandler()))

@@ -196,6 +196,27 @@ func (g *Grid) Save(ctx context.Context) error {
 		return err
 	}
 
+	if g.id == 0 {
+		row := tx.QueryRowContext(ctx, "SELECT * FROM new_grid($1)", g.poolID)
+		newGrid, err := g.model.gridByRow(row.Scan)
+		if err != nil {
+			if err2 := tx.Rollback(); err2 != nil {
+				return fmt.Errorf("error found: %#v. Another error found when trying to rollback: %#v", err, err2)
+			}
+
+			return err
+		}
+
+		g.id = newGrid.id
+		g.state = newGrid.state
+		g.created = newGrid.created
+		g.ord = newGrid.ord
+		g.poolID = newGrid.poolID
+		if g.settings != nil {
+			g.settings.gridID = g.id
+		}
+	}
+
 	if g.settings != nil {
 		if err := g.settings.Save(ctx, tx); err != nil {
 			if err2 := tx.Rollback(); err2 != nil {

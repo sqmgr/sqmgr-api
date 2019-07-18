@@ -488,6 +488,7 @@ LIMIT $3
 	return grids, nil
 }
 
+// SetGridsOrder will re-arrange the order of the grids
 func (p *Pool) SetGridsOrder(ctx context.Context, gridIDs []int64) error {
 	tx, err := p.model.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -553,10 +554,12 @@ func (p *Pool) SetGridsOrder(ctx context.Context, gridIDs []int64) error {
 }
 
 // NewGrid will create a new grid for the pool with some default settings
-func (p *Pool) NewGrid(ctx context.Context) (*Grid, error) {
-	const query = `SELECT * FROM new_grid($1)`
-	row := p.model.db.QueryRowContext(ctx, query, p.id)
-	return p.model.gridByRow(row.Scan)
+func (p *Pool) NewGrid() *Grid {
+	return &Grid{
+		model: p.model,
+		poolID:       p.id,
+		settings: &GridSettings{},
+	}
 }
 
 // GridByID will return a grid by its ID and ensures that it belongs to the pool

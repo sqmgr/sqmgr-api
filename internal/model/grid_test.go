@@ -67,8 +67,8 @@ func TestGrid(t *testing.T) {
 	g.Expect(pool.name).Should(gomega.Equal("My Pool"))
 	g.Expect(pool.gridType).Should(gomega.Equal(GridTypeStd25))
 
-	newGrid, err := pool.NewGrid(context.Background())
-	g.Expect(err).Should(gomega.Succeed())
+	newGrid := pool.NewGrid()
+	g.Expect(newGrid.Save(context.Background())).Should(gomega.Succeed())
 
 	grids, err := pool.Grids(context.Background(), 0, 1000)
 	g.Expect(err).Should(gomega.Succeed())

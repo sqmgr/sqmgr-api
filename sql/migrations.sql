@@ -236,8 +236,8 @@ CREATE FUNCTION new_grid(_pool_id bigint) RETURNS grids
     declare
         _row grids;
     begin
-        INSERT INTO grids (pool_id)
-        VALUES (_pool_id)
+        INSERT INTO grids (pool_id, ord)
+        VALUES (_pool_id, (SELECT COALESCE(MAX(ord), -1) + 1 FROM grids WHERE pool_id = _pool_id))
         RETURNING * INTO _row;
 
         INSERT INTO grid_settings (grid_id)

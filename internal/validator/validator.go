@@ -179,7 +179,7 @@ func (v *Validator) GridType(key, val string) model.GridType {
 
 // Datetime will validate a set of date, time and time zone values and return a time object
 func (v *Validator) Datetime(key, dateStr, timeStr, timeZoneOffsetStr string, isOptional ...bool) time.Time {
-	if len(isOptional) > 0 && isOptional[0] && len(dateStr) == 0 {
+	if len(isOptional) > 0 && isOptional[0] && ( len(dateStr) == 0 || strings.Index(dateStr, "0000-00-00") == 0 ) {
 		return time.Time{}
 	}
 

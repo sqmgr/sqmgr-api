@@ -76,8 +76,8 @@ func (s *Server) apiPoolPostHandler() http.HandlerFunc {
 	const ActionReorderGrids Action = "REORDER_GRIDS"
 
 	type postPayload struct {
-		Action Action `json:"action"`
-		IDs []int64 `json:"ids"`
+		Action Action  `json:"action"`
+		IDs    []int64 `json:"ids"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -122,28 +122,6 @@ func (s *Server) apiPoolPostHandler() http.HandlerFunc {
 			Result: jcd.Pool,
 		})
 		return
-	}
-}
-
-func (s *Server) apiPoolGamesPostHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		jcd := r.Context().Value(ctxKeyJWT).(*jwtContextData)
-
-		if !jcd.Claim.IsAdmin {
-			s.ServeJSONError(w, http.StatusForbidden, "")
-			return
-		}
-
-		grid, err := jcd.Pool.NewGrid(r.Context())
-		if err != nil {
-			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
-			return
-		}
-
-		s.ServeJSON(w, http.StatusCreated, jsonResponse{
-			Status: responseOK,
-			Result: grid,
-		})
 	}
 }
 
@@ -419,19 +397,27 @@ func (s *Server) apiPoolGamePostHandler() http.HandlerFunc {
 		}
 
 		gridID, _ := strconv.ParseInt(mux.Vars(r)["grid"], 10, 64)
-		grid, err := jcd.Pool.GridByID(r.Context(), gridID)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				s.ServeJSONError(w, http.StatusNotFound, "")
+
+		var grid *model.Grid
+		if gridID > 0 {
+			var err error
+			grid, err = jcd.Pool.GridByID(r.Context(), gridID)
+			if err != nil {
+				if err == sql.ErrNoRows {
+					s.ServeJSONError(w, http.StatusNotFound, "")
+					return
+				}
+
+				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 				return
 			}
 
-			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
-			return
-		}
-
-		if err := grid.LoadSettings(r.Context()); err != nil {
-			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+			if err := grid.LoadSettings(r.Context()); err != nil {
+				s.ServeJSONError(w, http.StatusInternalServerError, "", err)
+				return
+			}
+		} else if payload.Action != "save" {
+			s.ServeJSONError(w, http.StatusBadRequest, fmt.Sprintf("cannot call action %s without an ID", payload.Action))
 			return
 		}
 
@@ -483,6 +469,10 @@ func (s *Server) apiPoolGamePostHandler() http.HandlerFunc {
 					Result: v.Errors,
 				})
 				return
+			}
+
+			if grid == nil {
+				grid = jcd.Pool.NewGrid()
 			}
 
 			grid.SetEventDate(eventDate)

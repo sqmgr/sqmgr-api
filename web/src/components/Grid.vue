@@ -160,16 +160,19 @@ limitations under the License.
         },
         methods: {
             customizeWasClicked() {
-                ModalController.show('Customize Grid', GridCustomize, {
-                    gridID: this.grid.id,
-                }, {
-                    saved() {
-                        ModalController.hide()
-                        ModalController.showPrompt('Changes Saved', 'Changes saved successfully.', {
-                            dismissButton: 'OK',
+                api.getGrid(this.grid.id)
+                    .then(grid => {
+                        ModalController.show('Customize Grid', GridCustomize, {grid}, {
+                            saved() {
+                                ModalController.hide()
+                                ModalController.showPrompt('Changes Saved', 'Changes saved successfully.', {
+                                    dismissButton: 'OK',
+                                })
+                            }
                         })
-                    }
-                })
+
+                    })
+                    .catch(err => ModalController.showError(err))
             },
             drawNumbersWasClicked() {
                 let allClaimed = true

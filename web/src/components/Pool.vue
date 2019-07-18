@@ -99,9 +99,11 @@ limitations under the License.
 
         <h4>Help</h4>
 
-        <p>SqMGR allows you to create multiple games or events within a single squares pool. People will claim a square and then use that same square for all games in the pool. Each game will draw unique numbers.</p>
+        <p>SqMGR allows you to create multiple games or events within a single squares pool. People will claim a square
+            and then use that same square for all games in the pool. Each game will draw unique numbers.</p>
 
-        <p>For example, Ted might claim square 5 for an entire football season, but each week he'll have a different set of numbers for that square (e.g., 0 and 7 for week 1, 8 and 8 for week 2, etc.).</p>
+        <p>For example, Ted might claim square 5 for an entire football season, but each week he'll have a different set
+            of numbers for that square (e.g., 0 and 7 for week 1, 8 and 8 for week 2, etc.).</p>
         <Modal/>
     </section>
 </template>
@@ -147,22 +149,12 @@ limitations under the License.
         },
         methods: {
             createGrid() {
-                api.createGrid()
-                    .then(grid => {
-                        ModalController.show('Customize Grid', GridCustomize, {
-                            gridID: grid.id,
-                        }, {
-                            'modal-aborted': () => {
-                                api.deleteGrid(grid.id)
-                                    .catch(err => ModalController.showError(err))
-                            },
-                            'saved': grid => {
-                                ModalController.hide()
-                                this.grids.push(grid)
-                            }
-                        })
-                    })
-                    .catch(err => ModalController.showError(err))
+                ModalController.show('Customize Grid', GridCustomize, {}, {
+                    'saved': grid => {
+                        ModalController.hide()
+                        this.grids.push(grid)
+                    }
+                })
             },
             customizeGrid(grid) {
                 ModalController.show('Customize Grid', GridCustomize, {
