@@ -157,23 +157,25 @@ limitations under the License.
                 })
             },
             customizeGrid(grid) {
-                ModalController.show('Customize Grid', GridCustomize, {
-                    gridID: grid.id
-                }, {
-                    'saved': grid => {
-                        ModalController.hide()
-                        let index = -1
-                        for (let i = 0; i < this.grids.length; i++) {
-                            if (this.grids[i].id === grid.id) {
-                                index = i
-                            }
-                        }
+                api.getGrid(grid.id)
+                    .then(grid => {
+                        ModalController.show('Customize Grid', GridCustomize, {grid}, {
+                            'saved': grid => {
+                                ModalController.hide()
+                                let index = -1
+                                for (let i = 0; i < this.grids.length; i++) {
+                                    if (this.grids[i].id === grid.id) {
+                                        index = i
+                                    }
+                                }
 
-                        if (index >= 0) {
-                            this.grids.splice(index, 1, grid)
-                        }
-                    }
-                })
+                                if (index >= 0) {
+                                    this.grids.splice(index, 1, grid)
+                                }
+                            }
+                        })
+
+                    })
             },
             confirmDelete(grid) {
                 ModalController.showPrompt('Are you sure?', `Do you really want to delete "${grid.name}"`, {
