@@ -357,6 +357,11 @@ func (s *Server) apiPoolGameDeleteHandler() http.HandlerFunc {
 		}
 
 		if err := grid.Delete(r.Context()); err != nil {
+			if err == model.ErrLastGrid {
+				s.ServeJSONError(w, http.StatusBadRequest, "You cannot delete the last grid")
+				return
+			}
+
 			s.ServeJSONError(w, http.StatusInternalServerError, "", err)
 			return
 		}

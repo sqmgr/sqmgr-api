@@ -40,6 +40,9 @@ const (
 // ErrNumbersAlreadyDrawn happens when SelectRandomNumbers() is called multiple times
 var ErrNumbersAlreadyDrawn = errors.New("error: numbers have already been drawn")
 
+// ErrLastGrid happens when the user tries to delete the last remaining grid
+var ErrLastGrid = errors.New("error: you cannot delete the last grid")
+
 // Grid represents a single grid from a pool. A pool may contain more than one grid.
 type Grid struct {
 	model *Model
@@ -278,9 +281,18 @@ func (g *Grid) SelectRandomNumbers() error {
 
 // Delete the grid. By delete, we mean set the row to 'deleted'
 func (g *Grid) Delete(ctx context.Context) error {
-	const query = "UPDATE grids SET state = 'deleted', modified = (now() at time zone 'utc') WHERE id = $1"
-	_, err := g.model.db.ExecContext(ctx, query, g.id)
-	return err
+	const query = "SELECT * FROM delete_grid($1)"
+	row := g.model.db.QueryRowContext(ctx, query, g.id)
+	var ok bool
+	if err := row.Scan(&ok); err != nil {
+		return err
+	}
+
+	if !ok {
+		return ErrLastGrid
+	}
+
+	return nil
 }
 
 // LoadSettings will load the settings
