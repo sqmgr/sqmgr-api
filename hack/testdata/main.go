@@ -21,6 +21,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/weters/sqmgr/internal/config"
 	"math/rand"
 	"os"
 	"strings"
@@ -49,6 +50,10 @@ func main() {
 	logrus.WithField("seed", *seed).Info("seeding random number generator")
 	rand.Seed(*seed)
 	words := loadWords()
+
+	if err := config.Load(); err != nil {
+		panic(err)
+	}
 
 	db, err := database.Open()
 	if err != nil {
