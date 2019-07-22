@@ -15,12 +15,22 @@ limitations under the License.
 */
 
 <template>
-    <p>{{error}}</p>
+    <p>{{errorMessage}}</p>
 </template>
 
 <script>
     export default {
         name: "Error",
+        computed: {
+            errorMessage() {
+                try {
+                    const err = this.error.response.data.error
+                    return err
+                } catch (e) {
+                    return this.error
+                }
+            }
+        },
         props: {
             error: {
                 type: Error,
