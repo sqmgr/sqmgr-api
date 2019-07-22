@@ -197,18 +197,25 @@ func TestGridDelete(t *testing.T) {
 	m := New(getDB())
 
 	pool := getPool(m)
+	grid := pool.NewGrid()
+	g.Expect(grid.Save(context.Background())).Should(gomega.Succeed())
 	grids, err := pool.Grids(context.Background(), 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(len(grids)).Should(gomega.Equal(1))
+	g.Expect(len(grids)).Should(gomega.Equal(2))
 
 	g.Expect(grids[0].Delete(context.Background())).Should(gomega.Succeed())
 	grids, err = pool.Grids(context.Background(), 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(len(grids)).Should(gomega.Equal(0))
+	g.Expect(len(grids)).Should(gomega.Equal(1))
+
+	g.Expect(grids[0].Delete(context.Background())).Should(gomega.Equal(ErrLastGrid))
+	grids, err = pool.Grids(context.Background(), 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(grids)).Should(gomega.Equal(1))
 
 	grids, err = pool.Grids(context.Background(), 0, 10, true)
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(len(grids)).Should(gomega.Equal(1))
+	g.Expect(len(grids)).Should(gomega.Equal(2))
 }
 
 func getPool(m *Model) *Pool {
