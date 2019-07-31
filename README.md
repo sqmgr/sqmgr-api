@@ -1,4 +1,4 @@
-# SqMGR - An online football squares manager application
+# sqmgr-api - The backend for SqMGR
 
 ## To start development
 
@@ -8,11 +8,10 @@ Get a working [Go](https://golang.org/doc/install) and [Docker](https://docs.doc
 $ make git-hooks   # install any necessary git-hooks
 $ make dev-db      # starts a local PostgreSQL database in docker
 $ make migrations  # runs db migrations
-$ make web         # builds static assets
 $ make run         # run the web server
 ```
 
-Open your browser and navigate to [localhost:8080](http://localhost:8080).
+Verify you get a response by querying [localhost:5000](http://localhost:5000).
 
 ## Configuration
 
@@ -27,14 +26,5 @@ The following options can be set:
 Key | Description
 --- | ---
 `dsn` | Database DSN. Default is `host=localhost port=5432 user=postgres sslmode=disable`
-`from_address` | Email to use as from address. Default is `no-reply@sqmgr.com`
 `jwt_private_key` | Required. Path to a PEM private key
 `jwt_public_key` | Required. Path to a PEM public key
-`opaque_salt` | Used as the salt when hashing user IDs
-`recaptcha_enabled` | Is reCAPTCHA v3 enabled? Default is `true`
-`recaptcha_secret_key` | Google reCAPTCHA v3 secret key. Required if `recaptcha_enabled=true`
-`recaptcha_site_key` | Google reCAPTCHA v3 site key. Required if `recaptcha_enabled=true`
-`session_auth_key` | Key used for authenticating sessions. Should be 64 bytes
-`session_enc_key ` | Key used for encrypting sessions. Should be 32 bytes
-`smtp` | Address of an SMTP server
-`url` | Public address of the server. Default is `http://localhost:8080`

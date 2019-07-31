@@ -1,4 +1,4 @@
-module github.com/weters/sqmgr
+module github.com/weters/sqmgr-api
 
 go 1.12
 
@@ -10,6 +10,8 @@ require (
 	github.com/gorilla/sessions v1.1.3
 	github.com/lib/pq v1.1.1
 	github.com/onsi/gomega v1.5.0
+	github.com/prometheus/common v0.4.0
+	github.com/rs/cors v1.6.0
 	github.com/sirupsen/logrus v1.4.1
 	github.com/spf13/viper v1.4.0
 	github.com/synacor/argon2id v0.0.0-20190318165710-18569dfc600b

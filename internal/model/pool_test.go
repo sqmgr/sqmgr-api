@@ -72,7 +72,7 @@ func TestPool(t *testing.T) {
 	g := gomega.NewWithT(t)
 	m := New(getDB())
 
-	user, err := m.NewUser(randString()+"@sqmgr.com", "my-unique-password")
+	user, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
 	pool, err := m.NewPool(context.Background(), user.ID, "My Pool", GridTypeStd100, "my-other-unique-password")
@@ -130,34 +130,34 @@ func TestGridCollections(t *testing.T) {
 	g := gomega.NewWithT(t)
 	m := New(getDB())
 
-	user, err := m.NewUser(randString()+"@sqmgr.com", "my-unique-password")
+	user, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
 	pool, err := m.NewPool(context.Background(), user.ID, "Test for Collection", GridTypeStd100, "my-other-unique-password")
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(pool).ShouldNot(gomega.BeNil())
 
-	user2, err := m.NewUser(randString()+"@sqmgr.com", "my-unique-password-2")
+	user2, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
-	collection, err := m.PoolsJoinedByUser(context.Background(), user, 0, 10)
+	collection, err := m.PoolsJoinedByUserID(context.Background(), user.ID, 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(0))
 
-	collection, err = m.PoolsJoinedByUser(context.Background(), user2, 0, 10)
+	collection, err = m.PoolsJoinedByUserID(context.Background(), user2.ID, 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(0))
 
 	g.Expect(user2.JoinPool(context.Background(), pool)).Should(gomega.Succeed())
-	collection, err = m.PoolsJoinedByUser(context.Background(), user2, 0, 10)
+	collection, err = m.PoolsJoinedByUserID(context.Background(), user2.ID, 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(1))
 
-	collection, err = m.PoolsOwnedByUser(context.Background(), user, 0, 10)
+	collection, err = m.PoolsOwnedByUserID(context.Background(), user.ID, 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(1))
 
-	collection, err = m.PoolsOwnedByUser(context.Background(), user2, 0, 10)
+	collection, err = m.PoolsOwnedByUserID(context.Background(), user2.ID, 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(0))
 }
@@ -170,10 +170,10 @@ func TestGridCollectionPagination(t *testing.T) {
 	g := gomega.NewWithT(t)
 	m := New(getDB())
 
-	user1, err := m.NewUser(randString()+"@sqmgr.com", "my-unique-password")
+	user1, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
-	user2, err := m.NewUser(randString()+"@sqmgr.com", "my-unique-password")
+	user2, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
 	for i := 0; i < 30; i++ {
@@ -185,19 +185,19 @@ func TestGridCollectionPagination(t *testing.T) {
 		}
 	}
 
-	count, err := m.PoolsOwnedByUserCount(context.Background(), user1)
+	count, err := m.PoolsOwnedByUserIDCount(context.Background(), user1.ID)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(30)))
 
-	count, err = m.PoolsOwnedByUserCount(context.Background(), user2)
+	count, err = m.PoolsOwnedByUserIDCount(context.Background(), user2.ID)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(0)))
 
-	count, err = m.PoolsJoinedByUserCount(context.Background(), user1)
+	count, err = m.PoolsJoinedByUserIDCount(context.Background(), user1.ID)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(0)))
 
-	count, err = m.PoolsJoinedByUserCount(context.Background(), user2)
+	count, err = m.PoolsJoinedByUserIDCount(context.Background(), user2.ID)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(20)))
 
@@ -242,7 +242,7 @@ func TestGridSquares(t *testing.T) {
 	g := gomega.NewWithT(t)
 	m := New(getDB())
 
-	user, err := m.NewUser(randString()+"@sqmgr.com", "password")
+	user, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
 	pool, err := m.NewPool(context.Background(), user.ID, "Test Pool", GridTypeStd25, "a password")
@@ -259,7 +259,7 @@ func TestGridSquares(t *testing.T) {
 
 	square.Claimant = "Test User"
 	square.State = PoolSquareStateClaimed
-	square.SetUserIdentifier(user.ID)
+	square.SetUserID(user.ID)
 	err = square.Save(context.Background(), true, PoolSquareLog{
 		Note:       "Test Note",
 		RemoteAddr: "127.0.0.1",

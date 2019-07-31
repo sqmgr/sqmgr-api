@@ -19,7 +19,6 @@ package model
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -73,7 +72,8 @@ func PoolWithID(id int64) *Pool {
 	return &Pool{id: id}
 }
 
-type poolJSON struct {
+// PoolJSON represents an object that can be exposed to an end-user
+type PoolJSON struct {
 	Token    string    `json:"token"`
 	Name     string    `json:"name"`
 	GridType GridType  `json:"gridType"`
@@ -126,16 +126,16 @@ func (p *Pool) SetGridType(gridType GridType) {
 	p.gridType = gridType
 }
 
-// MarshalJSON provides custom JSON marshalling
-func (p *Pool) MarshalJSON() ([]byte, error) {
-	return json.Marshal(poolJSON{
+// JSON returns JSON that can be sent to the front-end
+func (p *Pool) JSON() *PoolJSON {
+	return &PoolJSON{
 		Token:    p.token,
 		Name:     p.name,
 		Locks:    p.Locks(),
 		GridType: p.gridType,
 		Created:  p.created,
 		Modified: p.modified,
-	})
+	}
 }
 
 type executer interface {
@@ -162,8 +162,8 @@ func (m *Model) poolByRow(scan scanFunc) (*Pool, error) {
 	return &s, nil
 }
 
-// PoolsJoinedByUser will return a collection of pools that the user joined
-func (m *Model) PoolsJoinedByUser(ctx context.Context, u *User, offset, limit int) ([]*Pool, error) {
+// PoolsJoinedByUserID will return a collection of pools that the user joined
+func (m *Model) PoolsJoinedByUserID(ctx context.Context, userID int64, offset int64, limit int) ([]*Pool, error) {
 	const query = `
 		SELECT pools.*
 		FROM pools
@@ -173,22 +173,22 @@ func (m *Model) PoolsJoinedByUser(ctx context.Context, u *User, offset, limit in
 		OFFSET $2
 		LIMIT $3`
 
-	return m.poolsByRows(m.db.QueryContext(ctx, query, u.ID, offset, limit))
+	return m.poolsByRows(m.db.QueryContext(ctx, query, userID, offset, limit))
 }
 
-// PoolsJoinedByUserCount will return a how many pools the user joined
-func (m *Model) PoolsJoinedByUserCount(ctx context.Context, u *User) (int64, error) {
+// PoolsJoinedByUserIDCount will return a how many pools the user joined
+func (m *Model) PoolsJoinedByUserIDCount(ctx context.Context, userID int64) (int64, error) {
 	const query = `
 		SELECT COUNT(*)
 		FROM pools
 		LEFT JOIN pools_users ON pools.id = pools_users.pool_id
 		WHERE pools_users.user_id = $1`
 
-	return m.poolsCount(m.db.QueryRowContext(ctx, query, u.ID))
+	return m.poolsCount(m.db.QueryRowContext(ctx, query, userID))
 }
 
-// PoolsOwnedByUser will return a collection of pools that were created by the user
-func (m *Model) PoolsOwnedByUser(ctx context.Context, u *User, offset, limit int) ([]*Pool, error) {
+// PoolsOwnedByUserID will return a collection of pools that were created by the user
+func (m *Model) PoolsOwnedByUserID(ctx context.Context, userID int64, offset int64, limit int) ([]*Pool, error) {
 	const query = `
 		SELECT *
 		FROM pools
@@ -197,17 +197,17 @@ func (m *Model) PoolsOwnedByUser(ctx context.Context, u *User, offset, limit int
 		OFFSET $2
 		LIMIT $3`
 
-	return m.poolsByRows(m.db.QueryContext(ctx, query, u.ID, offset, limit))
+	return m.poolsByRows(m.db.QueryContext(ctx, query, userID, offset, limit))
 }
 
-// PoolsOwnedByUserCount will return how many pools were created by the user
-func (m *Model) PoolsOwnedByUserCount(ctx context.Context, u *User) (int64, error) {
+// PoolsOwnedByUserIDCount will return how many pools were created by the user
+func (m *Model) PoolsOwnedByUserIDCount(ctx context.Context, userID int64) (int64, error) {
 	const query = `
 		SELECT COUNT(*)
 		FROM pools
 		WHERE user_id = $1`
 
-	return m.poolsCount(m.db.QueryRowContext(ctx, query, u.ID))
+	return m.poolsCount(m.db.QueryRowContext(ctx, query, userID))
 }
 
 func (m *Model) poolsByRows(rows *sql.Rows, err error) ([]*Pool, error) {
@@ -323,7 +323,7 @@ func (p *Pool) PasswordIsValid(password string) bool {
 func (p *Pool) Squares() (map[int]*PoolSquare, error) {
 	if p.squares == nil {
 		const query = `
-		SELECT id, square_id, user_id, session_user_id, state, claimant, modified
+		SELECT id, square_id, user_id, state, claimant, modified
 		FROM pool_squares
 		WHERE pool_id = $1
 		ORDER BY square_id`
@@ -352,7 +352,7 @@ func (p *Pool) Squares() (map[int]*PoolSquare, error) {
 // SquareBySquareID will return a single square based on the square ID
 func (p *Pool) SquareBySquareID(squareID int) (*PoolSquare, error) {
 	const query = `
-	SELECT id, square_id, user_id, session_user_id, state, claimant, modified
+	SELECT id, square_id, user_id, state, claimant, modified
 	FROM pool_squares
 	WHERE pool_id = $1
 		AND square_id = $2`
@@ -369,8 +369,7 @@ func (p *Pool) squareByRow(scan scanFunc) (*PoolSquare, error) {
 
 	var claimant *string
 	var userID *int64
-	var sessionUserID *string
-	if err := scan(&gs.ID, &gs.SquareID, &userID, &sessionUserID, &gs.State, &claimant, &gs.Modified); err != nil {
+	if err := scan(&gs.ID, &gs.SquareID, &userID, &gs.State, &claimant, &gs.Modified); err != nil {
 		return nil, err
 	}
 
@@ -382,19 +381,15 @@ func (p *Pool) squareByRow(scan scanFunc) (*PoolSquare, error) {
 		gs.userID = *userID
 	}
 
-	if sessionUserID != nil {
-		gs.sessionUserID = *sessionUserID
-	}
-
 	gs.Modified = gs.Modified.In(locationNewYork)
 
 	return &gs, nil
 }
 
 // Logs will return all pool square logs for the pool
-func (p *Pool) Logs(ctx context.Context, offset, limit int) ([]*PoolSquareLog, error) {
+func (p *Pool) Logs(ctx context.Context, offset int64, limit int) ([]*PoolSquareLog, error) {
 	const query = `
-		SELECT pool_squares_logs.id, pool_square_id, square_id, pool_squares_logs.user_id, pool_squares_logs.session_user_id, pool_squares_logs.state, pool_squares_logs.claimant, remote_addr, note, pool_squares_logs.created
+		SELECT pool_squares_logs.id, pool_square_id, square_id, pool_squares_logs.user_id, pool_squares_logs.state, pool_squares_logs.claimant, remote_addr, note, pool_squares_logs.created
 		FROM pool_squares_logs
 		INNER JOIN pool_squares ON pool_squares_logs.pool_square_id = pool_squares.id
 		WHERE pool_squares.pool_id = $1
@@ -453,7 +448,7 @@ func (p *Pool) DefaultGrid(ctx context.Context) (*Grid, error) {
 
 // Grids returns all grids assigned to the pool. By default, this will only return "active" grids. Pass true to as the allStates
 // argument to return grids with all states
-func (p *Pool) Grids(ctx context.Context, offset, limit int, allStates ...bool) ([]*Grid, error) {
+func (p *Pool) Grids(ctx context.Context, offset int64, limit int, allStates ...bool) ([]*Grid, error) {
 	activeOnly := len(allStates) == 0 || !allStates[0]
 	stateClause := ""
 	if activeOnly {
@@ -486,6 +481,26 @@ LIMIT $3
 	}
 
 	return grids, nil
+}
+
+// GridsCount returns the count of all grids assigned to the pool. By default, this will only return "active" grids. Pass true to as the allStates
+// argument to return grids with all states
+func (p *Pool) GridsCount(ctx context.Context, allStates ...bool) (int64, error) {
+	activeOnly := len(allStates) == 0 || !allStates[0]
+	stateClause := ""
+	if activeOnly {
+		stateClause = " AND state = 'active'"
+	}
+
+	query := `SELECT COUNT(*) FROM grids WHERE pool_id = $1` + stateClause
+
+	row := p.model.db.QueryRowContext(ctx, query, p.id)
+	var count int64
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
 
 // SetGridsOrder will re-arrange the order of the grids
@@ -527,7 +542,7 @@ func (p *Pool) SetGridsOrder(ctx context.Context, gridIDs []int64) error {
 	}
 
 	for ord, id := range gridIDs {
-		l := logrus.WithFields(logrus.Fields{"pool_id":p.id, "grid_id":id})
+		l := logrus.WithFields(logrus.Fields{"pool_id": p.id, "grid_id": id})
 		curOrd, ok := id2ord[id]
 		if !ok {
 			l.Warn("could not find grid in pool")
@@ -556,8 +571,8 @@ func (p *Pool) SetGridsOrder(ctx context.Context, gridIDs []int64) error {
 // NewGrid will create a new grid for the pool with some default settings
 func (p *Pool) NewGrid() *Grid {
 	return &Grid{
-		model: p.model,
-		poolID:       p.id,
+		model:    p.model,
+		poolID:   p.id,
 		settings: &GridSettings{},
 	}
 }

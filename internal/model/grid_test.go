@@ -56,7 +56,7 @@ func TestGrid(t *testing.T) {
 	g := gomega.NewWithT(t)
 	m := New(getDB())
 
-	user, err := m.NewUser(randString()+"@sqmgr.com", "my-pass")
+	user, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
 	pool, err := m.NewPool(context.Background(), user.ID, "My Pool", GridTypeStd25, "my-pass")
@@ -213,13 +213,21 @@ func TestGridDelete(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(grids)).Should(gomega.Equal(1))
 
+	count, err := pool.GridsCount(context.Background())
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(1)))
+
 	grids, err = pool.Grids(context.Background(), 0, 10, true)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(grids)).Should(gomega.Equal(2))
+
+	count, err = pool.GridsCount(context.Background(), true)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(2)))
 }
 
 func getPool(m *Model) *Pool {
-	user, err := m.NewUser(randString()+"@sqmgr.com", "my-password")
+	user, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	if err != nil {
 		panic(err)
 	}

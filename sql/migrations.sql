@@ -23,21 +23,15 @@ CREATE TABLE tokens
 
 CREATE TYPE states AS ENUM ('active', 'pending', 'deleted', 'disabled');
 
+CREATE TYPE stores AS ENUM ('sqmgr', 'auth0');
+
 CREATE TABLE users
 (
-    id            bigserial NOT NULL PRIMARY KEY,
-    email         text      NULL UNIQUE,
-    password_hash text      NOT NULL,
-    state         states    NOT NULL DEFAULT 'pending',
-    created       TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'),
-    modified      TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')
-);
-
-CREATE TABLE user_confirmations
-(
-    user_id bigint    NOT NULL REFERENCES users (id),
-    token   TEXT      NOT NULL UNIQUE,
-    created TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')
+    id       bigserial not null primary key,
+    store    stores    not null,
+    store_id text      not null,
+    created  timestamp not null default (now() at time zone 'utc'),
+    UNIQUE (store, store_id)
 );
 
 CREATE TABLE pools
@@ -104,7 +98,6 @@ CREATE TABLE pool_squares
     state           square_states not null default 'unclaimed',
     claimant        text,
     user_id         bigint references users (id), -- registered users
-    session_user_id text,                         -- non-registered, session-based users
     modified        timestamp     not null default (now() at time zone 'utc'),
     UNIQUE (pool_id, square_id)
 );
@@ -114,7 +107,6 @@ CREATE TABLE pool_squares_logs
     id              bigserial     not null primary key,
     pool_square_id  bigint        not null references pool_squares (id),
     user_id         bigint references users (id),
-    session_user_id text, -- non-registered, session-based users
     state           square_states not null default 'unclaimed',
     claimant        text,
     remote_addr     text,
@@ -130,7 +122,6 @@ CREATE INDEX pool_squares_logs_pool_square_id_idx ON pool_squares_logs (pool_squ
 --rollback DROP TABLE grid_settings;
 --rollback DROP TABLE grids;
 --rollback DROP TABLE pools;
---rollback DROP TABLE user_confirmations;
 --rollback DROP TABLE users;
 --rollback DROP TABLE tokens;
 --rollback DROP TYPE square_states;
@@ -138,49 +129,30 @@ CREATE INDEX pool_squares_logs_pool_square_id_idx ON pool_squares_logs (pool_squ
 
 --changeset weters:2 splitStatements:false
 
-CREATE FUNCTION new_user(_email text, _password_hash text) RETURNS users
+CREATE FUNCTION get_user(_store stores, _store_id text) RETURNS users
     LANGUAGE plpgsql
 AS
 $$
-DECLARE
+declare
     _record users;
-BEGIN
-    LOCK TABLE users IN SHARE UPDATE EXCLUSIVE MODE;
-    _record.id = -1;
+begin
+    SELECT *
+    INTO _record
+    FROM users
+    WHERE store = _store
+      AND store_id = _store_id;
 
-    PERFORM 1 FROM users WHERE email = _email;
-    IF FOUND THEN
-        RETURN _record;
-    END IF;
+    if found then
+        return _record;
+    end if;
 
-    INSERT INTO users (email, password_hash)
-    VALUES (_email, _password_hash) RETURNING * INTO _record;
+    insert into users (store, store_id)
+    values (_store, _store_id) returning * into _record;
 
-    RETURN _record;
-END;
+    return _record;
+end;
 $$;
 
-CREATE FUNCTION set_user_confirmation(_user_id bigint, _token text) RETURNS boolean
-    LANGUAGE plpgsql
-AS
-$$
-BEGIN
-    PERFORM 1
-    FROM user_confirmations
-    WHERE user_id = _user_id;
-
-    IF FOUND THEN
-        UPDATE user_confirmations
-        SET token   = _token,
-            created = (NOW() AT TIME ZONE 'UTC')
-        WHERE user_id = _user_id;
-        RETURN true;
-    END IF;
-
-    INSERT INTO user_confirmations(user_id, token) VALUES (_user_id, _token);
-    RETURN true;
-END;
-$$;
 
 CREATE FUNCTION new_token(_token text) RETURNS boolean
     LANGUAGE plpgsql
@@ -199,8 +171,7 @@ END;
 $$;
 
 CREATE FUNCTION update_pool_square(_id bigint, _state square_states, _claimant text, _user_id bigint,
-                                   _session_user_id text, _remote_addr text, _note text,
-                                   _is_admin boolean) RETURNS boolean
+                                   _remote_addr text, _note text, _is_admin boolean) RETURNS boolean
     LANGUAGE plpgsql
 AS
 $$
@@ -213,8 +184,7 @@ BEGIN
     SELECT INTO _row * FROM pool_squares WHERE id = _id FOR SHARE;
 
     _initial_claim := _row.claimant IS NULL AND _row.state = 'unclaimed';
-    _same_user := coalesce(_row.user_id, 0) = coalesce(_user_id, 0) AND
-                  coalesce(_row.session_user_id, '') = coalesce(_session_user_id, '');
+    _same_user := coalesce(_row.user_id, 0) = coalesce(_user_id, 0);
     _user_unclaim := _same_user AND _row.state = 'claimed' AND _state = 'unclaimed';
 
     IF NOT _is_admin
@@ -227,19 +197,17 @@ BEGIN
     IF _state = 'unclaimed' THEN
         _claimant := NULL;
         _user_id := NULL;
-        _session_user_id := NULL;
     END IF;
 
     UPDATE pool_squares
     SET state           = _state,
         claimant        = _claimant,
         user_id         = _user_id,
-        session_user_id = _session_user_id,
         modified        = (now() at time zone 'utc')
     WHERE id = _id;
 
-    INSERT INTO pool_squares_logs (pool_square_id, user_id, session_user_id, state, claimant, note, remote_addr)
-    VALUES (_id, _user_id, _session_user_id, _state, _claimant, _note, _remote_addr);
+    INSERT INTO pool_squares_logs (pool_square_id, user_id, state, claimant, note, remote_addr)
+    VALUES (_id, _user_id, _state, _claimant, _note, _remote_addr);
 
     RETURN TRUE;
 END;
@@ -293,8 +261,7 @@ $$;
 --rollback DROP FUNCTION new_pool(text, bigint, text, text, text, int);
 --rollback DROP FUNCTION new_grid(bigint);
 --rollback DROP FUNCTION update_pool_square(bigint, square_states, text, bigint, text, text, text, boolean);
---rollback DROP FUNCTION new_user(text, text);
---rollback DROP FUNCTION set_user_confirmation(bigint, text);
+--rollback DROP FUNCTION get_user(store, text);
 --rollback DROP FUNCTION new_token(text);
 
 --changeset weters:3 splitStatements:false
@@ -332,3 +299,15 @@ end;
 $$;
 
 --rollback drop function delete_grid(bigint);
+
+--changeset weters:4
+
+CREATE TABLE guest_users (
+    store stores not null,
+    store_id text not null primary key,
+    expires timestamp not null,
+    remote_addr text not null,
+    created timestamp not null default (now() at time zone 'utc')
+);
+
+--rollback DROP TABLE guest_users;

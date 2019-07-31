@@ -24,61 +24,16 @@ import (
 
 type config struct {
 	dsn                string
-	fromAddress        string
 	jwtPrivateKey      string
 	jwtPublicKey       string
-	opaqueSalt         string
-	recaptchaEnabled   bool
-	recaptchaSecretKey string
-	recaptchaSiteKey   string
-	sessionAuthKey     string
-	sessionEncKey      string
-	smtp               string
-	url                string
 }
 
 var instance *config
-
-// URL is the public facing URL of the site
-func URL() string {
-	mustHaveInstance()
-	return instance.url
-}
-
-// SMTP returns the location of an smtp server
-func SMTP() string {
-	mustHaveInstance()
-	return instance.smtp
-}
-
-// FromAddress will return the email address used in the "from" field in any SqMGR-sent emails
-func FromAddress() string {
-	mustHaveInstance()
-	return instance.fromAddress
-}
-
-// SessionAuthKey returns a 64-byte string used for authentication sessions
-func SessionAuthKey() string {
-	mustHaveInstance()
-	return instance.sessionAuthKey
-}
-
-// SessionEncKey returns a 32-byte string used for encrypting sessions
-func SessionEncKey() string {
-	mustHaveInstance()
-	return instance.sessionEncKey
-}
 
 // DSN returns a database's data source name
 func DSN() string {
 	mustHaveInstance()
 	return instance.dsn
-}
-
-// OpaqueSalt returns a salt that is used for obfuscating user IDs
-func OpaqueSalt() string {
-	mustHaveInstance()
-	return instance.opaqueSalt
 }
 
 // JWTPublicKey returns the path to a PEM encoded public key
@@ -93,24 +48,6 @@ func JWTPrivateKey() string {
 	return instance.jwtPrivateKey
 }
 
-// RecaptchaEnabled returns whether recaptcha is currently enabled
-func RecaptchaEnabled() bool {
-	mustHaveInstance()
-	return instance.recaptchaEnabled
-}
-
-// RecaptchaSecretKey returns the Google secret key used for reCAPTCHA v3
-func RecaptchaSecretKey() string {
-	mustHaveInstance()
-	return instance.recaptchaSecretKey
-}
-
-// RecaptchaSiteKey returns the Google site key used for reCAPTCHA v3
-func RecaptchaSiteKey() string {
-	mustHaveInstance()
-	return instance.recaptchaSiteKey
-}
-
 func mustHaveInstance() {
 	if instance == nil {
 		panic("config: must call Load() first")
@@ -123,25 +60,11 @@ func Load() error {
 	viper.AddConfigPath(".")
 	viper.AddConfigPath("/etc/sqmgr")
 	viper.SetEnvPrefix("sqmgr_conf")
-	viper.BindEnv("dsn")
-	viper.BindEnv("from_address")
-	viper.BindEnv("jwt_private_key")
-	viper.BindEnv("jwt_public_key")
-	viper.BindEnv("opaque_salt")
-	viper.BindEnv("recaptcha_enabled")
-	viper.BindEnv("recaptcha_secret_key")
-	viper.BindEnv("recaptcha_site_key")
-	viper.BindEnv("session_auth_key")
-	viper.BindEnv("session_enc_key")
-	viper.BindEnv("smtp")
-	viper.BindEnv("url")
+	_ = viper.BindEnv("dsn")
+	_ = viper.BindEnv("jwt_private_key")
+	_ = viper.BindEnv("jwt_public_key")
 
 	viper.SetDefault("dsn", "host=localhost port=5432 user=postgres sslmode=disable")
-	viper.SetDefault("recaptcha_enabled", true)
-	viper.SetDefault("opaque_salt", "SqMGR-salt")
-	viper.SetDefault("url", "http://localhost:8080")
-	viper.SetDefault("from_address", "no-reply@sqmgr.com")
-	viper.SetDefault("smtp", "localhost:25")
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, isNotFoundError := err.(viper.ConfigFileNotFoundError); !isNotFoundError {
@@ -153,17 +76,8 @@ func Load() error {
 
 	instance = &config{
 		dsn:                viper.GetString("dsn"),
-		fromAddress:        viper.GetString("from_address"),
 		jwtPrivateKey:      viperGetStringOrFatal("jwt_private_key"),
 		jwtPublicKey:       viperGetStringOrFatal("jwt_public_key"),
-		opaqueSalt:         viper.GetString("opaque_salt"),
-		recaptchaEnabled:   viper.GetBool("recaptcha_enabled"),
-		recaptchaSecretKey: viperGetStringOrWarn("recaptcha_secret_key"),
-		recaptchaSiteKey:   viperGetStringOrWarn("recaptcha_site_key"),
-		sessionAuthKey:     viperGetStringOrFatal("session_auth_key"),
-		sessionEncKey:      viperGetStringOrFatal("session_enc_key"),
-		smtp:               viper.GetString("smtp"),
-		url:                viper.GetString("url"),
 	}
 
 	return nil

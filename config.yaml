@@ -1,7 +1,5 @@
 jwt_public_key: .keys/public.pem
 jwt_private_key: .keys/private.pem
-session_auth_key: dev-session-auth-key---X2xr5nJgD2eetKHZoYOoh00otckwU8mmB3jEvTBhc
-session_enc_key: dev-session-enc-key---Bgvp9YxwQT
 recaptcha_enabled: false
 recaptcha_site_key: FIXME
 recaptcha_secret_key: FIXME

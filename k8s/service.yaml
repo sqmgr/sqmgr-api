@@ -1,10 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: sqmgr-dev
+  name: sqmgr-api
 spec:
   selector:
-    app: sqmgr-dev
+    app: sqmgr-api
+    tier: backend
   ports:
-  - port: 8080
+  - port: 5000
 

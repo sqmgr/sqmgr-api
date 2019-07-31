@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/lib/pq"
@@ -62,7 +61,8 @@ type Grid struct {
 	settings *GridSettings
 }
 
-type gridJSON struct {
+// GridJSON represents grid metadata that can be sent to the front-end
+type GridJSON struct {
 	ID           int64         `json:"id"`
 	Name         string        `json:"name"`
 	HomeTeamName string        `json:"homeTeamName"`
@@ -76,9 +76,9 @@ type gridJSON struct {
 	Settings     *GridSettings `json:"settings"`
 }
 
-// MarshalJSON will marshal the JSON using a custom marshaller
-func (g *Grid) MarshalJSON() ([]byte, error) {
-	return json.Marshal(gridJSON{
+// JSON will marshal the JSON using a custom marshaller
+func (g *Grid) JSON() *GridJSON {
+	return &GridJSON{
 		ID:           g.ID(),
 		Name:         g.Name(),
 		HomeTeamName: g.HomeTeamName(),
@@ -90,7 +90,7 @@ func (g *Grid) MarshalJSON() ([]byte, error) {
 		Created:      g.Created(),
 		Modified:     g.modified,
 		Settings:     g.settings,
-	})
+	}
 }
 
 // State is a getter for the state

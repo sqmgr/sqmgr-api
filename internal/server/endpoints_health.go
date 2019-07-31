@@ -14,23 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package database
+package server
 
-import (
-	"database/sql"
-	"github.com/weters/sqmgr-api/internal/config"
-)
+import "net/http"
 
-// Open will open a database based on an environment variable DSN
-func Open() (*sql.DB, error) {
-	db, err := sql.Open("postgres", config.DSN())
-	if err != nil {
-		return nil, err
+func (s *Server) getHealthEndpoint() http.HandlerFunc {
+	ok := map[string]string{
+		"status": "OK",
+		"version": s.version,
 	}
 
-	if err := db.Ping(); err != nil {
-		return nil, err
+	return func(w http.ResponseWriter, r *http.Request) {
+		s.writeJSONResponse(w, http.StatusOK, ok)
 	}
-
-	return db, nil
 }

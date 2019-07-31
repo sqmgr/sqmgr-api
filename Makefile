@@ -1,4 +1,4 @@
-IMG ?= "weters/sqmgrserver"
+IMG ?= "weters/sqmgr-api"
 LB_IMG ?= "weters/sqmgr-lb"
 VERSION ?= $(shell git describe --always)
 PG_HOST ?= "localhost"
@@ -18,24 +18,21 @@ DEPLOY_NAME ?= "sqmgr-dev"
 
 .PHONY: run
 run: .keys/private.pem .keys/public.pem
-	go run cmd/sqmgrserver/*.go -dev
+	go run cmd/sqmgr-api/*.go -dev
 
 .PHONY: docker-build
 docker-build: test-integration
-	docker build -t ${IMG} --build-arg VERSION=${VERSION} .
-	docker build -t ${LB_IMG} -f Dockerfile-liquibase .
-
-.PHONY: docker-tag
-docker-tag:
-	docker tag ${IMG} ${IMG}:${VERSION}
-	docker tag ${LB_IMG} ${LB_IMG}:${VERSION}
+	docker build -t ${IMG}:${VERSION} --build-arg VERSION=${VERSION} .
+	docker tag ${IMG}:${VERSION} ${IMG}:latest
+	docker build -t ${LB_IMG}:${VERSION} -f Dockerfile-liquibase .
+	docker tag ${LB_IMG}:${VERSION} ${LB_IMG}:latest
 
 .PHONY: docker-push
-docker-push: docker-build docker-tag
-	docker push ${IMG}:latest
+docker-push:
 	docker push ${IMG}:${VERSION}
-	docker push ${LB_IMG}:latest
+	docker push ${IMG}:latest
 	docker push ${LB_IMG}:${VERSION}
+	docker push ${LB_IMG}:latest
 
 .PHONY: k8s-deploy
 k8s-deploy: docker-push
@@ -117,7 +114,3 @@ testdata:
 .PHONY: wait
 wait:
 	sleep 1
-
-.PHONY: web
-web:
-	$(MAKE) -C web npm-install build

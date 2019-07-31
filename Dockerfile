@@ -4,23 +4,14 @@ COPY go.* ./
 COPY cmd/ cmd/
 COPY internal/ internal/
 COPY pkg/ pkg/
-RUN CGO_ENABLED=0 GOOS=linux go build -a -o sqmgrserver github.com/weters/sqmgr/cmd/sqmgrserver
-
-FROM node:latest AS build-node
-WORKDIR /build/
-COPY web/ web/
-RUN cd web \
-	&& npm i \
-	&& npm run build
+RUN CGO_ENABLED=0 GOOS=linux go build -a -o sqmgr-api github.com/weters/sqmgr-api/cmd/sqmgr-api
 
 FROM alpine:latest
-EXPOSE 8080
+EXPOSE 5000
 WORKDIR /app
-COPY --from=build-go /build/sqmgrserver /bin/sqmgrserver
+RUN apk add --no-cache ca-certificates
+COPY --from=build-go /build/sqmgr-api /bin/sqmgr-api
 COPY --from=build-go /usr/share/zoneinfo/America/New_York /usr/share/zoneinfo/America/New_York
-COPY --from=build-go /etc/ssl/certs/ /etc/ssl/certs/
-COPY --from=build-node /build/web/static/ web/static/
-COPY web/templates/ web/templates/
 ARG VERSION
 ENV SQMGR_VERSION=${VERSION}
-ENTRYPOINT [ "/bin/sqmgrserver" ]
+ENTRYPOINT [ "/bin/sqmgr-api" ]

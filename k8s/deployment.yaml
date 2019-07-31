@@ -1,21 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sqmgr-dev
+  name: sqmgr-api
+  labels:
+    app: sqmgr-api
+    tier: backend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: sqmgr-dev
+      app: sqmgr-api
+      tier: backend
   template:
     metadata:
       labels:
-        app: sqmgr-dev
+        app: sqmgr-api
+        tier: backend
     spec:
       initContainers:
         - name: liquibase
-          image: weters/sqmgr-lb
-          imagePullPolicy: Always
+          image: weters/sqmgr-lb:latest
+          imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef:
                 name: sqmgr-config
@@ -29,48 +34,32 @@ spec:
             - '--changeLogFile'
             - './sql/migrations.sql'
             - 'update'
-        - name: certs
-          image: alpine
-          volumeMounts:
-            - mountPath: /etc/ssl/certs
-              name: certs
-            - mountPath: /etc/sqmgr
-              name: mail-cert
-          command:
-            - sh
-            - '-c'
-            - 'apk add ca-certificates && cat /etc/sqmgr/sqmgr-mail.crt >> /etc/ssl/certs/ca-certificates.crt'
       containers:
       - name: sqmgr
         envFrom:
           - secretRef:
               name: sqmgr-config
         env:
-        - name: SQMGR_CONF_SMTP
-          value: 10.1.1.1:25
-        - name: SQMGR_CONF_FROM_ADDRESS
-          value: no-reply@sqmgr.com
-        - name: SQMGR_CONF_URL
-          value: https://sqmgr.com
         - name: SQMGR_CONF_DSN
           value: 'dbname=$(PG_DBNAME) host=$(PG_HOST) port=$(PG_PORT) user=$(PG_USER) sslmode=$(PG_SSLMODE) password=$(PG_PASSWORD)'
         - name: SQMGR_CONF_JWT_PUBLIC_KEY
           value: /opt/sqmgr/jwt-keys/public.pem
         - name: SQMGR_CONF_JWT_PRIVATE_KEY
           value: /opt/sqmgr/jwt-keys/private.pem
-        image: weters/sqmgrserver:latest
-        imagePullPolicy: Always
+        image: weters/sqmgr-api:latest
+        imagePullPolicy: IfNotPresent
         volumeMounts:
           - mountPath: /opt/sqmgr/jwt-keys
             name: jwt-keys
-          - mountPath: /etc/ssl/certs
-            name: certs
+        readinessProbe:
+          httpGet:
+            port: 5000
+            path: /
+        livenessProbe:
+          httpGet:
+            port: 5000
+            path: /
       volumes:
-        - name: certs
-          emptyDir: {}
-        - name: mail-cert
-          configMap:
-            name: sqmgr-mail-cert
         - name: jwt-keys
           secret:
             secretName: sqmgr-jwt-keys

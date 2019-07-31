@@ -20,16 +20,15 @@ import (
 	"bufio"
 	"context"
 	"flag"
-	"fmt"
-	"github.com/weters/sqmgr/internal/config"
+	"github.com/weters/sqmgr-api/internal/config"
 	"math/rand"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/weters/sqmgr/internal/database"
-	"github.com/weters/sqmgr/internal/model"
+	"github.com/weters/sqmgr-api/internal/database"
+	"github.com/weters/sqmgr-api/internal/model"
 
 	_ "github.com/lib/pq"
 )
@@ -61,27 +60,13 @@ func main() {
 	}
 	m := model.New(db)
 
-	accounts := make([]*model.User, *numAccounts)
-	for i := range accounts {
-		email := fmt.Sprintf("user%d@sqmgr.com", i)
-		logrus.WithField("email", email).Info("creating user")
-		user, err := m.NewUser(email, "test-password")
+	userIDs := []string{"auth0|5d37c36dc907360db784a5a0", "auth0|00001", "auth0|00002"}
+	accounts := make([]*model.User, len(userIDs))
+	for i, userID := range userIDs {
+		logrus.WithField("userID", userID).Info("creating user")
+		user, err := m.GetUser(context.Background(), model.IssuerAuth0, userID)
 		if err != nil {
-			if err != model.ErrUserExists {
-				logrus.WithError(err).Fatal("cannot create user")
-			}
-
-			logrus.WithField("email", email).Warn("user already exists")
-
-			user, err = m.UserByEmail(email, true)
-			if err != nil {
-				logrus.WithError(err).Fatal("cannot load user")
-			}
-		}
-
-		user.State = model.Active
-		if err := user.Save(); err != nil {
-			panic(err)
+			logrus.WithError(err).Fatal("cannot create user")
 		}
 
 		accounts[i] = user
@@ -96,7 +81,7 @@ func main() {
 		}
 
 		name := words.Create(2, " ")
-		logrus.WithFields(logrus.Fields{"name": name, "user": user.Email}).Info("creating pool")
+		logrus.WithFields(logrus.Fields{"name": name, "user": user.ID}).Info("creating pool")
 		pool, err := m.NewPool(context.Background(), user.ID, name, gridType, "joinpw")
 		if err != nil {
 			panic(err)
@@ -164,7 +149,7 @@ func main() {
 			}
 
 			if rand.Intn(100) < *chance {
-				logrus.WithFields(logrus.Fields{"name": name, "user": account.Email}).Info("joining pool")
+				logrus.WithFields(logrus.Fields{"name": name, "user": account.ID}).Info("joining pool")
 				if err := account.JoinPool(context.Background(), pool); err != nil {
 					logrus.WithError(err).Fatal("could not join pool")
 				}

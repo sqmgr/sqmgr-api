@@ -14,23 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package database
+package server
 
-import (
-	"database/sql"
-	"github.com/weters/sqmgr-api/internal/config"
+type sqmgrContext int
+
+const (
+	ctxUserKey sqmgrContext = iota
+	ctxUserIDKey
+	ctxPoolKey
 )
-
-// Open will open a database based on an environment variable DSN
-func Open() (*sql.DB, error) {
-	db, err := sql.Open("postgres", config.DSN())
-	if err != nil {
-		return nil, err
-	}
-
-	if err := db.Ping(); err != nil {
-		return nil, err
-	}
-
-	return db, nil
-}

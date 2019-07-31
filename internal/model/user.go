@@ -17,22 +17,12 @@ limitations under the License.
 package model
 
 import (
-	"bytes"
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"html/template"
-	"net/smtp"
-	"net/url"
+	"github.com/dgrijalva/jwt-go"
 	"time"
-
-	"github.com/sirupsen/logrus"
-	"github.com/synacor/argon2id"
-	"github.com/weters/sqmgr/internal/config"
-	"github.com/weters/sqmgr/pkg/tokengen"
 )
 
 // ErrUserExists is an error when the user already exists (when trying to create a new account)
@@ -41,204 +31,72 @@ var ErrUserExists = errors.New("model: user already exists")
 // ErrUserNotFound is when the user is not found in the database
 var ErrUserNotFound = errors.New("model: user not found")
 
+// UserStore represents a store where users may reside
+type UserStore string
 
+// constants for the JWT "iss" (issuer) claim
+const (
+	IssuerAuth0 = "https://sqmgr.auth0.com/"
+	IssuerSqMGR = "https://api.sqmgr.com/"
+)
 
-// durationBeforeReauth is a maximum duration allowed before a user is required to resupply their credentials
-// before doing some potentially destructive operation
-const durationBeforeReauth = time.Minute * 3
+// constants for UserStore
+const (
+	UserStoreSqMGR UserStore = "sqmgr"
+	UserStoreAuth0 UserStore = "auth0"
+)
 
-// User represents an account
+var issToStore = map[string]UserStore{
+	IssuerAuth0: UserStoreAuth0,
+	IssuerSqMGR: UserStoreSqMGR,
+}
+
+// User represents a SqMGR user
 type User struct {
 	*Model
-	ID           int64
-	Email        string
-	PasswordHash string
-	State        State
-	Created      time.Time
-	Modified     time.Time
-	Metadata     UserMetadata // data not persisted to database
+	ID      int64
+	Store   UserStore
+	StoreID string
+	Created time.Time
+
+	// not stored in the database
+	Token *jwt.Token
 }
 
-// UserMetadata represents data that won't be persisted to the database for a user. May contain information regarding
-// logged in states, etc.
-type UserMetadata struct {
-	LastCredentialCheck time.Time
+// UserAction are a set of actions that a user can perform
+type UserAction int
+
+// UserAction constants
+const (
+	UserActionCreatePool UserAction = iota
+)
+
+// Can will return true if the user can do the action
+func (u *User) Can(action UserAction) bool {
+	switch action {
+	case UserActionCreatePool:
+		return u.Store == UserStoreAuth0
+	}
+
+	return false
 }
 
-// NewUser will try to save a new user in the database
-func (m *Model) NewUser(email, password string) (*User, error) {
-	hashedPassword, err := argon2id.DefaultHashPassword(password)
-	if err != nil {
+// GetUser will get or create a record in the database based on the JWT issuer and store id
+func (m *Model) GetUser(ctx context.Context, issuer, storeID string) (*User, error) {
+	store, ok := issToStore[issuer]
+	if !ok {
+		return nil, fmt.Errorf("invalid issuer: %s", issuer)
+	}
+
+	row := m.db.QueryRowContext(ctx, "SELECT id, store, store_id, created FROM get_user($1, $2)", store, storeID)
+
+	var u User
+	u.Model = m
+	if err := row.Scan(&u.ID, &u.Store, &u.StoreID, &u.Created); err != nil {
 		return nil, err
 	}
 
-	row := m.db.QueryRow("SELECT * FROM new_user($1, $2)", email, hashedPassword)
-
-	user, err := m.userByRow(row)
-	if err != nil {
-		return nil, err
-	}
-
-	if user.ID == -1 {
-		return nil, ErrUserExists
-	}
-
-	return user, nil
-}
-
-// UserID is a getter for the ID
-func (u *User) UserID(ctx context.Context) interface{} {
-	return u.ID
-}
-
-// RequiresReauthentication will return true if the user needs to re-enter their credentials
-func (u *User) RequiresReauthentication() bool {
-	return time.Now().Sub(u.Metadata.LastCredentialCheck) > durationBeforeReauth
-}
-
-// Save will persist any changes to the database
-func (u *User) Save() error {
-	row := u.db.QueryRow("UPDATE users SET email = $1, password_hash = $2, state = $3, modified = (NOW() AT TIME ZONE 'UTC') WHERE id = $4 RETURNING modified", u.Email, u.PasswordHash, u.State, u.ID)
-
-	return row.Scan(&u.Modified)
-}
-
-// UserByVerifyToken will lookup a user by its verification token
-func (m *Model) UserByVerifyToken(token string) (*User, error) {
-	row := m.db.QueryRow(`
-		SELECT users.*
-		FROM user_confirmations
-		INNER JOIN users ON user_confirmations.user_id = users.id
-		WHERE token = $1
-	`, token)
-
-	return m.userByRow(row)
-}
-
-// UserByEmail will return a user by the email address. optionalAllStates is a varargs that can accept a single bool value.
-// If false or not supplied, then only Active users will be returned.
-func (m *Model) UserByEmail(email string, optAllowAllStates ...bool) (*User, error) {
-	var row *sql.Row
-
-	if len(optAllowAllStates) > 0 && optAllowAllStates[0] {
-		// all states
-		row = m.db.QueryRow("SELECT * FROM users WHERE email = $1", email)
-	} else {
-		// only active
-		row = m.db.QueryRow("SELECT * FROM users WHERE email = $1 AND state = $2", email, Active)
-	}
-
-	return m.userByRow(row)
-}
-
-// UserByEmailAndPassword will return a user if the email and password matches. If it doesn't match, ErrUserNotFound is returned.
-func (m *Model) UserByEmailAndPassword(email, password string) (*User, error) {
-	user, err := m.UserByEmail(email)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, ErrUserNotFound
-		}
-
-		return nil, err
-	}
-
-	if err := argon2id.Compare(user.PasswordHash, password); err != nil {
-		if err != argon2id.ErrMismatchedHashAndPassword {
-			logrus.WithError(err).Errorf("unexpected error from argon2id")
-		}
-
-		return nil, ErrUserNotFound
-	}
-
-	return user, nil
-}
-
-// PasswordIsValid will check to see if the user can login
-func (u *User) PasswordIsValid(password string) bool {
-	if err := argon2id.Compare(u.PasswordHash, password); err != nil {
-		if err != argon2id.ErrMismatchedHashAndPassword {
-			logrus.WithError(err).Errorf("could not validate password")
-		}
-
-		return false
-	}
-
-	return true
-}
-
-// SetPassword will set the new password. This will NOT persist the change to the database
-func (u *User) SetPassword(password string) error {
-	hash, err := argon2id.DefaultHashPassword(password)
-	if err != nil {
-		return err
-	}
-
-	u.PasswordHash = hash
-	return nil
-}
-
-// SendVerificationEmail will create a new verification token and send it to the user
-func (u *User) SendVerificationEmail(tpl *template.Template) error {
-	token, err := tokengen.Generate(64)
-	if err != nil {
-		return err
-	}
-
-	w := bytes.NewBuffer(nil)
-
-	if _, err = u.db.Exec("SELECT * FROM set_user_confirmation($1, $2)", u.ID, token); err != nil {
-		return nil
-	}
-
-	siteURL, err := url.Parse(config.URL())
-	if err != nil {
-		return err
-	}
-
-	siteURL, err = siteURL.Parse("/signup/verify/" + url.PathEscape(token))
-	if err != nil {
-		return err
-	}
-
-	tpl.Execute(w, map[string]string{
-		"VerificationLink": siteURL.String(),
-	})
-
-	body := fmt.Sprintf(`To: %s
-From: %s
-Subject: %s
-Content-Type: text/html; charset=utf-8
-
-%s`, u.Email, config.FromAddress(), "SqMGR - Account Verification", w.String())
-
-	if err := smtp.SendMail(config.SMTP(), nil, config.FromAddress(), []string{u.Email}, []byte(body)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Delete will mark the account as "deleted" by setting random values to the email and password. This will
-// keep the account ID in tact in order to not destroy any boards previously created.
-func (u *User) Delete() error {
-	// first 20 bytes is email, last 20 is password
-	randomData := make([]byte, 40)
-	if _, err := rand.Read(randomData); err != nil {
-		return err
-	}
-
-	email := hex.EncodeToString(randomData[0:len(randomData)/2]) + "@deleted.sqmgr.com"
-
-	passwordHash, err := argon2id.DefaultHashPassword(string(randomData[len(randomData)/2:]))
-	if err != nil {
-		return err
-	}
-
-	u.Email = email
-	u.PasswordHash = passwordHash
-	u.State = Deleted
-
-	return nil
+	return &u, nil
 }
 
 // JoinPool will link a user to a grid game.
@@ -273,43 +131,4 @@ func (u *User) IsMemberOf(ctx context.Context, p *Pool) (bool, error) {
 // IsAdminOf will return true if the user is the admin of the grid
 func (u *User) IsAdminOf(ctx context.Context, p *Pool) bool {
 	return u.ID == p.userID
-}
-
-// OpaqueUserID will return a hashed user identifier
-func (u *User) OpaqueUserID(ctx context.Context) (string, error) {
-	return opaqueID(u.ID)
-}
-
-func (m *Model) userByRow(row *sql.Row) (*User, error) {
-	u := &User{Model: m}
-
-	var email, passwordHash, state *string
-	var created *time.Time
-	var modified *time.Time
-
-	if err := row.Scan(&u.ID, &email, &passwordHash, &state, &created, &modified); err != nil {
-		return nil, err
-	}
-
-	if email != nil {
-		u.Email = *email
-	}
-
-	if passwordHash != nil {
-		u.PasswordHash = *passwordHash
-	}
-
-	if state != nil {
-		u.State = State(*state)
-	}
-
-	if created != nil {
-		u.Created = *created
-	}
-
-	if modified != nil {
-		u.Modified = *modified
-	}
-
-	return u, nil
 }

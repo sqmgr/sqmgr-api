@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 )
 
@@ -67,7 +66,6 @@ type PoolSquare struct {
 	ID            int64 `json:"-"`
 	PoolID        int64 `json:"-"`
 	userID        int64
-	sessionUserID string
 	SquareID      int              `json:"squareID"`
 	State         PoolSquareState  `json:"state"`
 	Claimant      string           `json:"claimant"`
@@ -75,30 +73,36 @@ type PoolSquare struct {
 	Logs          []*PoolSquareLog `json:"logs,omitempty"`
 }
 
-type poolSquareJSON struct {
-	OpaqueUserID string           `json:"opaqueUserID"`
-	SquareID     int              `json:"squareID"`
-	State        PoolSquareState  `json:"state"`
-	Claimant     string           `json:"claimant"`
-	Modified     time.Time        `json:"modified"`
-	Logs         []*PoolSquareLog `json:"logs,omitempty"`
+// UserID is a getter
+func (p *PoolSquare) UserID() int64 {
+	return p.userID
 }
 
-// MarshalJSON will custom JSON encode a PoolSquare
-func (p *PoolSquare) MarshalJSON() ([]byte, error) {
-	oid, err := opaqueID(p.UserIdentifier())
-	if err != nil {
-		return nil, err
-	}
+// SetUserID is a setter
+func (p *PoolSquare) SetUserID(userID int64) {
+	p.userID = userID
+}
 
-	return json.Marshal(poolSquareJSON{
-		OpaqueUserID: oid,
+// PoolSquareJSON represents JSON that can be sent to the front-end
+type PoolSquareJSON struct {
+	UserID   int64            `json:"userId"`
+	SquareID int              `json:"squareId"`
+	State    PoolSquareState  `json:"state"`
+	Claimant string           `json:"claimant"`
+	Modified time.Time        `json:"modified"`
+	Logs     []*PoolSquareLog `json:"logs,omitempty"`
+}
+
+// JSON will custom JSON encode a PoolSquare
+func (p *PoolSquare) JSON() *PoolSquareJSON {
+	return &PoolSquareJSON{
+		UserID: p.userID,
 		SquareID:     p.SquareID,
 		State:        p.State,
 		Claimant:     p.Claimant,
 		Modified:     p.Modified,
 		Logs:         p.Logs,
-	})
+	}
 }
 
 // PoolSquareLog represents an individual log entry for a pool square
@@ -107,33 +111,11 @@ type PoolSquareLog struct {
 	poolSquareID  int64
 	squareID      int
 	userID        int64
-	sessionUserID string
 	state         PoolSquareState
 	claimant      string
 	RemoteAddr    string
 	Note          string
 	created       time.Time
-}
-
-// SetUserIdentifier will allow you to set either the userID (int64) or the sessionUserID (string)
-func (p *PoolSquare) SetUserIdentifier(uid interface{}) {
-	switch val := uid.(type) {
-	case int64:
-		p.userID = val
-	case string:
-		p.sessionUserID = val
-	default:
-		panic(fmt.Sprintf("invalid userID type %T", uid))
-	}
-}
-
-// UserIdentifier will return the appropriate ID
-func (p *PoolSquare) UserIdentifier() interface{} {
-	if p.userID > 0 {
-		return p.userID
-	}
-
-	return p.sessionUserID
 }
 
 // SquareID is a getter for the square ID
@@ -146,23 +128,29 @@ func (p *PoolSquareLog) Claimant() string {
 	return p.claimant
 }
 
-type poolSquareLogJSON struct {
-	SquareID   int             `json:"squareID"`
-	State      PoolSquareState `json:"state"`
-	Claimant   string          `json:"claimant"`
-	Note       string          `json:"note"`
-	Created    time.Time       `json:"created"`
+// PoolSquareLogJSON returns data safe for a user to see
+type PoolSquareLogJSON struct {
+	SquareID int             `json:"squareID"`
+	State    PoolSquareState `json:"state"`
+	Claimant string          `json:"claimant"`
+	Note     string          `json:"note"`
+	Created  time.Time       `json:"created"`
 }
 
-// MarshalJSON will custom marshal the JSON
+// JSON will return data safe for the front-end
+func (p *PoolSquareLog) JSON() *PoolSquareLogJSON {
+	return &PoolSquareLogJSON{
+		SquareID: p.SquareID(),
+		State:    p.State(),
+		Claimant: p.Claimant(),
+		Note:     p.Note,
+		Created:  p.Created(),
+	}
+}
+
+// MarshalJSON will return data safe for the front-end
 func (p *PoolSquareLog) MarshalJSON() ([]byte, error) {
-	return json.Marshal(poolSquareLogJSON{
-		SquareID:   p.SquareID(),
-		State:      p.State(),
-		Claimant:   p.Claimant(),
-		Note:       p.Note,
-		Created:    p.Created(),
-	})
+	return json.Marshal(p.JSON())
 }
 
 // Created is a getter for created
@@ -193,23 +181,18 @@ func (p *PoolSquare) Save(ctx context.Context, isAdmin bool, poolSquareLog PoolS
 	}
 
 	var userID *int64
-	var sessionUserID *string
 	var remoteAddr *string
 
 	if p.userID > 0 {
 		userID = &p.userID
 	}
 
-	if p.sessionUserID != "" {
-		sessionUserID = &p.sessionUserID
-	}
-
 	if poolSquareLog.RemoteAddr != "" {
 		remoteAddr = &poolSquareLog.RemoteAddr
 	}
 
-	const query = "SELECT * FROM update_pool_square($1, $2, $3, $4, $5, $6, $7, $8)"
-	row := p.Model.db.QueryRowContext(ctx, query, p.ID, p.State, claimant, userID, sessionUserID, remoteAddr, poolSquareLog.Note, isAdmin)
+	const query = "SELECT * FROM update_pool_square($1, $2, $3, $4, $5, $6, $7)"
+	row := p.Model.db.QueryRowContext(ctx, query, p.ID, p.State, claimant, userID, remoteAddr, poolSquareLog.Note, isAdmin)
 
 	var ok bool
 	if err := row.Scan(&ok); err != nil {
@@ -227,19 +210,14 @@ func poolSquareLogByRow(scan scanFunc) (*PoolSquareLog, error) {
 	var l PoolSquareLog
 	var remoteAddr *string
 	var userID *int64
-	var sessionUserID *string
 	var claimant *string
 
-	if err := scan(&l.id, &l.poolSquareID, &l.squareID, &userID, &sessionUserID, &l.state, &claimant, &remoteAddr, &l.Note, &l.created); err != nil {
+	if err := scan(&l.id, &l.poolSquareID, &l.squareID, &userID, &l.state, &claimant, &remoteAddr, &l.Note, &l.created); err != nil {
 		return nil, err
 	}
 
 	if userID != nil {
 		l.userID = *userID
-	}
-
-	if sessionUserID != nil {
-		l.sessionUserID = *sessionUserID
 	}
 
 	if remoteAddr != nil {
@@ -258,7 +236,7 @@ func poolSquareLogByRow(scan scanFunc) (*PoolSquareLog, error) {
 // LoadLogs will load the logs for the given square
 func (p *PoolSquare) LoadLogs(ctx context.Context) error {
 	const query = `
-		SELECT pool_squares_logs.id, pool_square_id, square_id, pool_squares_logs.user_id, pool_squares_logs.session_user_id, pool_squares_logs.state, pool_squares_logs.claimant, remote_addr, note, pool_squares_logs.created
+		SELECT pool_squares_logs.id, pool_square_id, square_id, pool_squares_logs.user_id, pool_squares_logs.state, pool_squares_logs.claimant, remote_addr, note, pool_squares_logs.created
 		FROM pool_squares_logs
 		INNER JOIN pool_squares ON pool_squares_logs.pool_square_id = pool_squares.id
 		WHERE pool_square_id = $1 

@@ -38,6 +38,11 @@ type SMJWT struct {
 	privateKey *rsa.PrivateKey
 }
 
+// PublicKey returns the public key
+func (s *SMJWT) PublicKey() *rsa.PublicKey {
+	return s.publicKey
+}
+
 // New will return a new SMJWT object. Before you can use either Sign() or Validate(), you'll need to call
 // LoadPrivateKey() and/or LoadPublicKey() respectively
 func New() *SMJWT {

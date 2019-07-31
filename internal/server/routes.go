@@ -17,70 +17,68 @@ limitations under the License.
 package server
 
 import (
+	"github.com/gorilla/mux"
+	"github.com/rs/cors"
+	"github.com/sirupsen/logrus"
 	"net/http"
-	"path/filepath"
 )
 
+var optionsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { })
+
 func (s *Server) setupRoutes() {
-	s.Router.Use(s.middleware)
 
-	// static directory
-	s.Router.PathPrefix("/static/").Methods(http.MethodGet).Handler(http.StripPrefix("/static/", s.noDirListing(http.FileServer(http.Dir(filepath.Join("web", "static"))))))
+	// these routes do NOT require auth
+	s.Router.Path("/").Methods(http.MethodGet).Handler(s.getHealthEndpoint())
+	s.Router.Path("/pool/configuration").Methods(http.MethodGet).Handler(s.getPoolConfiguration())
+	s.Router.Path("/user/guest").Methods(http.MethodPost).Handler(s.postUserGuestEndpoint())
 
-	// static files
-	s.Router.Path("/humans.txt").Methods(http.MethodGet).Handler(s.staticFileHandler(filepath.Join("web", "static", "humans.txt")))
-	s.Router.Path("/robots.txt").Methods(http.MethodGet).Handler(s.staticFileHandler(filepath.Join("web", "static", "robots.txt")))
+	// these routes REQUIRE AUTH
+	authRouter := s.NewRoute().Subrouter()
+	authRouter.Use(s.authHandler)
+	authRouter.Path("/pool").Methods(http.MethodPost).Handler(s.postPoolEndpoint())
+	authRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/member").Methods(http.MethodPost).Handler(s.postPoolTokenMemberEndpoint())
+	authRouter.Path("/user/self").Methods(http.MethodGet).Handler(s.getUserSelfEndpoint())
 
-	// basic pags
-	s.Router.Path("/").Methods(http.MethodGet).Handler(s.simpleGetHandler("index.html"))
-	s.Router.Path("/about").Methods(http.MethodGet).Handler(s.simpleGetHandler("about.html"))
-	s.Router.Path("/donate").Methods(http.MethodGet).Handler(s.simpleGetHandler("donate.html"))
-	s.Router.Path("/privacy").Methods(http.MethodGet).Handler(s.simpleGetHandler("privacy.html"))
-	s.Router.Path("/terms").Methods(http.MethodGet).Handler(s.simpleGetHandler("terms.html"))
+	authPoolRouter := authRouter.NewRoute().Subrouter()
+	authPoolRouter.Use(s.poolHandler)
+	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}").Methods(http.MethodGet).Handler(s.getPoolTokenEndpoint())
+	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}").Methods(http.MethodPost).Handler(s.postPoolTokenEndpoint())
+	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/grid").Methods(http.MethodGet).Handler(s.getPoolTokenGridEndpoint())
+	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/grid/{id:[0-9]+}").Methods(http.MethodDelete).Handler(s.deletePoolTokenGridIDEndpoint())
+	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/grid/{id:[0-9]+}").Methods(http.MethodGet).Handler(s.getPoolTokenGridIDEndpoint())
+	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/grid/{id:[0-9]+}").Methods(http.MethodPost).Handler(s.postPoolTokenGridIDEndpoint())
+	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/log").Methods(http.MethodGet).Handler(s.getPoolTokenLogEndpoint())
+	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/square").Methods(http.MethodGet).Handler(s.getPoolTokenSquareEndpoint())
+	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/square/{id:[0-9]+}").Methods(http.MethodGet).Handler(s.getPoolTokenSquareIDEndpoint())
+	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/square/{id:[0-9]+}").Methods(http.MethodPost).Handler(s.postPoolTokenSquareIDEndpoint())
 
-	// login/logout functionality
-	s.Router.Path("/login").Methods(http.MethodGet, http.MethodPost).Handler(s.loginHandler())
-	s.Router.Path("/logout").Methods(http.MethodGet).Handler(s.loginHandler())
+	authUserRouter := authRouter.NewRoute().Subrouter()
+	authUserRouter.Use(s.userHandler)
+	authUserRouter.Path("/user/{id:[0-9]+}/pool/{membership:(?:own|belong)}").Methods(http.MethodGet).Handler(s.getUserIDPoolMembershipEndpoint())
 
-	// account management
-	s.Router.Path("/account").Methods(http.MethodGet).Handler(s.authHandler(s.accountHandler()))
-	s.Router.Path("/account/joined").Methods(http.MethodGet).Handler(s.authHandler(s.accountSquaresHandler(joined)))
-	s.Router.Path("/account/owned").Methods(http.MethodGet).Handler(s.authHandler(s.accountSquaresHandler(owned)))
-	s.Router.Path("/account/change-password").Methods(http.MethodGet, http.MethodPost).Handler(s.authHandler(s.accountChangePasswordHandler()))
-	s.Router.Path("/account/delete").Methods(http.MethodGet, http.MethodPost).Handler(s.authHandler(s.accountDeleteHandler()))
-	s.Router.Path("/account/deleted").Methods(http.MethodGet).Handler(s.accountDeletedHandler())
-	s.Router.Path("/account/verify").Methods(http.MethodGet, http.MethodPost).Handler(s.authHandler(s.accountVerifyHandler()))
+	pathTemplates := make(map[string]bool)
 
-	// pools
-	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodGet).Handler(s.poolMemberHandler(true, false, s.poolHandler()))
-	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/game/{grid:[0-9]+}").Methods(http.MethodGet).Handler(s.poolMemberHandler(true, false, s.poolGridHandler()))
-	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/join").Methods(http.MethodGet, http.MethodPost).Handler(s.poolMemberHandler(false, false, s.poolJoinHandler()))
-	// probably only necessary temporarily
-	s.Router.Path("/pool/{token:[A-Za-z0-9_-]{8}}/jwt").Methods(http.MethodGet).Handler(s.poolMemberHandler(false, false, s.poolJWTHandler()))
 
-	// signup
-	s.Router.Path("/signup").Methods(http.MethodGet, http.MethodPost).Handler(s.signupHandler())
-	s.Router.Path("/signup/complete").Methods(http.MethodGet).Handler(s.signupCompleteHandler())
-	s.Router.Path("/signup/resend").Methods(http.MethodPost).Handler(s.signupResendPostHandler())
-	s.Router.Path("/signup/resend").Methods(http.MethodGet).Handler(s.signupResendGetHandler())
-	s.Router.Path("/signup/verify/{token:[A-Za-z0-9_-]{64}}").Methods(http.MethodGet).Handler(s.signupVerifyHandler())
+	// add OPTIONS route
+	if err := s.Router.Walk(func(route *mux.Route, _ *mux.Router, _ []*mux.Route) error {
+		path, err := route.GetPathTemplate()
+		if err == nil {
+			pathTemplates[path] = true
+		}
 
-	// grid management
-	s.Router.Path("/create").Methods(http.MethodGet, http.MethodPost).Handler(s.authHandler(s.createHandler()))
+		return nil
+	}); err != nil {
+		logrus.WithError(err).Fatal("could not walk router")
+	}
 
-	// temporary
-	s.Router.Path("/info").Methods(http.MethodGet).Handler(s.infoHandler())
+	for tpl := range pathTemplates {
+		s.Router.Path(tpl).Methods(http.MethodOptions).Handler(optionsHandler)
+	}
 
-	// API stuff
-	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodGet).Handler(s.apiPoolJWTHandler(s.apiPoolHandler()))
-	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}").Methods(http.MethodPost).Handler(s.apiPoolJWTHandler(s.apiPoolPostHandler()))
-	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/squares").Methods(http.MethodGet).Handler(s.apiPoolJWTHandler(s.apiPoolSquaresHandler()))
-	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/game").Methods(http.MethodGet).Handler(s.apiPoolJWTHandler(s.apiPoolGamesHandler()))
-	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/game/{grid:[0-9]+}").Methods(http.MethodGet).Handler(s.apiPoolJWTHandler(s.apiPoolGameHandler()))
-	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/game/{grid:[0-9]+}").Methods(http.MethodPost).Handler(s.apiPoolJWTHandler(s.apiPoolGamePostHandler()))
-	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/game/{grid:[0-9]+}").Methods(http.MethodDelete).Handler(s.apiPoolJWTHandler(s.apiPoolGameDeleteHandler()))
-	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/logs").Methods(http.MethodGet).Handler(s.apiPoolJWTHandler(s.apiPoolLogsHandler()))
-	s.Router.Path("/api/pool/{token:[A-Za-z0-9_-]{8}}/squares/{square:[0-9]{1,3}}").Methods(http.MethodGet, http.MethodPost).Handler(s.apiPoolJWTHandler(s.apiPoolSquaresSquareHandler()))
 
-	s.Router.NotFoundHandler = s.middleware(s.notFoundHandler())
+	c := cors.New(cors.Options{
+		AllowedMethods:         []string{http.MethodGet, http.MethodDelete, http.MethodPost, http.MethodPatch},
+		AllowedHeaders:         []string{"Authorization","Content-Type"},
+	})
+	s.Router.Use(c.Handler)
 }
