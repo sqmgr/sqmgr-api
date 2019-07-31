@@ -20,7 +20,7 @@ spec:
       initContainers:
         - name: liquibase
           image: weters/sqmgr-lb:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           envFrom:
             - secretRef:
                 name: sqmgr-config
@@ -47,7 +47,7 @@ spec:
         - name: SQMGR_CONF_JWT_PRIVATE_KEY
           value: /opt/sqmgr/jwt-keys/private.pem
         image: weters/sqmgr-api:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         volumeMounts:
           - mountPath: /opt/sqmgr/jwt-keys
             name: jwt-keys
