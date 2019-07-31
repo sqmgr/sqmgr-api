@@ -7,7 +7,7 @@ PG_USERNAME ?= "postgres"
 PG_DATABASE ?= "postgres"
 PG_PASSWORD ?= ""
 ROLLBACK_COUNT ?= "1"
-DEPLOY_NAME ?= "sqmgr-dev"
+DEPLOY_NAME ?= "sqmgr-api"
 
 .keys/private.pem:
 	-mkdir .keys
@@ -35,7 +35,7 @@ docker-push:
 	docker push ${LB_IMG}:latest
 
 .PHONY: k8s-deploy
-k8s-deploy: docker-push
+k8s-deploy:
 	kubectl set image deploy ${DEPLOY_NAME} sqmgr=$(IMG):${VERSION} --record
 	kubectl rollout status deploy ${DEPLOY_NAME}
 
