@@ -41,11 +41,23 @@ type Pool struct {
 	name         string
 	gridType     GridType
 	passwordHash string
+	checkID      int
 	locks        time.Time
 	created      time.Time
 	modified     time.Time
 
 	squares map[int]*PoolSquare
+}
+
+// CheckID will return the current check ID.
+func (p *Pool) CheckID() int {
+	return p.checkID
+}
+
+// SetCheckID will set the current check ID. A check ID can be changed
+// if you want to prevent old JWT links from working.
+func (p *Pool) SetCheckID(checkID int) {
+	p.checkID = checkID
 }
 
 // IsLocked will return true if the locks date is in the past
@@ -147,7 +159,7 @@ type scanFunc func(dest ...interface{}) error
 func (m *Model) poolByRow(scan scanFunc) (*Pool, error) {
 	s := Pool{model: m}
 	var locks *time.Time
-	if err := scan(&s.id, &s.token, &s.userID, &s.name, &s.gridType, &s.passwordHash, &locks, &s.created, &s.modified); err != nil {
+	if err := scan(&s.id, &s.token, &s.userID, &s.name, &s.gridType, &s.passwordHash, &locks, &s.created, &s.modified, &s.checkID); err != nil {
 		return nil, err
 	}
 
@@ -294,7 +306,15 @@ func (p *Pool) SetPassword(password string) error {
 
 // Save will save the pool
 func (p *Pool) Save(ctx context.Context) error {
-	const query = `UPDATE pools SET name = $1, grid_type = $2, password_hash = $3, locks = $4, modified = (NOW() AT TIME ZONE 'utc')  WHERE id = $5`
+	const query = `
+UPDATE pools
+SET name = $1,
+    grid_type = $2,
+    password_hash = $3,
+    locks = $4,
+    check_id = $5,
+    modified = (NOW() AT TIME ZONE 'utc')
+WHERE id = $6`
 
 	var locks *time.Time
 	if !p.locks.IsZero() {
@@ -302,7 +322,7 @@ func (p *Pool) Save(ctx context.Context) error {
 		locks = &locksInUTC
 	}
 
-	_, err := p.model.db.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.id)
+	_, err := p.model.db.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.id)
 	return err
 }
 
@@ -317,6 +337,12 @@ func (p *Pool) PasswordIsValid(password string) bool {
 	}
 
 	return true
+}
+
+// CheckIDIsValid will return true if the check IDs match.
+// This is used to invalidate JWT links
+func (p *Pool) CheckIDIsValid(check int) bool {
+	return check == p.checkID
 }
 
 // Squares will return the squares that belong to a pool. This method will lazily load the squares

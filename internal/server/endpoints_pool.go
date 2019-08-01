@@ -34,6 +34,13 @@ import (
 
 const minJoinPasswordLength = 6
 const validationErrorMessage = "There were one or more errors with your request"
+const sqmgrInviteAudience = "com.sqmgr.invite"
+var inviteTokenTTL = time.Hour * 24 * 365 // 1 year
+
+type inviteClaims struct {
+	*jwt.StandardClaims
+	CheckID int `json:"chid"`
+}
 
 func (s *Server) poolHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -315,8 +322,6 @@ func (s *Server) getPoolTokenEndpoint() http.HandlerFunc {
 	}
 }
 
-const sqmgrInviteAudience = "com.sqmgr.invite"
-
 func (s *Server) getPoolTokenInviteTokenEndpoint() http.HandlerFunc {
 	type response struct {
 		JWT string `json:"jwt"`
@@ -330,12 +335,15 @@ func (s *Server) getPoolTokenInviteTokenEndpoint() http.HandlerFunc {
 			return
 		}
 
-		claim := &jwt.StandardClaims{
-			Audience:  sqmgrInviteAudience,
-			ExpiresAt: time.Now().Add(time.Hour * 24 * 7).Unix(),
-			Issuer:    model.IssuerSqMGR,
-			NotBefore: 0,
-			Subject:   pool.Token(),
+		claim := &inviteClaims{
+			StandardClaims: &jwt.StandardClaims{
+				Audience:  sqmgrInviteAudience,
+				ExpiresAt: time.Now().Add(inviteTokenTTL).Unix(),
+				Issuer:    model.IssuerSqMGR,
+				NotBefore: 0,
+				Subject:   pool.Token(),
+			},
+			CheckID: pool.CheckID(),
 		}
 
 		sign, err := s.smjwt.Sign(claim)
@@ -786,14 +794,17 @@ func (s *Server) postPoolTokenMemberEndpoint() http.HandlerFunc {
 		}
 
 		if data.JWT != "" {
-			j, err := s.smjwt.Validate(data.JWT)
+			j, err := s.smjwt.Validate(data.JWT, &inviteClaims{})
 			if err != nil {
 				s.writeErrorResponse(w, http.StatusBadRequest, err)
 				return
 			}
 
-			if !j.Claims.(*jwt.StandardClaims).VerifyAudience(sqmgrInviteAudience, true) ||
-				!j.Claims.(*jwt.StandardClaims).VerifyIssuer(model.IssuerSqMGR, true) {
+			claims := j.Claims.(*inviteClaims)
+
+			if !claims.VerifyAudience(sqmgrInviteAudience, true) ||
+				!claims.VerifyIssuer(model.IssuerSqMGR, true) ||
+				!pool.CheckIDIsValid(claims.CheckID) {
 				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("invalid join token"))
 				return
 			}

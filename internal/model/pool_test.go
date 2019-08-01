@@ -83,6 +83,7 @@ func TestPool(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(grid.Name()).Should(gomega.Equal("Away Team vs. Home Team"))
 
+	g.Expect(pool.CheckID()).Should(gomega.Equal(0))
 	g.Expect(pool.id).Should(gomega.BeNumerically(">", 0))
 	g.Expect(pool.userID).Should(gomega.Equal(user.ID))
 	g.Expect(pool.token).Should(gomega.MatchRegexp(`^[A-Za-z0-9_-]{8}\z`))
@@ -97,6 +98,8 @@ func TestPool(t *testing.T) {
 	pool.name = "Different Name"
 	pool.gridType = GridTypeStd25
 
+	pool.SetCheckID(1)
+
 	err = pool.Save(context.Background())
 	g.Expect(err).Should(gomega.Succeed())
 
@@ -106,6 +109,7 @@ func TestPool(t *testing.T) {
 
 	g.Expect(pool2.name).Should(gomega.Equal("Different Name"))
 	g.Expect(pool2.gridType).Should(gomega.Equal(GridTypeStd25))
+	g.Expect(pool2.CheckID()).Should(gomega.Equal(1))
 
 	pool3, err := m.PoolByToken(context.Background(), pool2.token)
 	g.Expect(err).Should(gomega.Succeed())

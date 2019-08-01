@@ -311,3 +311,9 @@ CREATE TABLE guest_users (
 );
 
 --rollback DROP TABLE guest_users;
+
+--changeset weters:5
+
+ALTER TABLE pools ADD COLUMN check_id INTEGER NOT NULL DEFAULT 0;
+
+--rollback ALTER TABLE pools DROP COLUMN check_id;
