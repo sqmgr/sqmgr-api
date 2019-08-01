@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"github.com/weters/sqmgr-api/internal/model"
@@ -123,8 +124,8 @@ func (s *Server) getPoolTokenLogEndpoint() http.HandlerFunc {
 	const maxPerPage = 100
 
 	type response struct {
-		Logs []*model.PoolSquareLogJSON `json:"logs"`
-		Total int64 `json:"total"`
+		Logs  []*model.PoolSquareLogJSON `json:"logs"`
+		Total int64                      `json:"total"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -149,7 +150,6 @@ func (s *Server) getPoolTokenLogEndpoint() http.HandlerFunc {
 		if limit > maxPerPage {
 			s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("limit cannot exceed %d", maxPerPage))
 		}
-
 
 		logs, err := pool.Logs(r.Context(), offset, limit)
 		if err != nil {
@@ -207,32 +207,32 @@ func (s *Server) deletePoolTokenGridIDEndpoint() http.HandlerFunc {
 
 func (s *Server) getPoolConfiguration() http.HandlerFunc {
 	type keyDescription struct {
-		Key model.GridType `json:"key"`
-		Description string `json:"description"`
+		Key         model.GridType `json:"key"`
+		Description string         `json:"description"`
 	}
 
 	gridTypes := model.GridTypes()
 	gridTypesSlice := make([]keyDescription, len(gridTypes))
 	for i, gt := range gridTypes {
 		gridTypesSlice[i] = keyDescription{
-			Key:   gt,
+			Key:         gt,
 			Description: gt.Description(),
 		}
 	}
 
 	resp := struct {
-		NameMaxLength int                        `json:"nameMaxLength"`
-		NotesMaxLength int                       `json:"notesMaxLength"`
-		TeamNameMaxLength int                    `json:"teamNameMaxLength"`
-		PoolSquareStates []model.PoolSquareState `json:"poolSquareStates"`
-		GridTypes []keyDescription               `json:"gridTypes"`
-		MinJoinPasswordLength int `json:"minJoinPasswordLength"`
+		NameMaxLength         int                     `json:"nameMaxLength"`
+		NotesMaxLength        int                     `json:"notesMaxLength"`
+		TeamNameMaxLength     int                     `json:"teamNameMaxLength"`
+		PoolSquareStates      []model.PoolSquareState `json:"poolSquareStates"`
+		GridTypes             []keyDescription        `json:"gridTypes"`
+		MinJoinPasswordLength int                     `json:"minJoinPasswordLength"`
 	}{
-		NameMaxLength:     model.NameMaxLength,
-		NotesMaxLength:    model.NotesMaxLength,
-		TeamNameMaxLength: model.TeamNameMaxLength,
-		PoolSquareStates: model.PoolSquareStates,
-		GridTypes: gridTypesSlice,
+		NameMaxLength:         model.NameMaxLength,
+		NotesMaxLength:        model.NotesMaxLength,
+		TeamNameMaxLength:     model.TeamNameMaxLength,
+		PoolSquareStates:      model.PoolSquareStates,
+		GridTypes:             gridTypesSlice,
 		MinJoinPasswordLength: minJoinPasswordLength,
 	}
 
@@ -249,22 +249,22 @@ func (s *Server) getPoolConfiguration() http.HandlerFunc {
 	}
 }
 
-func (s *Server) postPoolEndpoint() http.HandlerFunc{
+func (s *Server) postPoolEndpoint() http.HandlerFunc {
 	type payload struct {
-		Name string `json:"name"`
-		GridType string `json:"gridType"`
-		JoinPassword string `json:"joinPassword"`
+		Name                string `json:"name"`
+		GridType            string `json:"gridType"`
+		JoinPassword        string `json:"joinPassword"`
 		ConfirmJoinPassword string `json:"confirmJoinPassword"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(ctxUserKey).(*model.User)
-		if !user.Can(model.UserActionCreatePool){
+		if !user.Can(model.UserActionCreatePool) {
 			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
 		}
 
-		if r.Header.Get("Content-Type") != "application/json"	 {
+		if r.Header.Get("Content-Type") != "application/json" {
 			s.writeErrorResponse(w, http.StatusUnsupportedMediaType, nil)
 			return
 		}
@@ -312,6 +312,39 @@ func (s *Server) getPoolTokenEndpoint() http.HandlerFunc {
 			PoolJSON: pool.JSON(),
 			IsAdmin:  isAdminOf,
 		})
+	}
+}
+
+const sqmgrInviteAudience = "com.sqmgr.invite"
+
+func (s *Server) getPoolTokenInviteTokenEndpoint() http.HandlerFunc {
+	type response struct {
+		JWT string `json:"jwt"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := r.Context().Value(ctxUserKey).(*model.User)
+		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
+		if ! user.IsAdminOf(r.Context(), pool) {
+			s.writeErrorResponse(w, http.StatusForbidden, nil)
+			return
+		}
+
+		claim := &jwt.StandardClaims{
+			Audience:  sqmgrInviteAudience,
+			ExpiresAt: time.Now().Add(time.Hour * 24 * 7).Unix(),
+			Issuer:    model.IssuerSqMGR,
+			NotBefore: 0,
+			Subject:   pool.Token(),
+		}
+
+		sign, err := s.smjwt.Sign(claim)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, response{JWT: sign})
 	}
 }
 
@@ -453,7 +486,7 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 		if err != nil {
 			if err == sql.ErrNoRows {
 				logrus.WithFields(logrus.Fields{
-					"pool": pool.ID(),
+					"pool":   pool.ID(),
 					"square": squareID,
 				}).Error("could not find square")
 				s.writeErrorResponse(w, http.StatusNotFound, nil)
@@ -480,8 +513,6 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 			s.writeErrorResponse(w, http.StatusBadRequest, err)
 			return
 		}
-
-
 
 		if payload.Rename {
 			if !isAdmin {
@@ -726,6 +757,7 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 func (s *Server) postPoolTokenMemberEndpoint() http.HandlerFunc {
 	type payload struct {
 		Password string `json:"password"`
+		JWT      string `json:"jwt"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -734,11 +766,11 @@ func (s *Server) postPoolTokenMemberEndpoint() http.HandlerFunc {
 		pool, err := s.model.PoolByToken(r.Context(), token)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				s.writeErrorResponse(w,http.StatusNotFound, nil)
+				s.writeErrorResponse(w, http.StatusNotFound, nil)
 				return
 			}
 
-			s.writeErrorResponse(w,http.StatusInternalServerError, err)
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -749,11 +781,23 @@ func (s *Server) postPoolTokenMemberEndpoint() http.HandlerFunc {
 
 		var data payload
 		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-			s.writeErrorResponse(w,http.StatusBadRequest, err)
+			s.writeErrorResponse(w, http.StatusBadRequest, err)
 			return
 		}
 
-		if !pool.PasswordIsValid(data.Password) {
+		if data.JWT != "" {
+			j, err := s.smjwt.Validate(data.JWT)
+			if err != nil {
+				s.writeErrorResponse(w, http.StatusBadRequest, err)
+				return
+			}
+
+			if !j.Claims.(*jwt.StandardClaims).VerifyAudience(sqmgrInviteAudience, true) ||
+				!j.Claims.(*jwt.StandardClaims).VerifyIssuer(model.IssuerSqMGR, true) {
+				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("invalid join token"))
+				return
+			}
+		} else if !pool.PasswordIsValid(data.Password) {
 			s.writeErrorResponse(w, http.StatusBadRequest, errors.New("password is invalid"))
 			return
 		}
@@ -771,4 +815,3 @@ type poolResponse struct {
 	*model.PoolJSON
 	IsAdmin bool `json:"isAdmin"`
 }
-

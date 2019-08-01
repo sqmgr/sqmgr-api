@@ -42,6 +42,7 @@ func (s *Server) setupRoutes() {
 	authPoolRouter := authRouter.NewRoute().Subrouter()
 	authPoolRouter.Use(s.poolHandler)
 	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}").Methods(http.MethodGet).Handler(s.getPoolTokenEndpoint())
+	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/invitetoken").Methods(http.MethodGet).Handler(s.getPoolTokenInviteTokenEndpoint())
 	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}").Methods(http.MethodPost).Handler(s.postPoolTokenEndpoint())
 	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/grid").Methods(http.MethodGet).Handler(s.getPoolTokenGridEndpoint())
 	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/grid/{id:[0-9]+}").Methods(http.MethodDelete).Handler(s.deletePoolTokenGridIDEndpoint())
