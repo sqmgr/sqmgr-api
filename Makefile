@@ -39,6 +39,9 @@ k8s-deploy:
 	kubectl set image deploy ${DEPLOY_NAME} sqmgr=$(IMG):${VERSION} --record
 	kubectl rollout status deploy ${DEPLOY_NAME}
 
+.PHONY: release
+release: docker-build docker-push k8s-deploy
+
 .PHONY: test
 test:
 	golint ./...
