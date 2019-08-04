@@ -63,18 +63,18 @@ type User struct {
 	Token *jwt.Token
 }
 
-// UserAction are a set of actions that a user can perform
-type UserAction int
+// Permission is a user capability
+type Permission int
 
 // UserAction constants
 const (
-	UserActionCreatePool UserAction = iota
+	PermissionCreatePool Permission = iota
 )
 
-// Can will return true if the user can do the action
-func (u *User) Can(action UserAction) bool {
+// HasPermission will return true if the user can do the action
+func (u *User) HasPermission(action Permission) bool {
 	switch action {
-	case UserActionCreatePool:
+	case PermissionCreatePool:
 		return u.Store == UserStoreAuth0
 	}
 
@@ -151,3 +151,16 @@ func (u *User) IsMemberOf(ctx context.Context, p *Pool) (bool, error) {
 func (u *User) IsAdminOf(ctx context.Context, p *Pool) bool {
 	return u.ID == p.userID
 }
+
+// PoolsCreatedWithin will return the number of pools a user has created within a given duration period
+func (u *User) PoolsCreatedWithin(ctx context.Context, within time.Duration) (int, error) {
+	const query = "SELECT COUNT(*) FROM pools WHERE user_id = $1 AND created > NOW() - INTERVAL '1 microsecond' * $2"
+	row := u.db.QueryRowContext(ctx, query, u.ID, within / time.Microsecond)
+	var count int
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+

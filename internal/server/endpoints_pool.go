@@ -266,7 +266,7 @@ func (s *Server) postPoolEndpoint() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(ctxUserKey).(*model.User)
-		if !user.Can(model.UserActionCreatePool) {
+		if !user.HasPermission(model.PermissionCreatePool) {
 			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
 		}
@@ -287,6 +287,16 @@ func (s *Server) postPoolEndpoint() http.HandlerFunc {
 		gridType := v.GridType("Grid Configuration", data.GridType)
 		password := v.Password("Join Password", data.JoinPassword, data.ConfirmJoinPassword, minJoinPasswordLength)
 
+		if err := user.Can(r.Context(), model.ActionCreatePool, user); err != nil {
+			if _, ok := err.(model.ActionError); ok {
+				s.writeErrorResponse(w, http.StatusBadRequest, err)
+				return
+			}
+
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
 		if !v.OK() {
 			s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
 				Status:           statusError,
@@ -295,6 +305,7 @@ func (s *Server) postPoolEndpoint() http.HandlerFunc {
 			})
 			return
 		}
+
 
 		pool, err := s.model.NewPool(r.Context(), user.ID, name, gridType, password)
 		if err != nil {
