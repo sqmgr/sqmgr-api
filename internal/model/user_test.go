@@ -60,6 +60,21 @@ func TestJoinGrid(t *testing.T) {
 	g.Expect(u2.IsAdminOf(context.Background(), s)).Should(gomega.BeFalse())
 }
 
+func TestGetUserByID(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+
+	u, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(u.ID).Should(gomega.BeNumerically(">", 0))
+
+	u2, err := m.GetUserByID(context.Background(), u.ID)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(u2.ID).Should(gomega.Equal(u.ID))
+}
+
 func randString() string {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {

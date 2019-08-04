@@ -18,6 +18,8 @@ package server
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/google/uuid"
@@ -126,6 +128,38 @@ func (s *Server) getUserIDPoolMembershipEndpoint() http.HandlerFunc {
 		}
 
 		s.writeJSONResponse(w, http.StatusOK, respObj)
+	}
+}
+
+func (s *Server) deleteUserIDPoolTokenEndpoint() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := r.Context().Value(ctxUserIDKey).(int64)
+		user, err := s.model.GetUserByID(r.Context(), userID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				s.writeErrorResponse(w, http.StatusNotFound, errors.New("user not found"))
+				return
+			}
+		}
+
+		poolToken := mux.Vars(r)["token"]
+		pool, err := s.model.PoolByToken(r.Context(), poolToken)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				s.writeErrorResponse(w, http.StatusNotFound, errors.New("pool not found"))
+				return
+			}
+
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		if err := user.LeavePool(r.Context(), pool); err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 

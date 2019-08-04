@@ -56,6 +56,7 @@ func (s *Server) setupRoutes() {
 	authUserRouter := authRouter.NewRoute().Subrouter()
 	authUserRouter.Use(s.userHandler)
 	authUserRouter.Path("/user/{id:[0-9]+}/pool/{membership:(?:own|belong)}").Methods(http.MethodGet).Handler(s.getUserIDPoolMembershipEndpoint())
+	authUserRouter.Path("/user/{id:[0-9]+}/pool/{token:[A-Za-z0-9_-]+}").Methods(http.MethodDelete).Handler(s.deleteUserIDPoolTokenEndpoint())
 
 	pathTemplates := make(map[string]bool)
 

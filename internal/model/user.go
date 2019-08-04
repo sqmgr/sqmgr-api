@@ -81,15 +81,7 @@ func (u *User) Can(action UserAction) bool {
 	return false
 }
 
-// GetUser will get or create a record in the database based on the JWT issuer and store id
-func (m *Model) GetUser(ctx context.Context, issuer, storeID string) (*User, error) {
-	store, ok := issToStore[issuer]
-	if !ok {
-		return nil, fmt.Errorf("invalid issuer: %s", issuer)
-	}
-
-	row := m.db.QueryRowContext(ctx, "SELECT id, store, store_id, created FROM get_user($1, $2)", store, storeID)
-
+func (m *Model) userByRow(row *sql.Row) (*User, error) {
 	var u User
 	u.Model = m
 	if err := row.Scan(&u.ID, &u.Store, &u.StoreID, &u.Created); err != nil {
@@ -99,10 +91,37 @@ func (m *Model) GetUser(ctx context.Context, issuer, storeID string) (*User, err
 	return &u, nil
 }
 
-// JoinPool will link a user to a grid game.
+// GetUserByID will return a user by its ID.
+func (m *Model) GetUserByID(ctx context.Context, id int64) (*User, error) {
+	row := m.db.QueryRowContext(ctx, "SELECT id, store, store_id, created FROM users WHERE id = $1", id)
+	return m.userByRow(row)
+}
+
+// GetUser will get or create a record in the database based on the JWT issuer and store id
+func (m *Model) GetUser(ctx context.Context, issuer, storeID string) (*User, error) {
+	store, ok := issToStore[issuer]
+	if !ok {
+		return nil, fmt.Errorf("invalid issuer: %s", issuer)
+	}
+
+	row := m.db.QueryRowContext(ctx, "SELECT id, store, store_id, created FROM get_user($1, $2)", store, storeID)
+	return m.userByRow(row)
+}
+
+// JoinPool will link a user to a pool.
 func (u *User) JoinPool(ctx context.Context, p *Pool) error {
 	_, err := u.db.ExecContext(ctx, "INSERT INTO pools_users (pool_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", p.id, u.ID)
 	return err
+}
+
+// LeavePool will unlink a user from a pool
+func (u *User) LeavePool(ctx context.Context, p *Pool) error {
+	_, err := u.db.ExecContext(ctx, "DELETE FROM pools_users WHERE pool_id = $1 AND user_id = $2", p.ID(), u.ID)
+	if err != nil {
+		return fmt.Errorf("could not delete pools_users: %v", err)
+	}
+
+	return nil
 }
 
 // IsMemberOf will return true if the user belongs to the grid
