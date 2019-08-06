@@ -77,6 +77,7 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 	type payload struct {
 		Action string  `json:"action"`
 		IDs    []int64 `json:"ids"`
+		Name string `json:"name"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -109,6 +110,21 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 			err = pool.Save(r.Context())
 		case "reorderGrids":
 			err = pool.SetGridsOrder(r.Context(), resp.IDs)
+		case "rename":
+			v := validator.New()
+			name := v.Printable("Name", resp.Name, false)
+			name = v.MaxLength("Name", name, model.NameMaxLength)
+			if !v.OK() {
+				s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
+					Status:           statusError,
+					Error:            validationErrorMessage,
+					ValidationErrors: v.Errors,
+				})
+				return
+			}
+
+			pool.SetName(name)
+			err = pool.Save(r.Context())
 		default:
 			s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("unsupported action %s", resp.Action))
 			return
