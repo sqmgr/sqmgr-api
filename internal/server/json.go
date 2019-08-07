@@ -60,3 +60,17 @@ func (s *Server) writeJSONResponse(w http.ResponseWriter, statusCode int, body i
 		logrus.WithError(err).Error("could not encode JSON")
 	}
 }
+
+func (s *Server) parseJSONPayload(w http.ResponseWriter, r *http.Request, obj interface{}) bool {
+	if r.Header.Get("Content-Type") != "application/json" {
+		s.writeErrorResponse(w, http.StatusUnsupportedMediaType, nil)
+		return false
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(obj)	; err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err)
+		return false
+	}
+
+	return true
+}

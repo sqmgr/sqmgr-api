@@ -89,14 +89,8 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 			return
 		}
 
-		if r.Header.Get("Content-Type") != "application/json" {
-			s.writeErrorResponse(w, http.StatusUnsupportedMediaType, nil)
-			return
-		}
-
 		var resp payload
-		if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
-			s.writeErrorResponse(w, http.StatusBadRequest, err)
+		if ok := s.parseJSONPayload(w, r, &resp); !ok {
 			return
 		}
 
@@ -287,14 +281,8 @@ func (s *Server) postPoolEndpoint() http.HandlerFunc {
 			return
 		}
 
-		if r.Header.Get("Content-Type") != "application/json" {
-			s.writeErrorResponse(w, http.StatusUnsupportedMediaType, nil)
-			return
-		}
-
 		var data payload
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-			s.writeErrorResponse(w, http.StatusBadRequest, err)
+		if ok := s.parseJSONPayload(w, r, &data); !ok {
 			return
 		}
 
@@ -809,14 +797,8 @@ func (s *Server) postPoolTokenMemberEndpoint() http.HandlerFunc {
 			return
 		}
 
-		if r.Header.Get("Content-Type") != "application/json" {
-			s.writeErrorResponse(w, http.StatusUnsupportedMediaType, nil)
-			return
-		}
-
 		var data payload
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-			s.writeErrorResponse(w, http.StatusBadRequest, err)
+		if ok := s.parseJSONPayload(w, r, &data); !ok {
 			return
 		}
 

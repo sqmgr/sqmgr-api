@@ -163,6 +163,65 @@ func (s *Server) deleteUserIDPoolTokenEndpoint() http.HandlerFunc {
 	}
 }
 
+func (s *Server) postUserIDGuestJWT() http.HandlerFunc {
+	type payload struct {
+		// The SqMGR JWT
+		JWT string `json:"jwt"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := r.Context().Value(ctxUserIDKey).(int64)
+		user, err := s.model.GetUserByID(r.Context(), userID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				s.writeErrorResponse(w, http.StatusNotFound, errors.New("user not found"))
+				return
+			}
+		}
+
+		var thePayload payload
+		if ok := s.parseJSONPayload(w, r, &thePayload); !ok {
+			return
+		}
+
+		token, err := s.smjwt.Validate(thePayload.JWT)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, errors.New("cannot parse guest JWT"))
+			return
+		}
+
+		claims := token.Claims.(*jwt.StandardClaims)
+		if !claims.VerifyIssuer(model.IssuerSqMGR, true) ||
+			!claims.VerifyAudience(audienceSqMGR, true) {
+			s.writeErrorResponse(w, http.StatusBadRequest, errors.New("invalid guest JWT"))
+			return
+		}
+
+		guestUser, err := s.model.GetUser(r.Context(), model.IssuerSqMGR, claims.Subject)
+		if err != nil {
+			// not checking for ErrNoRows since that shouldn't happen. If it does, treat it like a 500
+			s.writeJSONResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		pools, err := s.model.PoolsJoinedByUserID(r.Context(), guestUser.ID, 0, 25)
+		if err != nil {
+			s.writeJSONResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		for _, pool := range pools {
+			if err := user.JoinPool(r.Context(), pool); err != nil {
+				s.writeJSONResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+
 func (s *Server) postUserGuestEndpoint() http.HandlerFunc {
 	type response struct {
 		JWT string `json:"jwt"`
