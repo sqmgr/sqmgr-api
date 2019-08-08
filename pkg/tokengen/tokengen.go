@@ -31,7 +31,7 @@ const asciia = 97
 // Generate will return a token of length "n".
 func Generate(n int) (string, error) {
 	token := make([]byte, n)
-	for i, _ := range token {
+	for i := range token {
 		bigNum, err := rand.Int(rand.Reader, max)
 		if err != nil {
 			return "", err
