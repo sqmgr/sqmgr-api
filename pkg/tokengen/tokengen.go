@@ -19,17 +19,33 @@ package tokengen
 
 import (
 	"crypto/rand"
-	"encoding/base64"
-	"math"
+	"math/big"
 )
+
+var max = big.NewInt(62) // 26 lower, 26 upper, 10 numbers
+
+const ascii0 = 48
+const asciiA = 65
+const asciia = 97
 
 // Generate will return a token of length "n".
 func Generate(n int) (string, error) {
-	byteSize := int(math.Ceil(float64(n) * 0.75))
-	b := make([]byte, byteSize)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
+	token := make([]byte, n)
+	for i, _ := range token {
+		bigNum, err := rand.Int(rand.Reader, max)
+		if err != nil {
+			return "", err
+		}
+
+		num := byte(bigNum.Int64())
+		if num < 10 {
+			token[i] = 48 + num
+		} else if num < 36 {
+			token[i] = asciiA + num - 10
+		} else {
+			token[i] = asciia + num - 36
+		}
 	}
 
-	return string(base64.RawURLEncoding.EncodeToString(b[:])[0:n]), nil
+	return string(token), nil
 }
