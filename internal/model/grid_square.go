@@ -207,7 +207,8 @@ func (p *PoolSquare) Save(ctx context.Context, isAdmin bool, poolSquareLog PoolS
 	}
 
 	if poolSquareLog.RemoteAddr != "" {
-		remoteAddr = &poolSquareLog.RemoteAddr
+		ip := ipFromRemoteAddr(poolSquareLog.RemoteAddr)
+		remoteAddr = &ip
 	}
 
 	const query = "SELECT * FROM update_pool_square($1, $2, $3, $4, $5, $6, $7)"
