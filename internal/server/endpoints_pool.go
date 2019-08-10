@@ -104,6 +104,12 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 			err = pool.Save(r.Context())
 		case "reorderGrids":
 			err = pool.SetGridsOrder(r.Context(), resp.IDs)
+		case "archive":
+			pool.SetArchived(true)
+			err = pool.Save(r.Context())
+		case "unarchive":
+			pool.SetArchived(false)
+			err = pool.Save(r.Context())
 		case "rename":
 			v := validator.New()
 			name := v.Printable("Name", resp.Name, false)

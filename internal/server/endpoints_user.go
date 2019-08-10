@@ -95,23 +95,30 @@ func (s *Server) getUserIDPoolMembershipEndpoint() http.HandlerFunc {
 			return
 		}
 
-		var getPools func(context.Context, int64, int64, int) ([]*model.Pool, error)
-		var getPoolsCount func(context.Context, int64) (int64, error)
+		includeArchived := r.FormValue("includeArchived") == "true"
+
+		var getPools func(context.Context, int64, bool, int64, int) ([]*model.Pool, error)
+		var getPoolsCount func(context.Context, int64, bool) (int64, error)
 		if membership == "own" {
 			getPools = s.model.PoolsOwnedByUserID
 			getPoolsCount = s.model.PoolsOwnedByUserIDCount
 		} else {
-			getPools = s.model.PoolsJoinedByUserID
-			getPoolsCount = s.model.PoolsJoinedByUserIDCount
+			getPools = func(ctx context.Context, userID int64, includeArchived bool, offset int64, limit int) ([]*model.Pool, error) {
+				return s.model.PoolsJoinedByUserID(ctx, userID, offset, limit)
+			}
+
+			getPoolsCount = func(ctx context.Context, userID int64, includeArchived bool) (int64, error) {
+				return s.model.PoolsJoinedByUserIDCount(ctx, userID)
+			}
 		}
 
-		pools, err := getPools(r.Context(), userID, offset, limit)
+		pools, err := getPools(r.Context(), userID, includeArchived, offset, limit)
 		if err != nil {
 			s.writeJSONResponse(w, http.StatusInternalServerError, err)
 			return
 		}
 
-		total, err := getPoolsCount(r.Context(), userID)
+		total, err := getPoolsCount(r.Context(), userID, includeArchived)
 		if err != nil {
 			s.writeJSONResponse(w, http.StatusInternalServerError, err)
 			return

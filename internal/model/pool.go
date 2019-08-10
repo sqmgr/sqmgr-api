@@ -42,11 +42,22 @@ type Pool struct {
 	gridType     GridType
 	passwordHash string
 	checkID      int
+	archived     bool
 	locks        time.Time
 	created      time.Time
 	modified     time.Time
 
 	squares map[int]*PoolSquare
+}
+
+// Archived is the getter whether the pool has been archived
+func (p *Pool) Archived() bool {
+	return p.archived
+}
+
+// SetArchived is the setter for whether the pool has been archived
+func (p *Pool) SetArchived(archived bool) {
+	p.archived = archived
 }
 
 // CheckID will return the current check ID.
@@ -89,6 +100,7 @@ type PoolJSON struct {
 	Token    string    `json:"token"`
 	Name     string    `json:"name"`
 	GridType GridType  `json:"gridType"`
+	Archived bool `json:"archived"`
 	Locks    time.Time `json:"locks"`
 	Created  time.Time `json:"created"`
 	Modified time.Time `json:"modified"`
@@ -144,6 +156,7 @@ func (p *Pool) JSON() *PoolJSON {
 		Token:    p.token,
 		Name:     p.name,
 		Locks:    p.Locks(),
+		Archived: p.Archived(),
 		GridType: p.gridType,
 		Created:  p.created,
 		Modified: p.modified,
@@ -159,7 +172,7 @@ type scanFunc func(dest ...interface{}) error
 func (m *Model) poolByRow(scan scanFunc) (*Pool, error) {
 	s := Pool{model: m}
 	var locks *time.Time
-	if err := scan(&s.id, &s.token, &s.userID, &s.name, &s.gridType, &s.passwordHash, &locks, &s.created, &s.modified, &s.checkID); err != nil {
+	if err := scan(&s.id, &s.token, &s.userID, &s.name, &s.gridType, &s.passwordHash, &locks, &s.created, &s.modified, &s.checkID, &s.archived); err != nil {
 		return nil, err
 	}
 
@@ -200,24 +213,35 @@ func (m *Model) PoolsJoinedByUserIDCount(ctx context.Context, userID int64) (int
 }
 
 // PoolsOwnedByUserID will return a collection of pools that were created by the user
-func (m *Model) PoolsOwnedByUserID(ctx context.Context, userID int64, offset int64, limit int) ([]*Pool, error) {
-	const query = `
+func (m *Model) PoolsOwnedByUserID(ctx context.Context, userID int64, includeArchived bool, offset int64, limit int) ([]*Pool, error) {
+	const baseQuery = `
 		SELECT *
 		FROM pools
-		WHERE user_id = $1
+		WHERE user_id = $1%s
 		ORDER BY pools.id DESC
 		OFFSET $2
 		LIMIT $3`
+
+	var query string
+	if includeArchived {
+		query = fmt.Sprintf(baseQuery, "")
+	} else {
+		query = fmt.Sprintf(baseQuery, " AND archived = 'f'")
+	}
 
 	return m.poolsByRows(m.db.QueryContext(ctx, query, userID, offset, limit))
 }
 
 // PoolsOwnedByUserIDCount will return how many pools were created by the user
-func (m *Model) PoolsOwnedByUserIDCount(ctx context.Context, userID int64) (int64, error) {
-	const query = `
+func (m *Model) PoolsOwnedByUserIDCount(ctx context.Context, userID int64, includeArchived bool) (int64, error) {
+	query := `
 		SELECT COUNT(*)
 		FROM pools
 		WHERE user_id = $1`
+
+	if !includeArchived {
+		query += " AND archived = 'f'"
+	}
 
 	return m.poolsCount(m.db.QueryRowContext(ctx, query, userID))
 }
@@ -313,8 +337,9 @@ SET name = $1,
     password_hash = $3,
     locks = $4,
     check_id = $5,
+    archived = $6,
     modified = (NOW() AT TIME ZONE 'utc')
-WHERE id = $6`
+WHERE id = $7`
 
 	var locks *time.Time
 	if !p.locks.IsZero() {
@@ -322,7 +347,7 @@ WHERE id = $6`
 		locks = &locksInUTC
 	}
 
-	_, err := p.model.db.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.id)
+	_, err := p.model.db.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.archived, p.id)
 	return err
 }
 

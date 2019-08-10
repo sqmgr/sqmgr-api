@@ -84,6 +84,7 @@ func TestPool(t *testing.T) {
 	g.Expect(grid.Name()).Should(gomega.Equal("Away Team vs. Home Team"))
 
 	g.Expect(pool.CheckID()).Should(gomega.Equal(0))
+	g.Expect(pool.Archived()).Should(gomega.BeFalse())
 	g.Expect(pool.id).Should(gomega.BeNumerically(">", 0))
 	g.Expect(pool.userID).Should(gomega.Equal(user.ID))
 	g.Expect(pool.token).Should(gomega.MatchRegexp(`^[A-Za-z0-9_-]{8}\z`))
@@ -99,6 +100,7 @@ func TestPool(t *testing.T) {
 	pool.gridType = GridTypeStd25
 
 	pool.SetCheckID(1)
+	pool.SetArchived(true)
 
 	err = pool.Save(context.Background())
 	g.Expect(err).Should(gomega.Succeed())
@@ -110,6 +112,7 @@ func TestPool(t *testing.T) {
 	g.Expect(pool2.name).Should(gomega.Equal("Different Name"))
 	g.Expect(pool2.gridType).Should(gomega.Equal(GridTypeStd25))
 	g.Expect(pool2.CheckID()).Should(gomega.Equal(1))
+	g.Expect(pool2.Archived()).Should(gomega.BeTrue())
 
 	pool3, err := m.PoolByToken(context.Background(), pool2.token)
 	g.Expect(err).Should(gomega.Succeed())
@@ -157,11 +160,11 @@ func TestGridCollections(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(1))
 
-	collection, err = m.PoolsOwnedByUserID(context.Background(), user.ID, 0, 10)
+	collection, err = m.PoolsOwnedByUserID(context.Background(), user.ID, false, 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(1))
 
-	collection, err = m.PoolsOwnedByUserID(context.Background(), user2.ID, 0, 10)
+	collection, err = m.PoolsOwnedByUserID(context.Background(), user2.ID, false, 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(0))
 }
@@ -189,11 +192,11 @@ func TestGridCollectionPagination(t *testing.T) {
 		}
 	}
 
-	count, err := m.PoolsOwnedByUserIDCount(context.Background(), user1.ID)
+	count, err := m.PoolsOwnedByUserIDCount(context.Background(), user1.ID, false)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(30)))
 
-	count, err = m.PoolsOwnedByUserIDCount(context.Background(), user2.ID)
+	count, err = m.PoolsOwnedByUserIDCount(context.Background(), user2.ID, false)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(0)))
 
@@ -329,5 +332,53 @@ func TestLocks(t *testing.T) {
 
 	p.SetLocks(time.Now())
 	g.Expect(p.IsLocked()).Should(gomega.BeTrue())
+}
 
+func TestArchiving(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+
+	user, err := m.GetUser(context.Background(), IssuerAuth0, "auth0|" + randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	for i := 0; i < 3; i++ {
+		pool, err := m.NewPool(context.Background(), user.ID, "Test", GridTypeStd25, "a-password")
+		g.Expect(err).Should(gomega.Succeed())
+		g.Expect(pool).ShouldNot(gomega.BeNil())
+	}
+
+	pools, err := user.PoolsOwnedByUserID(context.Background(), user.ID, false, 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(pools)).Should(gomega.Equal(3))
+
+	count, err := user.PoolsOwnedByUserIDCount(context.Background(), user.ID, false)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(3)))
+
+	// set one of the pools as archived
+
+	pools[0].SetArchived(true)
+	g.Expect(pools[0].Save(context.Background())).Should(gomega.Succeed())
+
+	//
+
+	pools, err = user.PoolsOwnedByUserID(context.Background(), user.ID, false, 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(pools)).Should(gomega.Equal(2))
+
+	count, err = user.PoolsOwnedByUserIDCount(context.Background(), user.ID, false)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(2)))
+
+	//
+
+	pools, err = user.PoolsOwnedByUserID(context.Background(), user.ID, true, 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(pools)).Should(gomega.Equal(3))
+
+	count, err = user.PoolsOwnedByUserIDCount(context.Background(), user.ID, true)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(3)))
 }

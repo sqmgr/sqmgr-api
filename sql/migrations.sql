@@ -317,3 +317,11 @@ CREATE TABLE guest_users (
 ALTER TABLE pools ADD COLUMN check_id INTEGER NOT NULL DEFAULT 0;
 
 --rollback ALTER TABLE pools DROP COLUMN check_id;
+
+--changeset weters:6
+
+ALTER TABLE pools ADD COLUMN archived BOOLEAN NOT NULL DEFAULT 'f';
+
+CREATE INDEX pools_user_id_archived_idx ON pools (user_id, archived);
+
+--rollback ALTER TABLE pools DROP COLUMN archived;
