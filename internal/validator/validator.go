@@ -148,19 +148,9 @@ func (v *Validator) NotPwnedPassword(key, pw string) string {
 }
 
 // Password will ensure that the confirmation matches the password and that they are a certain length
-func (v *Validator) Password(key, pw, cpw string, minLen int) string {
-	hasError := false
-	if pw != cpw {
-		v.AddError(key, "passwords do not match")
-		hasError = true
-	}
-
+func (v *Validator) Password(key, pw string, minLen int) string {
 	if len(pw) < minLen {
 		v.AddError(key, "password must be at least %d characters", minLen)
-		hasError = true
-	}
-
-	if hasError {
 		return ""
 	}
 
@@ -179,7 +169,7 @@ func (v *Validator) GridType(key, val string) model.GridType {
 
 // Datetime will validate a set of date, time and time zone values and return a time object
 func (v *Validator) Datetime(key, dateStr, timeStr, timeZoneOffsetStr string, isOptional ...bool) time.Time {
-	if len(isOptional) > 0 && isOptional[0] && ( len(dateStr) == 0 || strings.Index(dateStr, "0000-00-00") == 0 ) {
+	if len(isOptional) > 0 && isOptional[0] && (len(dateStr) == 0 || strings.Index(dateStr, "0000-00-00") == 0) {
 		return time.Time{}
 	}
 

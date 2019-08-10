@@ -280,7 +280,6 @@ func (s *Server) postPoolEndpoint() http.HandlerFunc {
 		Name                string `json:"name"`
 		GridType            string `json:"gridType"`
 		JoinPassword        string `json:"joinPassword"`
-		ConfirmJoinPassword string `json:"confirmJoinPassword"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -298,7 +297,7 @@ func (s *Server) postPoolEndpoint() http.HandlerFunc {
 		v := validator.New()
 		name := v.Printable("Squares Pool Name", data.Name)
 		gridType := v.GridType("Grid Configuration", data.GridType)
-		password := v.Password("Join Password", data.JoinPassword, data.ConfirmJoinPassword, minJoinPasswordLength)
+		password := v.Password("Join Password", data.JoinPassword, minJoinPasswordLength)
 
 		if err := user.Can(r.Context(), model.ActionCreatePool, user); err != nil {
 			if _, ok := err.(model.ActionError); ok {
