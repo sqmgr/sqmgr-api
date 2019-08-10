@@ -99,7 +99,7 @@ func TestPool(t *testing.T) {
 	pool.name = "Different Name"
 	pool.gridType = GridTypeStd25
 
-	pool.SetCheckID(1)
+	pool.IncrementCheckID()
 	pool.SetArchived(true)
 
 	err = pool.Save(context.Background())

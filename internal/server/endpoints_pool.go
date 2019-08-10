@@ -76,9 +76,11 @@ func (s *Server) poolHandler(next http.Handler) http.Handler {
 
 func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 	type payload struct {
-		Action string  `json:"action"`
-		IDs    []int64 `json:"ids"`
-		Name   string  `json:"name"`
+		Action          string  `json:"action"`
+		IDs             []int64 `json:"ids"`
+		Name            string  `json:"name"`
+		Password        string  `json:"password"`
+		ResetMembership bool    `json:"resetMembership"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +113,35 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 		case "unarchive":
 			pool.SetArchived(false)
 			err = pool.Save(r.Context())
+		case "changeJoinPassword":
+			v := validator.New()
+			password := v.Password("Join Password", resp.Password, minJoinPasswordLength)
+			if !v.OK() {
+				s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
+					Status:           statusError,
+					Error:            validationErrorMessage,
+					ValidationErrors: v.Errors,
+				})
+				return
+			}
+
+			if err := pool.SetPassword(password); err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+
+			pool.IncrementCheckID()
+			if err := pool.Save(r.Context()); err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+
+			if resp.ResetMembership {
+				if err := pool.RemoveAllMembers(r.Context()); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+			}
 		case "rename":
 			v := validator.New()
 			name := v.Printable("Name", resp.Name, false)
@@ -253,7 +284,7 @@ func (s *Server) getPoolConfiguration() http.HandlerFunc {
 		GridTypes             []keyDescription        `json:"gridTypes"`
 		MinJoinPasswordLength int                     `json:"minJoinPasswordLength"`
 	}{
-		ClaimantMaxLength: model.ClaimantMaxLength,
+		ClaimantMaxLength:     model.ClaimantMaxLength,
 		NameMaxLength:         model.NameMaxLength,
 		NotesMaxLength:        model.NotesMaxLength,
 		TeamNameMaxLength:     model.TeamNameMaxLength,
@@ -277,9 +308,9 @@ func (s *Server) getPoolConfiguration() http.HandlerFunc {
 
 func (s *Server) postPoolEndpoint() http.HandlerFunc {
 	type payload struct {
-		Name                string `json:"name"`
-		GridType            string `json:"gridType"`
-		JoinPassword        string `json:"joinPassword"`
+		Name         string `json:"name"`
+		GridType     string `json:"gridType"`
+		JoinPassword string `json:"joinPassword"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {

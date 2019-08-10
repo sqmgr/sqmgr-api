@@ -65,10 +65,10 @@ func (p *Pool) CheckID() int {
 	return p.checkID
 }
 
-// SetCheckID will set the current check ID. A check ID can be changed
+// IncrementCheckID will update the current check ID. A check ID can be changed
 // if you want to prevent old JWT links from working.
-func (p *Pool) SetCheckID(checkID int) {
-	p.checkID = checkID
+func (p *Pool) IncrementCheckID() {
+	p.checkID++
 }
 
 // IsLocked will return true if the locks date is in the past
@@ -633,4 +633,10 @@ func (p *Pool) GridByID(ctx context.Context, id int64) (*Grid, error) {
 	const query = `SELECT * FROM grids WHERE id = $1 AND pool_id = $2 AND state = 'active'`
 	row := p.model.db.QueryRowContext(ctx, query, id, p.id)
 	return p.model.gridByRow(row.Scan)
+}
+
+// RemoveAllMembers will boot all members from the pool
+func (p *Pool) RemoveAllMembers(ctx context.Context) error {
+	_, err := p.model.db.ExecContext(ctx, "DELETE FROM pools_users WHERE pool_id = $1", p.ID())
+	return err
 }
