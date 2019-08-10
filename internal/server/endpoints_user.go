@@ -52,9 +52,9 @@ func (s *Server) userHandler(next http.Handler) http.Handler {
 
 func (s *Server) getUserSelfEndpoint() http.HandlerFunc {
 	type response struct {
-		UserID int64 `json:"id"`
-		StoreID string `json:"store_id"`
-		Store model.UserStore `json:"store"`
+		UserID  int64           `json:"id"`
+		StoreID string          `json:"store_id"`
+		Store   model.UserStore `json:"store"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +73,7 @@ func (s *Server) getUserIDPoolMembershipEndpoint() http.HandlerFunc {
 
 	type resp struct {
 		Pools []*model.PoolJSON `json:"pools"`
-		Total int64 `json:"total"`
+		Total int64             `json:"total"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -130,8 +130,8 @@ func (s *Server) getUserIDPoolMembershipEndpoint() http.HandlerFunc {
 		}
 
 		respObj := resp{
-			Pools:      poolsJSON,
-			Total:      total,
+			Pools: poolsJSON,
+			Total: total,
 		}
 
 		s.writeJSONResponse(w, http.StatusOK, respObj)
@@ -228,15 +228,14 @@ func (s *Server) postUserIDGuestJWT() http.HandlerFunc {
 	}
 }
 
-
 func (s *Server) postUserGuestEndpoint() http.HandlerFunc {
 	type response struct {
-		JWT string `json:"jwt"`
-		ExpiresAt int64 `json:"expiresAt"`
+		JWT       string `json:"jwt"`
+		ExpiresAt int64  `json:"expiresAt"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		u, err :=uuid.NewRandom()
+		u, err := uuid.NewRandom()
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return

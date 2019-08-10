@@ -18,7 +18,6 @@ package model
 
 import (
 	"context"
-	"strings"
 	"time"
 )
 
@@ -38,10 +37,7 @@ INSERT INTO guest_users (store, store_id, expires, remote_addr)
 VALUES ($1, $2, $3, $4)
 RETURNING store, store_id, expires, remote_addr, created`
 
-	parts := strings.Split(remoteAddr, ":")
-	remoteAddr = strings.Join(parts[0:len(parts)-1], ":")
-
-	row := m.db.QueryRowContext(ctx, query, store, storeID, expiresAt, remoteAddr)
+	row := m.db.QueryRowContext(ctx, query, store, storeID, expiresAt, ipFromRemoteAddr(remoteAddr))
 	var guestUser GuestUser
 	if err := row.Scan(&guestUser.Store, &guestUser.StoreID, &guestUser.Expires, &guestUser.RemoteAddr, &guestUser.Created); err != nil {
 		return nil, err
