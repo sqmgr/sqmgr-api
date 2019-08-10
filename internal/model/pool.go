@@ -425,7 +425,7 @@ func (p *Pool) squareByRow(scan scanFunc) (*PoolSquare, error) {
 	}
 
 	if claimant != nil {
-		gs.Claimant = *claimant
+		gs.claimant = *claimant
 	}
 
 	if userID != nil {

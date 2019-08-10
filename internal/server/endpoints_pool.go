@@ -35,6 +35,7 @@ import (
 const minJoinPasswordLength = 6
 const validationErrorMessage = "There were one or more errors with your request"
 const sqmgrInviteAudience = "com.sqmgr.invite"
+
 var inviteTokenTTL = time.Hour * 24 * 365 // 1 year
 
 type inviteClaims struct {
@@ -77,7 +78,7 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 	type payload struct {
 		Action string  `json:"action"`
 		IDs    []int64 `json:"ids"`
-		Name string `json:"name"`
+		Name   string  `json:"name"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -244,6 +245,7 @@ func (s *Server) getPoolConfiguration() http.HandlerFunc {
 	}
 
 	resp := struct {
+		ClaimantMaxLength     int                     `json:"claimantMaxLength"`
 		NameMaxLength         int                     `json:"nameMaxLength"`
 		NotesMaxLength        int                     `json:"notesMaxLength"`
 		TeamNameMaxLength     int                     `json:"teamNameMaxLength"`
@@ -251,6 +253,7 @@ func (s *Server) getPoolConfiguration() http.HandlerFunc {
 		GridTypes             []keyDescription        `json:"gridTypes"`
 		MinJoinPasswordLength int                     `json:"minJoinPasswordLength"`
 	}{
+		ClaimantMaxLength: model.ClaimantMaxLength,
 		NameMaxLength:         model.NameMaxLength,
 		NotesMaxLength:        model.NotesMaxLength,
 		TeamNameMaxLength:     model.TeamNameMaxLength,
@@ -315,7 +318,6 @@ func (s *Server) postPoolEndpoint() http.HandlerFunc {
 			})
 			return
 		}
-
 
 		pool, err := s.model.NewPool(r.Context(), user.ID, name, gridType, password)
 		if err != nil {
@@ -532,7 +534,7 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 
 		// if the user isn't an admin and the grid is locked, do not let the user do anything
 		if pool.IsLocked() && !isAdmin {
-			s.writeErrorResponse(w, http.StatusForbidden, errors.New("The grid is locked"))
+			s.writeErrorResponse(w, http.StatusForbidden, errors.New("the grid is locked"))
 			return
 		}
 
@@ -553,7 +555,7 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 			claimant := v.Printable("name", payload.Claimant)
 			claimant = v.ContainsWordChar("name", claimant)
 
-			if claimant == square.Claimant {
+			if claimant == square.Claimant() {
 				v.AddError("claimant", "must be a different name")
 			}
 
@@ -566,12 +568,12 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 				return
 			}
 
-			oldClaimant := square.Claimant
-			square.Claimant = claimant
+			oldClaimant := square.Claimant()
+			square.SetClaimant(claimant)
 			lr.WithFields(logrus.Fields{
 				"oldClaimant": oldClaimant,
 				"claimant":    claimant,
-			}).Info("renaming sqaure")
+			}).Info("renaming square")
 
 			if err := square.Save(r.Context(), true, model.PoolSquareLog{
 				RemoteAddr: r.RemoteAddr,
@@ -595,7 +597,7 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 				return
 			}
 
-			square.Claimant = claimant
+			square.SetClaimant(claimant)
 			square.State = model.PoolSquareStateClaimed
 			square.SetUserID(user.ID)
 
@@ -614,7 +616,7 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 
 			if err := square.Save(r.Context(), false, model.PoolSquareLog{
 				RemoteAddr: r.RemoteAddr,
-				Note:       fmt.Sprintf("user: `%s` unclaimed", square.Claimant),
+				Note:       fmt.Sprintf("user: `%s` unclaimed", square.Claimant()),
 			}); err != nil {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
@@ -712,7 +714,7 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 		case "drawNumbers":
 			if err := grid.SelectRandomNumbers(); err != nil {
 				if err == model.ErrNumbersAlreadyDrawn {
-					s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("The numbers have already been drawn"))
+					s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("the numbers have already been drawn"))
 					return
 				}
 

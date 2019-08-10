@@ -262,9 +262,9 @@ func TestGridSquares(t *testing.T) {
 
 	square := squares[15]
 	g.Expect(square.SquareID).Should(gomega.Equal(15))
-	g.Expect(square.Claimant).Should(gomega.Equal(""))
+	g.Expect(square.claimant).Should(gomega.Equal(""))
 
-	square.Claimant = "Test User"
+	square.claimant = "Test User"
 	square.State = PoolSquareStateClaimed
 	square.SetUserID(user.ID)
 	err = square.Save(context.Background(), true, PoolSquareLog{
@@ -278,7 +278,7 @@ func TestGridSquares(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	square = squares[15]
-	g.Expect(square.Claimant).Should(gomega.Equal("Test User"))
+	g.Expect(square.claimant).Should(gomega.Equal("Test User"))
 
 	err = square.Save(context.Background(), true, PoolSquareLog{
 		Note: "A new note",
@@ -312,7 +312,7 @@ func TestGridSquares(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(len(logs))))
 
-	square.Claimant = "New User"
+	square.claimant = "New User"
 	err = square.Save(context.Background(), false, PoolSquareLog{
 		Note: "",
 	})

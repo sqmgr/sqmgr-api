@@ -21,7 +21,11 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+	"unicode/utf8"
 )
+
+// ClaimantMaxLength is the maximum number of characters allowed in a claimant name
+const ClaimantMaxLength = 30
 
 // PoolSquareState represents the state of an individual square within a given pool
 type PoolSquareState string
@@ -63,14 +67,29 @@ func (g PoolSquareState) IsValid() bool {
 // PoolSquare is an individual square within a pool
 type PoolSquare struct {
 	*Model
-	ID            int64 `json:"-"`
-	PoolID        int64 `json:"-"`
-	userID        int64
-	SquareID      int              `json:"squareID"`
-	State         PoolSquareState  `json:"state"`
-	Claimant      string           `json:"claimant"`
-	Modified      time.Time        `json:"modified"`
-	Logs          []*PoolSquareLog `json:"logs,omitempty"`
+	ID       int64 `json:"-"`
+	PoolID   int64 `json:"-"`
+	userID   int64
+	SquareID int              `json:"-"`
+	State    PoolSquareState  `json:"-"`
+	claimant string
+	Modified time.Time        `json:"-"`
+	Logs     []*PoolSquareLog `json:"-"`
+}
+// FIXME - remove the above json tags once we validate it's no longer necessary
+
+// Claimant returns the claimant
+func (p *PoolSquare) Claimant() string {
+	return p.claimant
+}
+
+// SetClaimant will set the claimant and clamp the length to at most N runes.
+func (p *PoolSquare) SetClaimant(claimant string) {
+	if utf8.RuneCountInString(claimant) > ClaimantMaxLength {
+		claimant = string([]rune(claimant)[0:ClaimantMaxLength])
+	}
+
+	p.claimant = claimant
 }
 
 // UserID is a getter
@@ -99,7 +118,7 @@ func (p *PoolSquare) JSON() *PoolSquareJSON {
 		UserID: p.userID,
 		SquareID:     p.SquareID,
 		State:        p.State,
-		Claimant:     p.Claimant,
+		Claimant:     p.Claimant(),
 		Modified:     p.Modified,
 		Logs:         p.Logs,
 	}
@@ -176,8 +195,8 @@ func (p *PoolSquareLog) ID() int64 {
 // Save will save the pool square and the associated log data to the database
 func (p *PoolSquare) Save(ctx context.Context, isAdmin bool, poolSquareLog PoolSquareLog) error {
 	var claimant *string
-	if p.Claimant != "" {
-		claimant = &p.Claimant
+	if p.claimant != "" {
+		claimant = &p.claimant
 	}
 
 	var userID *int64

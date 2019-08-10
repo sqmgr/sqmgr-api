@@ -131,7 +131,7 @@ func main() {
 				square.State = model.PoolSquareStatePaidFull
 			}
 
-			square.Claimant = nameList[rand.Intn(len(nameList))]
+			square.SetClaimant(nameList[rand.Intn(len(nameList))])
 
 			gsl := model.PoolSquareLog{
 				RemoteAddr: "127.0.0.1",
