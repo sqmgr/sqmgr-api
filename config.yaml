@@ -1,5 +1,2 @@
 jwt_public_key: .keys/public.pem
 jwt_private_key: .keys/private.pem
-recaptcha_enabled: false
-recaptcha_site_key: FIXME
-recaptcha_secret_key: FIXME
