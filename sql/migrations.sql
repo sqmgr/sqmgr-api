@@ -260,8 +260,8 @@ $$;
 
 --rollback DROP FUNCTION new_pool(text, bigint, text, text, text, int);
 --rollback DROP FUNCTION new_grid(bigint);
---rollback DROP FUNCTION update_pool_square(bigint, square_states, text, bigint, text, text, text, boolean);
---rollback DROP FUNCTION get_user(store, text);
+--rollback DROP FUNCTION update_pool_square(bigint, square_states, text, bigint, text, text, boolean);
+--rollback DROP FUNCTION get_user(stores, text);
 --rollback DROP FUNCTION new_token(text);
 
 --changeset weters:3 splitStatements:false
