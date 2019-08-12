@@ -42,6 +42,9 @@ var ErrNumbersAlreadyDrawn = errors.New("error: numbers have already been drawn"
 // ErrLastGrid happens when the user tries to delete the last remaining grid
 var ErrLastGrid = errors.New("error: you cannot delete the last grid")
 
+// ErrGridLimit happens when a user tries to create more grids in a pool than allowed
+var ErrGridLimit = fmt.Errorf("you cannot create more than %d grids per pool", MaxGridsPerPool)
+
 // Grid represents a single grid from a pool. A pool may contain more than one grid.
 type Grid struct {
 	model *Model
@@ -200,11 +203,15 @@ func (g *Grid) Save(ctx context.Context) error {
 	}
 
 	if g.id == 0 {
-		row := tx.QueryRowContext(ctx, "SELECT * FROM new_grid($1)", g.poolID)
+		row := tx.QueryRowContext(ctx, "SELECT * FROM new_grid($1, $2)", g.poolID, MaxGridsPerPool)
 		newGrid, err := g.model.gridByRow(row.Scan)
 		if err != nil {
 			if err2 := tx.Rollback(); err2 != nil {
 				return fmt.Errorf("error found: %#v. Another error found when trying to rollback: %#v", err, err2)
+			}
+
+			if err.Error() == "pq: limit reached" {
+				return ErrGridLimit
 			}
 
 			return err

@@ -29,7 +29,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/weters/pwned"
-	"github.com/weters/sqmgr-api/internal/model"
+	"github.com/weters/sqmgr-api/pkg/model"
 )
 
 var nonPrintableRx = regexp.MustCompile(`\p{C}`)

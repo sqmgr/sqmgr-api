@@ -28,7 +28,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/weters/sqmgr-api/internal/database"
-	"github.com/weters/sqmgr-api/internal/model"
+	"github.com/weters/sqmgr-api/pkg/model"
 
 	_ "github.com/lib/pq"
 )

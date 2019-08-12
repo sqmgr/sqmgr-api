@@ -21,7 +21,7 @@ import (
 	"errors"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/sirupsen/logrus"
-	"github.com/weters/sqmgr-api/internal/model"
+	"github.com/weters/sqmgr-api/pkg/model"
 	"net/http"
 	"strings"
 )

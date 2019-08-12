@@ -31,6 +31,9 @@ import (
 // NameMaxLength is the maximum length the pool name may be
 const NameMaxLength = 50
 
+// MaxGridsPerPool is the maximum number of grids we allow per pool
+const MaxGridsPerPool = 50
+
 // Pool is an individual pool board
 // This object uses getters and setters to help guard against user input.
 type Pool struct {
@@ -100,7 +103,7 @@ type PoolJSON struct {
 	Token    string    `json:"token"`
 	Name     string    `json:"name"`
 	GridType GridType  `json:"gridType"`
-	Archived bool `json:"archived"`
+	Archived bool      `json:"archived"`
 	Locks    time.Time `json:"locks"`
 	Created  time.Time `json:"created"`
 	Modified time.Time `json:"modified"`

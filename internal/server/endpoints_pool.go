@@ -25,8 +25,8 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
-	"github.com/weters/sqmgr-api/internal/model"
 	"github.com/weters/sqmgr-api/internal/validator"
+	"github.com/weters/sqmgr-api/pkg/model"
 	"net/http"
 	"strconv"
 	"time"
@@ -410,12 +410,13 @@ func (s *Server) getPoolTokenInviteTokenEndpoint() http.HandlerFunc {
 }
 
 func (s *Server) getPoolTokenGridEndpoint() http.HandlerFunc {
-	const defaultPerPage = 10
-	const maxPerPage = 25
+	const defaultPerPage = model.MaxGridsPerPool
+	const maxPerPage = model.MaxGridsPerPool
 
 	type response struct {
-		Grids []*model.GridJSON `json:"grids"`
-		Total int64             `json:"total"`
+		Grids      []*model.GridJSON `json:"grids"`
+		Total      int64             `json:"total"`
+		MaxAllowed int               `json:"maxAllowed"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -454,6 +455,7 @@ func (s *Server) getPoolTokenGridEndpoint() http.HandlerFunc {
 		s.writeJSONResponse(w, http.StatusOK, response{
 			Grids: gridsJSON,
 			Total: count,
+			MaxAllowed: model.MaxGridsPerPool,
 		})
 	}
 }
@@ -802,6 +804,11 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 			settings.SetAwayTeamColor2(awayTeamColor2)
 
 			if err := grid.Save(r.Context()); err != nil {
+				if err == model.ErrGridLimit {
+					s.writeErrorResponse(w, http.StatusBadRequest, err)
+					return
+				}
+
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
 			}

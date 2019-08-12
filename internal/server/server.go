@@ -22,7 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/weters/sqmgr-api/internal/config"
 	"github.com/weters/sqmgr-api/internal/keylocker"
-	"github.com/weters/sqmgr-api/internal/model"
+	"github.com/weters/sqmgr-api/pkg/model"
 	"github.com/weters/sqmgr-api/pkg/smjwt"
 )
 
@@ -49,8 +49,8 @@ func New(version string, db *sql.DB) *Server {
 		Router:    mux.NewRouter(),
 		model:     model.New(db),
 		keyLocker: keylocker.New("https://sqmgr.auth0.com/.well-known/jwks.json"),
-		smjwt: sj,
-		version: version,
+		smjwt:     sj,
+		version:   version,
 	}
 
 	s.setupRoutes()
