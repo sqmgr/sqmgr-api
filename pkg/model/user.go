@@ -110,6 +110,11 @@ func (m *Model) GetUser(ctx context.Context, issuer, storeID string) (*User, err
 
 // JoinPool will link a user to a pool.
 func (u *User) JoinPool(ctx context.Context, p *Pool) error {
+	// no-op
+	if u.IsAdminOf(ctx, p) {
+		return nil
+	}
+
 	_, err := u.db.ExecContext(ctx, "INSERT INTO pools_users (pool_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", p.id, u.ID)
 	return err
 }

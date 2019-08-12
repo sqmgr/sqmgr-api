@@ -38,26 +38,31 @@ func TestJoinGrid(t *testing.T) {
 	u2, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
-	s, err := m.NewPool(context.Background(), u.ID, "test", GridTypeStd100, "join-password")
+	pool, err := m.NewPool(context.Background(), u.ID, "test", GridTypeStd100, "join-password")
 	g.Expect(err).Should(gomega.Succeed())
 
-	ok, err := u.IsMemberOf(context.Background(), s)
+	g.Expect(u.JoinPool(context.Background(), pool)).Should(gomega.Succeed())
+	count, err := u.PoolsJoinedByUserIDCount(context.Background(), u.ID)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(0))) // verify you can't join a pool you own
+
+	ok, err := u.IsMemberOf(context.Background(), pool)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(ok).Should(gomega.BeTrue())
 
-	ok, err = u2.IsMemberOf(context.Background(), s)
+	ok, err = u2.IsMemberOf(context.Background(), pool)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(ok).Should(gomega.BeFalse())
 
-	g.Expect(u2.JoinPool(context.Background(), s)).Should(gomega.Succeed())
-	g.Expect(u2.JoinPool(context.Background(), s)).Should(gomega.Succeed(), "test ON CONFLICT")
+	g.Expect(u2.JoinPool(context.Background(), pool)).Should(gomega.Succeed())
+	g.Expect(u2.JoinPool(context.Background(), pool)).Should(gomega.Succeed(), "test ON CONFLICT")
 
-	ok, err = u2.IsMemberOf(context.Background(), s)
+	ok, err = u2.IsMemberOf(context.Background(), pool)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(ok).Should(gomega.BeTrue())
 
-	g.Expect(u.IsAdminOf(context.Background(), s)).Should(gomega.BeTrue())
-	g.Expect(u2.IsAdminOf(context.Background(), s)).Should(gomega.BeFalse())
+	g.Expect(u.IsAdminOf(context.Background(), pool)).Should(gomega.BeTrue())
+	g.Expect(u2.IsAdminOf(context.Background(), pool)).Should(gomega.BeFalse())
 }
 
 func TestGetUserByID(t *testing.T) {

@@ -867,12 +867,6 @@ func (s *Server) postPoolTokenMemberEndpoint() http.HandlerFunc {
 			return
 		}
 
-		// don't have pools show up in both "owned" and "joined"
-		if user.IsAdminOf(r.Context(), pool) {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-
 		if err := user.JoinPool(r.Context(), pool); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
