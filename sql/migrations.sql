@@ -432,3 +432,9 @@ $$;
 --rollback     RETURN _row;
 --rollback END;
 --rollback $$;
+
+--changeset weters:8
+
+ALTER TABLE grids ADD COLUMN manual_draw bool not null default 'f';
+
+--rollback ALTER TABLE grids DROP COLUMN manual_draw;

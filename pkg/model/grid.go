@@ -39,6 +39,9 @@ const (
 // ErrNumbersAlreadyDrawn happens when SelectRandomNumbers() is called multiple times
 var ErrNumbersAlreadyDrawn = errors.New("error: numbers have already been drawn")
 
+// ErrNumbersAreInvalid happens when the user submits manual numbers and they are invalid
+var ErrNumbersAreInvalid = errors.New("error: numbers supplied are invalid")
+
 // ErrLastGrid happens when the user tries to delete the last remaining grid
 var ErrLastGrid = errors.New("error: you cannot delete the last grid")
 
@@ -56,6 +59,7 @@ type Grid struct {
 	homeNumbers  []int
 	awayTeamName *string
 	awayNumbers  []int
+	manualDraw   bool
 	eventDate    time.Time
 	state        State
 	created      time.Time
@@ -72,6 +76,7 @@ type GridJSON struct {
 	HomeNumbers  []int         `json:"homeNumbers"`
 	AwayTeamName string        `json:"awayTeamName"`
 	AwayNumbers  []int         `json:"awayNumbers"`
+	ManualDraw   bool          `json:"manualDraw"`
 	EventDate    time.Time     `json:"eventDate"`
 	State        State         `json:"state"`
 	Created      time.Time     `json:"created"`
@@ -88,6 +93,7 @@ func (g *Grid) JSON() *GridJSON {
 		HomeNumbers:  g.HomeNumbers(),
 		AwayTeamName: g.AwayTeamName(),
 		AwayNumbers:  g.AwayNumbers(),
+		ManualDraw:   g.manualDraw,
 		EventDate:    g.EventDate(),
 		State:        g.State(),
 		Created:      g.Created(),
@@ -191,10 +197,11 @@ func (g *Grid) Save(ctx context.Context) error {
 			home_numbers = $3,
 		    away_team_name = $4,
 			away_numbers = $5,
-			event_date = $6,
-		    state = $7,
+		    manual_draw = $6,
+			event_date = $7,
+		    state = $8,
 			modified = (now() at time zone 'utc')
-		WHERE id = $8
+		WHERE id = $9
 	`
 
 	tx, err := g.model.db.BeginTx(ctx, nil)
@@ -242,7 +249,7 @@ func (g *Grid) Save(ctx context.Context) error {
 		eventDate = &g.eventDate
 	}
 
-	if _, err := tx.ExecContext(ctx, query, g.ord, g.homeTeamName, pq.Array(g.homeNumbers), g.awayTeamName, pq.Array(g.awayNumbers), eventDate, g.state, g.id); err != nil {
+	if _, err := tx.ExecContext(ctx, query, g.ord, g.homeTeamName, pq.Array(g.homeNumbers), g.awayTeamName, pq.Array(g.awayNumbers), g.manualDraw, eventDate, g.state, g.id); err != nil {
 		if err2 := tx.Rollback(); err2 != nil {
 			return fmt.Errorf("error found: %#v. Another error found when trying to rollback: %#v", err, err2)
 		}
@@ -261,6 +268,41 @@ func (g *Grid) Settings() *GridSettings {
 // Name returns the name of the grid
 func (g *Grid) Name() string {
 	return fmt.Sprintf("%s vs. %s", g.AwayTeamName(), g.HomeTeamName())
+}
+
+// SetManualNumbers will set numbers manually (user input)
+func (g *Grid) SetManualNumbers(homeTeamNumbers, awayTeamNumbers []int) error {
+	if g.homeNumbers != nil || g.awayNumbers != nil {
+		return ErrNumbersAlreadyDrawn
+	}
+
+	if !numbersAreValid(homeTeamNumbers) || !numbersAreValid(awayTeamNumbers) {
+		return ErrNumbersAreInvalid
+	}
+
+	g.manualDraw = true
+	g.homeNumbers = homeTeamNumbers
+	g.awayNumbers = awayTeamNumbers
+
+	return nil
+}
+
+func numbersAreValid(nums []int) bool {
+	if len(nums) != 10 {
+		return false
+	}
+
+	check := make([]int, 10)
+	for _, n := range nums {
+		if n >= 0 && n <= 9 {
+			check[n]++
+			if check[n] > 1 {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 // SelectRandomNumbers will select random numbers for the home and away team
@@ -353,7 +395,7 @@ func (m *Model) gridByRow(scan scanFunc) (*Grid, error) {
 	var homeNumbers, awayNumbers []sql.NullInt64
 	var eventDate *time.Time
 
-	if err := scan(&grid.id, &grid.poolID, &grid.ord, &grid.homeTeamName, pq.Array(&homeNumbers), &grid.awayTeamName, pq.Array(&awayNumbers), &eventDate, &grid.state, &grid.created, &grid.modified); err != nil {
+	if err := scan(&grid.id, &grid.poolID, &grid.ord, &grid.homeTeamName, pq.Array(&homeNumbers), &grid.awayTeamName, pq.Array(&awayNumbers), &eventDate, &grid.state, &grid.created, &grid.modified, &grid.manualDraw); err != nil {
 		return nil, err
 	}
 

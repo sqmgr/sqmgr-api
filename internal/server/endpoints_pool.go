@@ -695,6 +695,9 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 			AwayTeamName   string `json:"awayTeamName"`
 			AwayTeamColor1 string `json:"awayTeamColor1"`
 			AwayTeamColor2 string `json:"awayTeamColor2"`
+
+			HomeTeamNumbers []int `json:"homeTeamNumbers"`
+			AwayTeamNumbers []int `json:"awayTeamNumbers"`
 		} `json:"data,omitempty"`
 	}
 
@@ -743,6 +746,18 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 		}
 
 		switch data.Action {
+		case "drawManualNumbers":
+			if err := grid.SetManualNumbers(data.Data.HomeTeamNumbers, data.Data.AwayTeamNumbers); err != nil {
+				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("the numbers supplied are not valid"))
+			}
+
+			if err := grid.Save(r.Context()); err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+
+			s.writeJSONResponse(w, http.StatusOK, grid.JSON())
+			return
 		case "drawNumbers":
 			if err := grid.SelectRandomNumbers(); err != nil {
 				if err == model.ErrNumbersAlreadyDrawn {

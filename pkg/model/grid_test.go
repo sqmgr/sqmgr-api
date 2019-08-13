@@ -78,6 +78,7 @@ func TestGrid(t *testing.T) {
 	g.Expect(grid.poolID).Should(gomega.Equal(pool.id))
 	g.Expect(grid.ord).Should(gomega.Equal(0))
 	g.Expect(grid.eventDate.IsZero()).Should(gomega.BeTrue())
+	g.Expect(grid.manualDraw).Should(gomega.BeFalse())
 
 	g.Expect(grids[1].id).Should(gomega.Equal(newGrid.id))
 
@@ -86,6 +87,7 @@ func TestGrid(t *testing.T) {
 	grid.awayNumbers = []int{4, 5, 6}
 	now := time.Now()
 	grid.eventDate = now
+	grid.manualDraw = true
 	g.Expect(grid.Save(context.Background())).Should(gomega.Succeed())
 
 	grid, err = pool.GridByID(context.Background(), grid.id)
@@ -93,6 +95,7 @@ func TestGrid(t *testing.T) {
 	g.Expect(grid.ord).Should(gomega.Equal(2))
 	g.Expect(grid.homeNumbers).Should(gomega.Equal([]int{1, 2, 3}))
 	g.Expect(grid.awayNumbers).Should(gomega.Equal([]int{4, 5, 6}))
+	g.Expect(grid.manualDraw).Should(gomega.BeTrue())
 
 	grid.homeNumbers = nil
 	grid.awayNumbers = nil
