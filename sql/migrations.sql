@@ -438,3 +438,14 @@ $$;
 ALTER TABLE grids ADD COLUMN manual_draw bool not null default 'f';
 
 --rollback ALTER TABLE grids DROP COLUMN manual_draw;
+
+--changeset weters:9
+
+ALTER TABLE guest_users DROP CONSTRAINT guest_users_pkey;
+ALTER TABLE guest_users ADD CONSTRAINT guest_users_pkey PRIMARY KEY (store, store_id);
+
+CREATE INDEX guest_users_expires_idx ON guest_users (expires);
+
+--rollback DROP INDEX guest_users_expires_idx;
+--rollback ALTER TABLE guest_users DROP CONSTRAINT guest_users_pkey;
+--rollback ALTER TABLE guest_users ADD CONSTRAINT guest_users_pkey PRIMARY KEY (store_id);
