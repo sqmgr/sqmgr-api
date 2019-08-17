@@ -1,0 +1,37 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: sqmgr-guest-user-cleanup
+  labels:
+    app: sqmgr-guest-user-cleanup
+    tier: cron
+spec:
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    metadata:
+      labels:
+        app: sqmgr-guest-user-cleanup
+        tier: cron
+    spec:
+      parallelism: 1
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: sqmgr-guest-user-cleanup
+              image: weters/sqmgr-api:latest
+              command:
+                - '/bin/sqmgr-guest-user-cleanup'
+              envFrom:
+                - secretRef:
+                    name: sqmgr-config
+              env:
+                - name: SQMGR_CONF_DSN
+                  value: 'dbname=$(PG_DBNAME) host=$(PG_HOST) port=$(PG_PORT) user=$(PG_USER) sslmode=$(PG_SSLMODE) password=$(PG_PASSWORD)'
+                - name: SQMGR_CONF_JWT_PRIVATE_KEY
+                  value: '-'
+                - name: SQMGR_CONF_JWT_PUBLIC_KEY
+                  value: '-'
+          imagePullSecrets:
+            - name: docker-hub
+  schedule: '0 5 * * *'
