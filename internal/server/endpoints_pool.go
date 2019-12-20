@@ -453,8 +453,8 @@ func (s *Server) getPoolTokenGridEndpoint() http.HandlerFunc {
 		}
 
 		s.writeJSONResponse(w, http.StatusOK, response{
-			Grids: gridsJSON,
-			Total: count,
+			Grids:      gridsJSON,
+			Total:      count,
 			MaxAllowed: model.MaxGridsPerPool,
 		})
 	}
@@ -534,11 +534,12 @@ func (s *Server) getPoolTokenSquareIDEndpoint() http.HandlerFunc {
 
 func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 	type postPayload struct {
-		Claimant string                `json:"claimant"`
-		State    model.PoolSquareState `json:"state"`
-		Note     string                `json:"note"`
-		Unclaim  bool                  `json:"unclaim"`
-		Rename   bool                  `json:"rename"`
+		Claimant          string                `json:"claimant"`
+		State             model.PoolSquareState `json:"state"`
+		Note              string                `json:"note"`
+		Unclaim           bool                  `json:"unclaim"`
+		Rename            bool                  `json:"rename"`
+		SecondarySquareID int                   `json:"secondarySquareId"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -577,6 +578,29 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 			return
 		}
 
+		if pool.GridType() != model.GridTypeRoll100 && payload.SecondarySquareID > 0 {
+			s.writeErrorResponse(w, http.StatusBadRequest, errors.New("secondary squares are not used with this grid type"))
+			return
+		}
+
+		var secondSquare *model.PoolSquare
+		if payload.SecondarySquareID > 0 {
+			secondSquare, err = pool.SquareBySquareID(payload.SecondarySquareID)
+			if err != nil {
+				if err == sql.ErrNoRows {
+					logrus.WithFields(logrus.Fields{
+						"pool":   pool.ID(),
+						"square": squareID,
+					}).Error("could not find square")
+					s.writeErrorResponse(w, http.StatusNotFound, nil)
+					return
+				}
+
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+		}
+
 		if payload.Rename {
 			if !isAdmin {
 				s.writeErrorResponse(w, http.StatusForbidden, errors.New("only an admin can rename a square"))
@@ -607,7 +631,7 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 				"claimant":    claimant,
 			}).Info("renaming square")
 
-			if err := square.Save(r.Context(), true, model.PoolSquareLog{
+			if err := square.Save(r.Context(), s.model.DB, true, model.PoolSquareLog{
 				RemoteAddr: r.RemoteAddr,
 				Note:       fmt.Sprintf("admin: changed claimant from %s", oldClaimant),
 			}); err != nil {
@@ -633,23 +657,90 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 			square.State = model.PoolSquareStateClaimed
 			square.SetUserID(user.ID)
 
+			tx, err := s.model.DB.BeginTx(r.Context(), nil)
+			if err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+
 			lr.WithField("claimant", payload.Claimant).Info("claiming square")
-			if err := square.Save(r.Context(), false, model.PoolSquareLog{
+			if err := square.Save(r.Context(), tx, false, model.PoolSquareLog{
 				RemoteAddr: r.RemoteAddr,
 				Note:       "user: initial claim",
 			}); err != nil {
+				_ = tx.Rollback()
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+
+			if secondSquare != nil {
+				secondSquare.SetClaimant(claimant)
+				secondSquare.State = model.PoolSquareStateClaimed
+				secondSquare.SetUserID(user.ID)
+
+				if err := secondSquare.Save(r.Context(), tx, false, model.PoolSquareLog{
+					RemoteAddr: r.RemoteAddr,
+					Note:       "user: initial claim (secondary)",
+				}); err != nil {
+					_ = tx.Rollback()
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+
+				if err := secondSquare.SetParentSquare(r.Context(), tx, square); err != nil {
+					_ = tx.Rollback()
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+			}
+
+			if err := tx.Commit(); err != nil {
+				_ = tx.Rollback()
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
 			}
 		} else if payload.Unclaim && square.UserID() == user.ID {
-			// trying to unclaim as user
-			square.State = model.PoolSquareStateUnclaimed
-			square.SetUserID(user.ID)
+			tx, err := square.Model.DB.BeginTx(r.Context(), nil)
+			if err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
 
-			if err := square.Save(r.Context(), false, model.PoolSquareLog{
-				RemoteAddr: r.RemoteAddr,
-				Note:       fmt.Sprintf("user: `%s` unclaimed", square.Claimant()),
-			}); err != nil {
+			squares := []*model.PoolSquare{square}
+			if square.ParentID > 0 {
+				pSq, err := pool.SquareBySquareID(square.ParentSquareID)
+				if err != nil {
+					_ = tx.Rollback()
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+				squares = append(squares, pSq)
+			}
+
+			childSquares, err := square.ChildSquares(r.Context(), tx)
+			if err != nil {
+				_ = tx.Rollback()
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+			squares = append(squares, childSquares...)
+
+			for _, square := range squares {
+				// trying to unclaim as user
+				square.State = model.PoolSquareStateUnclaimed
+				square.SetUserID(user.ID)
+
+				if err := square.Save(r.Context(), tx, false, model.PoolSquareLog{
+					RemoteAddr: r.RemoteAddr,
+					Note:       fmt.Sprintf("user: `%s` unclaimed", square.Claimant()),
+				}); err != nil {
+					_ = tx.Rollback()
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+			}
+
+			if err := tx.Commit(); err != nil {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
 			}
@@ -659,7 +750,7 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 				square.State = payload.State
 			}
 
-			if err := square.Save(r.Context(), true, model.PoolSquareLog{
+			if err := square.Save(r.Context(), s.model.DB, true, model.PoolSquareLog{
 				RemoteAddr: r.RemoteAddr,
 				Note:       payload.Note,
 			}); err != nil {
@@ -689,6 +780,7 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 		Data   *struct {
 			EventDate      string `json:"eventDate"`
 			Notes          string `json:"notes"`
+			Rollover       bool   `json:"rollover"`
 			HomeTeamName   string `json:"homeTeamName"`
 			HomeTeamColor1 string `json:"homeTeamColor1"`
 			HomeTeamColor2 string `json:"homeTeamColor2"`
@@ -795,6 +887,10 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 			notes := v.PrintableWithNewline("Notes", data.Data.Notes, true)
 			notes = v.MaxLength("Notes", notes, model.NotesMaxLength)
 
+			if pool.GridType() != model.GridTypeRoll100 && data.Data.Rollover {
+				v.AddError("rollover", "Rollover is not valid for this pool type")
+			}
+
 			if !v.OK() {
 				s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
 					Status:           statusError,
@@ -811,6 +907,7 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 			grid.SetEventDate(eventDate)
 			grid.SetHomeTeamName(homeTeamName)
 			grid.SetAwayTeamName(awayTeamName)
+			grid.SetRollover(data.Data.Rollover)
 			settings := grid.Settings()
 			settings.SetNotes(notes)
 			settings.SetHomeTeamColor1(homeTeamColor1)

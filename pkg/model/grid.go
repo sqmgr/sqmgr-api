@@ -61,6 +61,7 @@ type Grid struct {
 	awayNumbers  []int
 	manualDraw   bool
 	eventDate    time.Time
+	rollover     bool
 	state        State
 	created      time.Time
 	modified     time.Time
@@ -78,6 +79,7 @@ type GridJSON struct {
 	AwayNumbers  []int         `json:"awayNumbers"`
 	ManualDraw   bool          `json:"manualDraw"`
 	EventDate    time.Time     `json:"eventDate"`
+	Rollover     bool          `json:"rollover"`
 	State        State         `json:"state"`
 	Created      time.Time     `json:"created"`
 	Modified     time.Time     `json:"modified"`
@@ -95,6 +97,7 @@ func (g *Grid) JSON() *GridJSON {
 		AwayNumbers:  g.AwayNumbers(),
 		ManualDraw:   g.manualDraw,
 		EventDate:    g.EventDate(),
+		Rollover:     g.Rollover(),
 		State:        g.State(),
 		Created:      g.Created(),
 		Modified:     g.modified,
@@ -124,6 +127,16 @@ func (g *Grid) AwayTeamName() string {
 	}
 
 	return *g.awayTeamName
+}
+
+// Rollover is a getter
+func (g *Grid) Rollover() bool {
+	return g.rollover
+}
+
+// SetRollover is the setter
+func (g *Grid) SetRollover(rollover bool) {
+	g.rollover = rollover
 }
 
 // SetAwayTeamName is the setter for the away team name
@@ -199,18 +212,24 @@ func (g *Grid) Save(ctx context.Context) error {
 			away_numbers = $5,
 		    manual_draw = $6,
 			event_date = $7,
-		    state = $8,
+		    rollover = $8,
+		    state = $9,
 			modified = (now() at time zone 'utc')
-		WHERE id = $9
+		WHERE id = $10
 	`
 
-	tx, err := g.model.db.BeginTx(ctx, nil)
+	tx, err := g.model.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
 	if g.id == 0 {
-		row := tx.QueryRowContext(ctx, "SELECT * FROM new_grid($1, $2)", g.poolID, MaxGridsPerPool)
+		const query = `
+SELECT ` + gridColumns + `
+FROM
+	new_grid($1, $2)
+`
+		row := tx.QueryRowContext(ctx, query, g.poolID, MaxGridsPerPool)
 		newGrid, err := g.model.gridByRow(row.Scan)
 		if err != nil {
 			if err2 := tx.Rollback(); err2 != nil {
@@ -249,7 +268,7 @@ func (g *Grid) Save(ctx context.Context) error {
 		eventDate = &g.eventDate
 	}
 
-	if _, err := tx.ExecContext(ctx, query, g.ord, g.homeTeamName, pq.Array(g.homeNumbers), g.awayTeamName, pq.Array(g.awayNumbers), g.manualDraw, eventDate, g.state, g.id); err != nil {
+	if _, err := tx.ExecContext(ctx, query, g.ord, g.homeTeamName, pq.Array(g.homeNumbers), g.awayTeamName, pq.Array(g.awayNumbers), g.manualDraw, eventDate, g.rollover, g.state, g.id); err != nil {
 		if err2 := tx.Rollback(); err2 != nil {
 			return fmt.Errorf("error found: %#v. Another error found when trying to rollback: %#v", err, err2)
 		}
@@ -331,7 +350,7 @@ func (g *Grid) SelectRandomNumbers() error {
 // Delete the grid. By delete, we mean set the row to 'deleted'
 func (g *Grid) Delete(ctx context.Context) error {
 	const query = "SELECT * FROM delete_grid($1)"
-	row := g.model.db.QueryRowContext(ctx, query, g.id)
+	row := g.model.DB.QueryRowContext(ctx, query, g.id)
 	var ok bool
 	if err := row.Scan(&ok); err != nil {
 		return err
@@ -346,7 +365,7 @@ func (g *Grid) Delete(ctx context.Context) error {
 
 // LoadSettings will load the settings
 func (g *Grid) LoadSettings(ctx context.Context) error {
-	row := g.model.db.QueryRowContext(ctx, `
+	row := g.model.DB.QueryRowContext(ctx, `
 		SELECT grid_id,
 			   home_team_color_1, home_team_color_2,
 			   away_team_color_1, away_team_color_2,
@@ -395,7 +414,7 @@ func (m *Model) gridByRow(scan scanFunc) (*Grid, error) {
 	var homeNumbers, awayNumbers []sql.NullInt64
 	var eventDate *time.Time
 
-	if err := scan(&grid.id, &grid.poolID, &grid.ord, &grid.homeTeamName, pq.Array(&homeNumbers), &grid.awayTeamName, pq.Array(&awayNumbers), &eventDate, &grid.state, &grid.created, &grid.modified, &grid.manualDraw); err != nil {
+	if err := scan(&grid.id, &grid.poolID, &grid.ord, &grid.homeTeamName, pq.Array(&homeNumbers), &grid.awayTeamName, pq.Array(&awayNumbers), &eventDate, &grid.rollover, &grid.state, &grid.created, &grid.modified, &grid.manualDraw); err != nil {
 		return nil, err
 	}
 
@@ -422,3 +441,18 @@ func (m *Model) gridByRow(scan scanFunc) (*Grid, error) {
 
 	return grid, nil
 }
+
+const gridColumns = `
+	id,
+	pool_id,
+	ord,
+	home_team_name,
+	home_numbers,
+	away_team_name,
+	away_numbers,
+	event_date,
+	rollover,
+	state,
+	created,
+	modified,
+	manual_draw`

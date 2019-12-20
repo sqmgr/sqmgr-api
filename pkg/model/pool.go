@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/lib/pq"
 	"time"
 	"unicode/utf8"
 
@@ -166,11 +167,7 @@ func (p *Pool) JSON() *PoolJSON {
 	}
 }
 
-type executer interface {
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
-}
 
-type scanFunc func(dest ...interface{}) error
 
 func (m *Model) poolByRow(scan scanFunc) (*Pool, error) {
 	s := Pool{model: m}
@@ -201,7 +198,7 @@ func (m *Model) PoolsJoinedByUserID(ctx context.Context, userID int64, offset in
 		OFFSET $2
 		LIMIT $3`
 
-	return m.poolsByRows(m.db.QueryContext(ctx, query, userID, offset, limit))
+	return m.poolsByRows(m.DB.QueryContext(ctx, query, userID, offset, limit))
 }
 
 // PoolsJoinedByUserIDCount will return a how many pools the user joined
@@ -212,7 +209,7 @@ func (m *Model) PoolsJoinedByUserIDCount(ctx context.Context, userID int64) (int
 		LEFT JOIN pools_users ON pools.id = pools_users.pool_id
 		WHERE pools_users.user_id = $1`
 
-	return m.poolsCount(m.db.QueryRowContext(ctx, query, userID))
+	return m.poolsCount(m.DB.QueryRowContext(ctx, query, userID))
 }
 
 // PoolsOwnedByUserID will return a collection of pools that were created by the user
@@ -232,7 +229,7 @@ func (m *Model) PoolsOwnedByUserID(ctx context.Context, userID int64, includeArc
 		query = fmt.Sprintf(baseQuery, " AND archived = 'f'")
 	}
 
-	return m.poolsByRows(m.db.QueryContext(ctx, query, userID, offset, limit))
+	return m.poolsByRows(m.DB.QueryContext(ctx, query, userID, offset, limit))
 }
 
 // PoolsOwnedByUserIDCount will return how many pools were created by the user
@@ -246,7 +243,7 @@ func (m *Model) PoolsOwnedByUserIDCount(ctx context.Context, userID int64, inclu
 		query += " AND archived = 'f'"
 	}
 
-	return m.poolsCount(m.db.QueryRowContext(ctx, query, userID))
+	return m.poolsCount(m.DB.QueryRowContext(ctx, query, userID))
 }
 
 func (m *Model) poolsByRows(rows *sql.Rows, err error) ([]*Pool, error) {
@@ -279,13 +276,13 @@ func (m *Model) poolsCount(row *sql.Row) (int64, error) {
 
 // PoolByToken will return the pools with the matching token
 func (m *Model) PoolByToken(ctx context.Context, token string) (*Pool, error) {
-	row := m.db.QueryRowContext(ctx, "SELECT * FROM pools WHERE token = $1", token)
+	row := m.DB.QueryRowContext(ctx, "SELECT * FROM pools WHERE token = $1", token)
 	return m.poolByRow(row.Scan)
 }
 
 // PoolByID will return the pools with the matching ID
 func (m *Model) PoolByID(id int64) (*Pool, error) {
-	row := m.db.QueryRow("SELECT * FROM pools WHERE id = $1", id)
+	row := m.DB.QueryRow("SELECT * FROM pools WHERE id = $1", id)
 	return m.poolByRow(row.Scan)
 }
 
@@ -310,7 +307,7 @@ func (m *Model) NewPool(ctx context.Context, userID int64, name string, gridType
 		FROM new_pool($1, $2, $3, $4, $5, $6)
 	`
 
-	row := m.db.QueryRowContext(ctx, query, token, userID, name, gridType, passwordHash, gridType.Squares())
+	row := m.DB.QueryRowContext(ctx, query, token, userID, name, gridType, passwordHash, gridType.Squares())
 
 	pool, err := m.poolByRow(row.Scan)
 	if err != nil {
@@ -350,7 +347,7 @@ WHERE id = $7`
 		locks = &locksInUTC
 	}
 
-	_, err := p.model.db.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.archived, p.id)
+	_, err := p.model.DB.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.archived, p.id)
 	return err
 }
 
@@ -377,12 +374,26 @@ func (p *Pool) CheckIDIsValid(check int) bool {
 func (p *Pool) Squares() (map[int]*PoolSquare, error) {
 	if p.squares == nil {
 		const query = `
-		SELECT id, square_id, user_id, state, claimant, modified
-		FROM pool_squares
-		WHERE pool_id = $1
-		ORDER BY square_id`
+		SELECT
+		       ps.id,
+		       ps.square_id,
+		       ps.parent_id,
+		       ps.user_id,
+		       ps.state,
+		       ps.claimant,
+		       ps.modified,
+		       ps2.square_id AS parent_square_id,
+		       (SELECT array_agg(square_id) FROM pool_squares ps3 WHERE ps3.parent_id = ps.id) AS child_square_ids
+		FROM
+		     pool_squares ps
+		LEFT JOIN
+		         pool_squares ps2 ON ps.parent_id = ps2.id
+		WHERE
+		      ps.pool_id = $1
+		ORDER BY
+		         ps.square_id`
 
-		rows, err := p.model.db.Query(query, p.id)
+		rows, err := p.model.DB.Query(query, p.id)
 		if err != nil {
 			return nil, err
 		}
@@ -406,12 +417,23 @@ func (p *Pool) Squares() (map[int]*PoolSquare, error) {
 // SquareBySquareID will return a single square based on the square ID
 func (p *Pool) SquareBySquareID(squareID int) (*PoolSquare, error) {
 	const query = `
-	SELECT id, square_id, user_id, state, claimant, modified
-	FROM pool_squares
-	WHERE pool_id = $1
-		AND square_id = $2`
+	SELECT
+	       ps.id,
+	       ps.square_id,
+	       ps.parent_id,
+	       ps.user_id,
+	       ps.state,
+	       ps.claimant,
+	       ps.modified,
+	       ps2.square_id AS parent_square_id,
+	       (SELECT array_agg(square_id) FROM pool_squares ps3 WHERE ps3.parent_id = ps.id) AS child_square_ids
+	FROM pool_squares ps
+	LEFT JOIN pool_squares ps2 ON ps.parent_id = ps2.id
+	WHERE
+	      ps.pool_id = $1 AND
+	      ps.square_id = $2`
 
-	row := p.model.db.QueryRow(query, p.id, squareID)
+	row := p.model.DB.QueryRow(query, p.id, squareID)
 	return p.squareByRow(row.Scan)
 }
 
@@ -423,7 +445,10 @@ func (p *Pool) squareByRow(scan scanFunc) (*PoolSquare, error) {
 
 	var claimant *string
 	var userID *int64
-	if err := scan(&gs.ID, &gs.SquareID, &userID, &gs.State, &claimant, &gs.Modified); err != nil {
+	var parentID *int64
+	var parentSquareID *int
+	var childSquareIDs []sql.NullInt64
+	if err := scan(&gs.ID, &gs.SquareID, &parentID, &userID, &gs.State, &claimant, &gs.Modified, &parentSquareID, pq.Array(&childSquareIDs)); err != nil {
 		return nil, err
 	}
 
@@ -433,6 +458,21 @@ func (p *Pool) squareByRow(scan scanFunc) (*PoolSquare, error) {
 
 	if userID != nil {
 		gs.userID = *userID
+	}
+
+	if parentID != nil {
+		gs.ParentID = *parentID
+	}
+
+	if parentSquareID != nil {
+		gs.ParentSquareID = *parentSquareID
+	}
+
+	if childSquareIDs != nil {
+		gs.ChildSquareIDs = make([]int8, len(childSquareIDs))
+		for i, c := range childSquareIDs {
+			gs.ChildSquareIDs[i] = int8(c.Int64)
+		}
 	}
 
 	gs.Modified = gs.Modified.In(locationNewYork)
@@ -450,7 +490,7 @@ func (p *Pool) Logs(ctx context.Context, offset int64, limit int) ([]*PoolSquare
 		ORDER BY pool_squares_logs.id DESC
 		OFFSET $2
 		LIMIT $3`
-	rows, err := p.model.db.QueryContext(ctx, query, p.id, offset, limit)
+	rows, err := p.model.DB.QueryContext(ctx, query, p.id, offset, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -476,7 +516,7 @@ func (p *Pool) LogsCount(ctx context.Context) (int64, error) {
 		FROM pool_squares_logs
 		INNER JOIN pool_squares ON pool_squares_logs.pool_square_id = pool_squares.id
 		WHERE pool_squares.pool_id = $1`
-	row := p.model.db.QueryRowContext(ctx, query, p.id)
+	row := p.model.DB.QueryRowContext(ctx, query, p.id)
 
 	var count int64
 	if err := row.Scan(&count); err != nil {
@@ -510,7 +550,7 @@ func (p *Pool) Grids(ctx context.Context, offset int64, limit int, allStates ...
 	}
 
 	query := `
-SELECT *
+SELECT ` + gridColumns + `
 FROM grids
 WHERE pool_id = $1` + stateClause + `
 ORDER BY ord, id
@@ -518,7 +558,7 @@ OFFSET $2
 LIMIT $3
 `
 
-	rows, err := p.model.db.QueryContext(ctx, query, p.id, offset, limit)
+	rows, err := p.model.DB.QueryContext(ctx, query, p.id, offset, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -548,7 +588,7 @@ func (p *Pool) GridsCount(ctx context.Context, allStates ...bool) (int64, error)
 
 	query := `SELECT COUNT(*) FROM grids WHERE pool_id = $1` + stateClause
 
-	row := p.model.db.QueryRowContext(ctx, query, p.id)
+	row := p.model.DB.QueryRowContext(ctx, query, p.id)
 	var count int64
 	if err := row.Scan(&count); err != nil {
 		return 0, err
@@ -559,7 +599,7 @@ func (p *Pool) GridsCount(ctx context.Context, allStates ...bool) (int64, error)
 
 // SetGridsOrder will re-arrange the order of the grids
 func (p *Pool) SetGridsOrder(ctx context.Context, gridIDs []int64) error {
-	tx, err := p.model.db.BeginTx(ctx, nil)
+	tx, err := p.model.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -633,13 +673,20 @@ func (p *Pool) NewGrid() *Grid {
 
 // GridByID will return a grid by its ID and ensures that it belongs to the pool
 func (p *Pool) GridByID(ctx context.Context, id int64) (*Grid, error) {
-	const query = `SELECT * FROM grids WHERE id = $1 AND pool_id = $2 AND state = 'active'`
-	row := p.model.db.QueryRowContext(ctx, query, id, p.id)
+	const query = `
+	SELECT ` + gridColumns + `
+	FROM
+	     grids
+	WHERE
+	      id = $1 AND
+	      pool_id = $2 AND
+	      state = 'active'`
+	row := p.model.DB.QueryRowContext(ctx, query, id, p.id)
 	return p.model.gridByRow(row.Scan)
 }
 
 // RemoveAllMembers will boot all members from the pool
 func (p *Pool) RemoveAllMembers(ctx context.Context) error {
-	_, err := p.model.db.ExecContext(ctx, "DELETE FROM pools_users WHERE pool_id = $1", p.ID())
+	_, err := p.model.DB.ExecContext(ctx, "DELETE FROM pools_users WHERE pool_id = $1", p.ID())
 	return err
 }

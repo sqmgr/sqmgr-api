@@ -25,11 +25,13 @@ type GridType string
 const (
 	GridTypeStd100 GridType = "std100"
 	GridTypeStd25  GridType = "std25"
+	GridTypeRoll100 GridType = "roll100"
 )
 
 var validGridTypes = map[GridType]bool{
 	GridTypeStd100: true,
 	GridTypeStd25:  true,
+	GridTypeRoll100:  true,
 }
 
 // ErrInvalidGridType is an error when a string has been typecast to a grid type that does not exist
@@ -42,6 +44,8 @@ func (g GridType) Description() string {
 		return "Standard, 100 squares"
 	case GridTypeStd25:
 		return "Standard, 25 squares"
+	case GridTypeRoll100:
+		return "Rollover, 100 squares"
 	}
 
 	return string(g)
@@ -68,5 +72,5 @@ func IsValidGridType(val string) error {
 
 // GridTypes returns a list of allowed grid types
 func GridTypes() []GridType {
-	return []GridType{GridTypeStd100, GridTypeStd25}
+	return []GridType{GridTypeStd100, GridTypeStd25, GridTypeRoll100}
 }

@@ -39,10 +39,10 @@ func TestCanCreatePool(t *testing.T) {
 
 	g.Expect(user.Can(context.Background(), ActionCreatePool, user)).Should(gomega.Equal(ActionError("You cannot create more than 3 pools per minute")))
 
-	_, err = m.db.Exec("UPDATE pools SET created = NOW() - INTERVAL '1 hour' WHERE user_id = $1", user.ID)
+	_, err = m.DB.Exec("UPDATE pools SET created = NOW() - INTERVAL '1 hour' WHERE user_id = $1", user.ID)
 	g.Expect(err).Should(gomega.Succeed())
 
-	stmt, err := m.db.Prepare("UPDATE pools SET created = (NOW() - INTERVAL '1 minute') WHERE id = $1")
+	stmt, err := m.DB.Prepare("UPDATE pools SET created = (NOW() - INTERVAL '1 minute') WHERE id = $1")
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(user.Can(context.Background(), ActionCreatePool, user)).Should(gomega.Succeed())
 
@@ -56,7 +56,7 @@ func TestCanCreatePool(t *testing.T) {
 
 	g.Expect(user.Can(context.Background(), ActionCreatePool, user)).Should(gomega.Equal(ActionError("You cannot create more than 10 pools per day")))
 
-	_, err = m.db.Exec("UPDATE pools SET created = NOW() - INTERVAL '1 day' WHERE user_id = $1", user.ID)
+	_, err = m.DB.Exec("UPDATE pools SET created = NOW() - INTERVAL '1 day' WHERE user_id = $1", user.ID)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(user.Can(context.Background(), ActionCreatePool, user)).Should(gomega.Succeed())
 }

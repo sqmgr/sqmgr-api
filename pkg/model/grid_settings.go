@@ -69,7 +69,7 @@ func (g GridSettings) MarshalJSON() ([]byte, error) {
 }
 
 // Save will save the settings
-func (g *GridSettings) Save(ctx context.Context, q executer) error {
+func (g *GridSettings) Save(ctx context.Context, q Queryable) error {
 	_, err := q.ExecContext(ctx, `
 		UPDATE grid_settings SET
 			home_team_color_1 = $1,

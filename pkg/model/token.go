@@ -30,7 +30,7 @@ const tokenLen = 8
 
 // NewToken will attempt to generate a random unique token up to X times.
 func (m *Model) NewToken() (string, error) {
-	stmt, err := m.db.Prepare("SELECT new_token FROM new_token($1)")
+	stmt, err := m.DB.Prepare("SELECT new_token FROM new_token($1)")
 	if err != nil {
 		return "", err
 	}

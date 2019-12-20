@@ -93,7 +93,7 @@ func (m *Model) userByRow(row *sql.Row) (*User, error) {
 
 // GetUserByID will return a user by its ID.
 func (m *Model) GetUserByID(ctx context.Context, id int64) (*User, error) {
-	row := m.db.QueryRowContext(ctx, "SELECT id, store, store_id, created FROM users WHERE id = $1", id)
+	row := m.DB.QueryRowContext(ctx, "SELECT id, store, store_id, created FROM users WHERE id = $1", id)
 	return m.userByRow(row)
 }
 
@@ -104,7 +104,7 @@ func (m *Model) GetUser(ctx context.Context, issuer, storeID string) (*User, err
 		return nil, fmt.Errorf("invalid issuer: %s", issuer)
 	}
 
-	row := m.db.QueryRowContext(ctx, "SELECT id, store, store_id, created FROM get_user($1, $2)", store, storeID)
+	row := m.DB.QueryRowContext(ctx, "SELECT id, store, store_id, created FROM get_user($1, $2)", store, storeID)
 	return m.userByRow(row)
 }
 
@@ -115,13 +115,13 @@ func (u *User) JoinPool(ctx context.Context, p *Pool) error {
 		return nil
 	}
 
-	_, err := u.db.ExecContext(ctx, "INSERT INTO pools_users (pool_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", p.id, u.ID)
+	_, err := u.DB.ExecContext(ctx, "INSERT INTO pools_users (pool_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", p.id, u.ID)
 	return err
 }
 
 // LeavePool will unlink a user from a pool
 func (u *User) LeavePool(ctx context.Context, p *Pool) error {
-	_, err := u.db.ExecContext(ctx, "DELETE FROM pools_users WHERE pool_id = $1 AND user_id = $2", p.ID(), u.ID)
+	_, err := u.DB.ExecContext(ctx, "DELETE FROM pools_users WHERE pool_id = $1 AND user_id = $2", p.ID(), u.ID)
 	if err != nil {
 		return fmt.Errorf("could not delete pools_users: %v", err)
 	}
@@ -138,7 +138,7 @@ func (u *User) IsMemberOf(ctx context.Context, p *Pool) (bool, error) {
 
 	// otherwise, check to see if they are a member
 
-	row := u.db.QueryRowContext(ctx, "SELECT true FROM pools_users WHERE pool_id = $1 AND user_id = $2", p.id, u.ID)
+	row := u.DB.QueryRowContext(ctx, "SELECT true FROM pools_users WHERE pool_id = $1 AND user_id = $2", p.id, u.ID)
 
 	var ok bool
 	if err := row.Scan(&ok); err != nil {
@@ -160,7 +160,7 @@ func (u *User) IsAdminOf(ctx context.Context, p *Pool) bool {
 // PoolsCreatedWithin will return the number of pools a user has created within a given duration period
 func (u *User) PoolsCreatedWithin(ctx context.Context, within time.Duration) (int, error) {
 	const query = "SELECT COUNT(*) FROM pools WHERE user_id = $1 AND created > NOW() - INTERVAL '1 microsecond' * $2"
-	row := u.db.QueryRowContext(ctx, query, u.ID, within / time.Microsecond)
+	row := u.DB.QueryRowContext(ctx, query, u.ID, within / time.Microsecond)
 	var count int
 	if err := row.Scan(&count); err != nil {
 		return 0, err

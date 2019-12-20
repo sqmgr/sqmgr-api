@@ -14,17 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package model handles various models
 package model
 
-import "database/sql"
+import (
+	"context"
+	"database/sql"
+)
 
-// Model is an object that can be used to interact with a database
-type Model struct {
-	DB *sql.DB
+// Queryable is an interface that will allow both *sql.DB and *sql.Tx
+type Queryable interface {
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 }
 
-// New returns a new model. The DB can be any database, but it's most likely a postgres handle.
-func New(db *sql.DB) *Model {
-	return &Model{db}
-}
+type scanFunc func(dest ...interface{}) error

@@ -37,7 +37,7 @@ INSERT INTO guest_users (store, store_id, expires, remote_addr)
 VALUES ($1, $2, $3, $4)
 RETURNING store, store_id, expires, remote_addr, created`
 
-	row := m.db.QueryRowContext(ctx, query, store, storeID, expiresAt, ipFromRemoteAddr(remoteAddr))
+	row := m.DB.QueryRowContext(ctx, query, store, storeID, expiresAt, ipFromRemoteAddr(remoteAddr))
 	var guestUser GuestUser
 	if err := row.Scan(&guestUser.Store, &guestUser.StoreID, &guestUser.Expires, &guestUser.RemoteAddr, &guestUser.Created); err != nil {
 		return nil, err

@@ -267,7 +267,7 @@ func TestGridSquares(t *testing.T) {
 	square.claimant = "Test User"
 	square.State = PoolSquareStateClaimed
 	square.SetUserID(user.ID)
-	err = square.Save(context.Background(), true, PoolSquareLog{
+	err = square.Save(context.Background(), m.DB, true, PoolSquareLog{
 		Note:       "Test Note",
 		RemoteAddr: "127.0.0.1",
 	})
@@ -280,7 +280,7 @@ func TestGridSquares(t *testing.T) {
 	square = squares[15]
 	g.Expect(square.claimant).Should(gomega.Equal("Test User"))
 
-	err = square.Save(context.Background(), true, PoolSquareLog{
+	err = square.Save(context.Background(), m.DB, true, PoolSquareLog{
 		Note: "A new note",
 	})
 	g.Expect(err).Should(gomega.Succeed())
@@ -313,7 +313,7 @@ func TestGridSquares(t *testing.T) {
 	g.Expect(count).Should(gomega.Equal(int64(len(logs))))
 
 	square.claimant = "New User"
-	err = square.Save(context.Background(), false, PoolSquareLog{
+	err = square.Save(context.Background(), m.DB, false, PoolSquareLog{
 		Note: "",
 	})
 	g.Expect(err).Should(gomega.Equal(ErrSquareAlreadyClaimed))

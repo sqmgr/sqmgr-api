@@ -18,6 +18,7 @@ package model
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"time"
@@ -67,15 +68,19 @@ func (g PoolSquareState) IsValid() bool {
 // PoolSquare is an individual square within a pool
 type PoolSquare struct {
 	*Model
-	ID       int64 `json:"-"`
-	PoolID   int64 `json:"-"`
-	userID   int64
-	SquareID int              `json:"-"`
-	State    PoolSquareState  `json:"-"`
-	claimant string
-	Modified time.Time        `json:"-"`
-	Logs     []*PoolSquareLog `json:"-"`
+	ID             int64 `json:"-"`
+	ParentID       int64 `json:"-"`
+	PoolID         int64 `json:"-"`
+	userID         int64
+	SquareID       int             `json:"-"`
+	ParentSquareID int             `json:"-"`
+	ChildSquareIDs []int8           `json:"-"`
+	State          PoolSquareState `json:"-"`
+	claimant       string
+	Modified       time.Time        `json:"-"`
+	Logs           []*PoolSquareLog `json:"-"`
 }
+
 // FIXME - remove the above json tags once we validate it's no longer necessary
 
 // Claimant returns the claimant
@@ -104,37 +109,41 @@ func (p *PoolSquare) SetUserID(userID int64) {
 
 // PoolSquareJSON represents JSON that can be sent to the front-end
 type PoolSquareJSON struct {
-	UserID   int64            `json:"userId"`
-	SquareID int              `json:"squareId"`
-	State    PoolSquareState  `json:"state"`
-	Claimant string           `json:"claimant"`
-	Modified time.Time        `json:"modified"`
-	Logs     []*PoolSquareLog `json:"logs,omitempty"`
+	UserID         int64            `json:"userId"`
+	SquareID       int              `json:"squareId"`
+	ParentSquareID int              `json:"parentSquareId"`
+	ChildSquareIDs []int8            `json:"childSquareIds"`
+	State          PoolSquareState  `json:"state"`
+	Claimant       string           `json:"claimant"`
+	Modified       time.Time        `json:"modified"`
+	Logs           []*PoolSquareLog `json:"logs,omitempty"`
 }
 
 // JSON will custom JSON encode a PoolSquare
 func (p *PoolSquare) JSON() *PoolSquareJSON {
 	return &PoolSquareJSON{
-		UserID: p.userID,
-		SquareID:     p.SquareID,
-		State:        p.State,
-		Claimant:     p.Claimant(),
-		Modified:     p.Modified,
-		Logs:         p.Logs,
+		UserID:         p.userID,
+		SquareID:       p.SquareID,
+		ParentSquareID: p.ParentSquareID,
+		ChildSquareIDs: p.ChildSquareIDs,
+		State:          p.State,
+		Claimant:       p.Claimant(),
+		Modified:       p.Modified,
+		Logs:           p.Logs,
 	}
 }
 
 // PoolSquareLog represents an individual log entry for a pool square
 type PoolSquareLog struct {
-	id            int64
-	poolSquareID  int64
-	squareID      int
-	userID        int64
-	state         PoolSquareState
-	claimant      string
-	RemoteAddr    string
-	Note          string
-	created       time.Time
+	id           int64
+	poolSquareID int64
+	squareID     int
+	userID       int64
+	state        PoolSquareState
+	claimant     string
+	RemoteAddr   string
+	Note         string
+	created      time.Time
 }
 
 // SquareID is a getter for the square ID
@@ -192,8 +201,14 @@ func (p *PoolSquareLog) ID() int64 {
 	return p.id
 }
 
+// SetParentSquare will set the parent square
+func (p *PoolSquare) SetParentSquare(ctx context.Context, tx *sql.Tx, square *PoolSquare) error {
+	_, err := tx.ExecContext(ctx, "UPDATE pool_squares SET parent_id = $1 WHERE id = $2", square.ID, p.ID)
+	return err
+}
+
 // Save will save the pool square and the associated log data to the database
-func (p *PoolSquare) Save(ctx context.Context, isAdmin bool, poolSquareLog PoolSquareLog) error {
+func (p *PoolSquare) Save(ctx context.Context, dbFn Queryable, isAdmin bool, poolSquareLog PoolSquareLog) error {
 	var claimant *string
 	if p.claimant != "" {
 		claimant = &p.claimant
@@ -212,7 +227,7 @@ func (p *PoolSquare) Save(ctx context.Context, isAdmin bool, poolSquareLog PoolS
 	}
 
 	const query = "SELECT * FROM update_pool_square($1, $2, $3, $4, $5, $6, $7)"
-	row := p.Model.db.QueryRowContext(ctx, query, p.ID, p.State, claimant, userID, remoteAddr, poolSquareLog.Note, isAdmin)
+	row := dbFn.QueryRowContext(ctx, query, p.ID, p.State, claimant, userID, remoteAddr, poolSquareLog.Note, isAdmin)
 
 	var ok bool
 	if err := row.Scan(&ok); err != nil {
@@ -256,12 +271,24 @@ func poolSquareLogByRow(scan scanFunc) (*PoolSquareLog, error) {
 // LoadLogs will load the logs for the given square
 func (p *PoolSquare) LoadLogs(ctx context.Context) error {
 	const query = `
-		SELECT pool_squares_logs.id, pool_square_id, square_id, pool_squares_logs.user_id, pool_squares_logs.state, pool_squares_logs.claimant, remote_addr, note, pool_squares_logs.created
-		FROM pool_squares_logs
-		INNER JOIN pool_squares ON pool_squares_logs.pool_square_id = pool_squares.id
-		WHERE pool_square_id = $1 
-		ORDER BY id DESC`
-	rows, err := p.Model.db.QueryContext(ctx, query, p.ID)
+		SELECT
+		       pool_squares_logs.id,
+		       pool_square_id,
+		       square_id,
+		       pool_squares_logs.user_id,
+		       pool_squares_logs.state,
+		       pool_squares_logs.claimant,
+		       remote_addr, note,
+		       pool_squares_logs.created
+		FROM
+		     pool_squares_logs
+		INNER JOIN
+		         pool_squares ON pool_squares_logs.pool_square_id = pool_squares.id
+		WHERE
+		      pool_square_id = $1 
+		ORDER BY
+		         id DESC`
+	rows, err := p.Model.DB.QueryContext(ctx, query, p.ID)
 	if err != nil {
 		return err
 	}
@@ -279,4 +306,46 @@ func (p *PoolSquare) LoadLogs(ctx context.Context) error {
 
 	p.Logs = logs
 	return nil
+}
+
+// ChildSquares returns the children of the current square
+func (p *PoolSquare) ChildSquares(ctx context.Context, q Queryable) ([]*PoolSquare, error) {
+	const query = `
+		SELECT
+		       ps.id,
+		       ps.square_id,
+		       ps.parent_id,
+		       ps.user_id,
+		       ps.state,
+		       ps.claimant,
+		       ps.modified,
+		       ps2.square_id AS parent_square_id,
+		       (SELECT array_agg(square_id) FROM pool_squares ps3 WHERE ps3.parent_id = ps.id) AS child_square_ids
+		FROM
+			pool_squares ps
+		LEFT JOIN
+			pool_squares ps2 ON ps.parent_id = ps2.id
+		WHERE
+			ps.parent_id = $1
+		ORDER BY
+			ps.square_id`
+	rows, err := q.QueryContext(ctx, query, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// this is a little hacky. it's done to be able to call squareByRow()
+	pool := &Pool{model: p.Model, id: p.PoolID}
+
+	squares := make([]*PoolSquare, 0)
+	for rows.Next() {
+		square, err := pool.squareByRow(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		squares = append(squares, square)
+	}
+
+	return squares, nil
 }

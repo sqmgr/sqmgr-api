@@ -449,3 +449,111 @@ CREATE INDEX guest_users_expires_idx ON guest_users (expires);
 --rollback DROP INDEX guest_users_expires_idx;
 --rollback ALTER TABLE guest_users DROP CONSTRAINT guest_users_pkey;
 --rollback ALTER TABLE guest_users ADD CONSTRAINT guest_users_pkey PRIMARY KEY (store_id);
+
+
+--changeset weters:10 splitStatements:false rollbackSplitStatements:false
+
+ALTER TABLE pool_squares ADD COLUMN parent_id bigint REFERENCES pool_squares (id);
+
+DROP FUNCTION update_pool_square(_id bigint, _state square_states, _claimant text, _user_id bigint,
+                                   _remote_addr text, _note text, _is_admin boolean);
+CREATE FUNCTION update_pool_square(_id bigint, _state square_states, _claimant text, _user_id bigint,
+                                   _remote_addr text, _note text, _is_admin boolean) RETURNS boolean
+    LANGUAGE plpgsql
+AS
+$$
+DECLARE
+    _row           pool_squares;
+    _initial_claim boolean;
+    _same_user     boolean;
+    _user_unclaim  boolean;
+    _parent_id     integer;
+BEGIN
+    SELECT INTO _row * FROM pool_squares WHERE id = _id FOR SHARE;
+
+    _initial_claim := _row.claimant IS NULL AND _row.state = 'unclaimed';
+    _same_user := coalesce(_row.user_id, 0) = coalesce(_user_id, 0);
+    _user_unclaim := _same_user AND _row.state = 'claimed' AND _state = 'unclaimed';
+
+    IF NOT _is_admin
+        AND NOT _initial_claim
+        AND NOT _user_unclaim
+    THEN
+        RETURN FALSE;
+    END IF;
+
+    _parent_id = _row.parent_id;
+    IF _state = 'unclaimed' THEN
+        _claimant := NULL;
+        _user_id := NULL;
+        _parent_id := NULL;
+    END IF;
+
+    UPDATE pool_squares
+    SET state           = _state,
+        claimant        = _claimant,
+        user_id         = _user_id,
+        parent_id       = _parent_id,
+        modified        = (now() at time zone 'utc')
+    WHERE id = _id;
+
+    INSERT INTO pool_squares_logs (pool_square_id, user_id, state, claimant, note, remote_addr)
+    VALUES (_id, _user_id, _state, _claimant, _note, _remote_addr);
+
+    RETURN TRUE;
+END;
+$$;
+
+--rollback ALTER TABLE pool_squares DROP COLUMN parent_id;
+
+--rollback DROP FUNCTION update_pool_square(_id bigint, _state square_states, _claimant text, _user_id bigint,
+--rollback     _remote_addr text, _note text, _is_admin boolean);
+--rollback CREATE FUNCTION update_pool_square(_id bigint, _state square_states, _claimant text, _user_id bigint,
+--rollback                                    _remote_addr text, _note text, _is_admin boolean) RETURNS boolean
+--rollback     LANGUAGE plpgsql
+--rollback AS
+--rollback $$
+--rollback DECLARE
+--rollback     _row           pool_squares;
+--rollback     _initial_claim boolean;
+--rollback     _same_user     boolean;
+--rollback     _user_unclaim  boolean;
+--rollback BEGIN
+--rollback     SELECT INTO _row * FROM pool_squares WHERE id = _id FOR SHARE;
+--rollback
+--rollback     _initial_claim := _row.claimant IS NULL AND _row.state = 'unclaimed';
+--rollback     _same_user := coalesce(_row.user_id, 0) = coalesce(_user_id, 0);
+--rollback     _user_unclaim := _same_user AND _row.state = 'claimed' AND _state = 'unclaimed';
+--rollback
+--rollback     IF NOT _is_admin
+--rollback         AND NOT _initial_claim
+--rollback         AND NOT _user_unclaim
+--rollback     THEN
+--rollback         RETURN FALSE;
+--rollback     END IF;
+--rollback
+--rollback     IF _state = 'unclaimed' THEN
+--rollback         _claimant := NULL;
+--rollback         _user_id := NULL;
+--rollback     END IF;
+--rollback
+--rollback     UPDATE pool_squares
+--rollback     SET state           = _state,
+--rollback         claimant        = _claimant,
+--rollback         user_id         = _user_id,
+--rollback         modified        = (now() at time zone 'utc')
+--rollback     WHERE id = _id;
+--rollback
+--rollback     INSERT INTO pool_squares_logs (pool_square_id, user_id, state, claimant, note, remote_addr)
+--rollback     VALUES (_id, _user_id, _state, _claimant, _note, _remote_addr);
+--rollback
+--rollback     RETURN TRUE;
+--rollback END;
+--rollback $$;
+
+
+--changeset weters:11
+
+ALTER TABLE grids ADD COLUMN rollover BOOLEAN NOT NULL DEFAULT false;
+
+--rollback ALTER TABLE grids DROP COLUMN rollover;
