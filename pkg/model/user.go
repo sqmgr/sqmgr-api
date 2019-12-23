@@ -111,7 +111,9 @@ func (m *Model) GetUser(ctx context.Context, issuer, storeID string) (*User, err
 // JoinPool will link a user to a pool.
 func (u *User) JoinPool(ctx context.Context, p *Pool) error {
 	// no-op
-	if u.IsAdminOf(ctx, p) {
+	if isAdmin, err := u.IsAdminOf(ctx, p); err != nil {
+		return err
+	} else if isAdmin {
 		return nil
 	}
 
@@ -152,9 +154,42 @@ func (u *User) IsMemberOf(ctx context.Context, p *Pool) (bool, error) {
 	return ok, nil
 }
 
+// SetAdminOf will set the user as an admin in the pool. Note: this user must
+// already be a member
+func (u *User) SetAdminOf(ctx context.Context, p *Pool, isAdmin bool) error {
+	_, err := u.DB.ExecContext(ctx, `
+UPDATE
+    pools_users
+SET
+    is_admin = $1,
+    modified = (NOW() AT TIME ZONE 'UTC')
+WHERE
+	pool_id = $2 AND
+  	user_id = $3`, isAdmin, p.ID(), u.ID)
+
+	return err
+}
+
 // IsAdminOf will return true if the user is the admin of the grid
-func (u *User) IsAdminOf(ctx context.Context, p *Pool) bool {
-	return u.ID == p.userID
+func (u *User) IsAdminOf(ctx context.Context, p *Pool) (bool, error) {
+	if u.ID == p.userID {
+		return true, nil
+	}
+
+	// otherwise, check to see if they are an admin
+
+	row := u.DB.QueryRowContext(ctx, "SELECT true FROM pools_users WHERE pool_id = $1 AND user_id = $2 AND is_admin", p.id, u.ID)
+
+	var ok bool
+	if err := row.Scan(&ok); err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	return ok, nil
 }
 
 // PoolsCreatedWithin will return the number of pools a user has created within a given duration period

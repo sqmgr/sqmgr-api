@@ -557,3 +557,13 @@ $$;
 ALTER TABLE grids ADD COLUMN rollover BOOLEAN NOT NULL DEFAULT false;
 
 --rollback ALTER TABLE grids DROP COLUMN rollover;
+
+
+
+
+--changeset weters:12
+
+ALTER TABLE pools_users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN modified TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC');
+
+--rollback ALTER TABLE pools_users DROP COLUMN is_admin, DROP COLUMN modified;

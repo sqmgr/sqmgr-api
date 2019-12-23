@@ -87,7 +87,10 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
 		user := r.Context().Value(ctxUserKey).(*model.User)
 
-		if !user.IsAdminOf(r.Context(), pool) {
+		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		} else if !isAdmin {
 			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
 		}
@@ -187,7 +190,10 @@ func (s *Server) getPoolTokenLogEndpoint() http.HandlerFunc {
 		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
 		user := r.Context().Value(ctxUserKey).(*model.User)
 
-		if !user.IsAdminOf(r.Context(), pool) {
+		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		} else if !isAdmin {
 			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
 		}
@@ -366,7 +372,11 @@ func (s *Server) getPoolTokenEndpoint() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(ctxUserKey).(*model.User)
 		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
-		isAdminOf := user.IsAdminOf(r.Context(), pool)
+		isAdminOf, err := user.IsAdminOf(r.Context(), pool)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
 
 		s.writeJSONResponse(w, http.StatusOK, poolResponse{
 			PoolJSON: pool.JSON(),
@@ -383,7 +393,10 @@ func (s *Server) getPoolTokenInviteTokenEndpoint() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(ctxUserKey).(*model.User)
 		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
-		if ! user.IsAdminOf(r.Context(), pool) {
+		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		} else if !isAdmin {
 			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
 		}
@@ -521,7 +534,10 @@ func (s *Server) getPoolTokenSquareIDEndpoint() http.HandlerFunc {
 			return
 		}
 
-		if user.IsAdminOf(r.Context(), pool) {
+		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		} else if isAdmin {
 			if err := square.LoadLogs(r.Context()); err != nil {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
@@ -563,7 +579,11 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 
 		lr := logrus.WithField("square-id", squareID)
 
-		isAdmin := user.IsAdminOf(r.Context(), pool)
+		isAdmin, err := user.IsAdminOf(r.Context(), pool)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
 
 		// if the user isn't an admin and the grid is locked, do not let the user do anything
 		if pool.IsLocked() && !isAdmin {
@@ -797,7 +817,10 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
 		user := r.Context().Value(ctxUserKey).(*model.User)
 
-		if !user.IsAdminOf(r.Context(), pool) {
+		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		} else if !isAdmin {
 			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
 		}

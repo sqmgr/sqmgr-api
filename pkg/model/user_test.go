@@ -61,8 +61,23 @@ func TestJoinGrid(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(ok).Should(gomega.BeTrue())
 
-	g.Expect(u.IsAdminOf(context.Background(), pool)).Should(gomega.BeTrue())
-	g.Expect(u2.IsAdminOf(context.Background(), pool)).Should(gomega.BeFalse())
+	isAdminOf, err := u.IsAdminOf(context.Background(), pool)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(isAdminOf).Should(gomega.BeTrue())
+
+	isAdminOf, err = u2.IsAdminOf(context.Background(), pool)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(isAdminOf).Should(gomega.BeFalse())
+
+	u2.SetAdminOf(context.Background(), pool, true)
+	isAdminOf, err = u2.IsAdminOf(context.Background(), pool)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(isAdminOf).Should(gomega.BeTrue())
+
+	u2.SetAdminOf(context.Background(), pool, false)
+	isAdminOf, err = u2.IsAdminOf(context.Background(), pool)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(isAdminOf).Should(gomega.BeFalse())
 }
 
 func TestGetUserByID(t *testing.T) {
