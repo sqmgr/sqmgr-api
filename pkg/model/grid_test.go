@@ -41,6 +41,13 @@ func TestGridName(t *testing.T) {
 	grid.SetHomeTeamName("")
 	g.Expect(grid.Name()).Should(gomega.Equal("Away Team vs. Home Team"))
 
+	// Test Label
+	grid.SetLabel("Wild Card")
+	g.Expect(grid.Name()).Should(gomega.Equal("Wild Card: Away Team vs. Home Team"))
+
+	grid.SetLabel("")
+	g.Expect(grid.Name()).Should(gomega.Equal("Away Team vs. Home Team"))
+
 	grid.SetHomeTeamName(strings.Repeat("á", 50) + "é")
 	g.Expect(grid.HomeTeamName()).Should(gomega.Equal(strings.Repeat("á", 50)))
 

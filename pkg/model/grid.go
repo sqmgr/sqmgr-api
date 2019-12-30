@@ -55,6 +55,7 @@ type Grid struct {
 	id           int64
 	poolID       int64
 	ord          int
+	label        *string
 	homeTeamName *string
 	homeNumbers  []int
 	awayTeamName *string
@@ -73,6 +74,7 @@ type Grid struct {
 type GridJSON struct {
 	ID           int64         `json:"id"`
 	Name         string        `json:"name"`
+	Label        string        `json:"label"`
 	HomeTeamName string        `json:"homeTeamName"`
 	HomeNumbers  []int         `json:"homeNumbers"`
 	AwayTeamName string        `json:"awayTeamName"`
@@ -91,6 +93,7 @@ func (g *Grid) JSON() *GridJSON {
 	return &GridJSON{
 		ID:           g.ID(),
 		Name:         g.Name(),
+		Label:        g.Label(),
 		HomeTeamName: g.HomeTeamName(),
 		HomeNumbers:  g.HomeNumbers(),
 		AwayTeamName: g.AwayTeamName(),
@@ -201,23 +204,27 @@ func (g *Grid) HomeNumbers() []int {
 	return g.homeNumbers
 }
 
+// Label returns the label of the grid.
+func (g *Grid) Label() string {
+	if g.label == nil {
+		return ""
+	}
+
+	return *g.label
+}
+
+// SetLabel will set the label
+func (g *Grid) SetLabel(label string) {
+	if label == "" {
+		g.label = nil
+		return
+	}
+
+	g.label = &label
+}
+
 // Save will save the grid. It will also save any dependent objects
 func (g *Grid) Save(ctx context.Context) error {
-	const query = `
-		UPDATE grids
-		SET ord = $1,
-		    home_team_name = $2,
-			home_numbers = $3,
-		    away_team_name = $4,
-			away_numbers = $5,
-		    manual_draw = $6,
-			event_date = $7,
-		    rollover = $8,
-		    state = $9,
-			modified = (now() at time zone 'utc')
-		WHERE id = $10
-	`
-
 	tx, err := g.model.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -268,7 +275,23 @@ FROM
 		eventDate = &g.eventDate
 	}
 
-	if _, err := tx.ExecContext(ctx, query, g.ord, g.homeTeamName, pq.Array(g.homeNumbers), g.awayTeamName, pq.Array(g.awayNumbers), g.manualDraw, eventDate, g.rollover, g.state, g.id); err != nil {
+	const query = `
+		UPDATE grids
+		SET ord = $1,
+		    home_team_name = $2,
+			home_numbers = $3,
+		    away_team_name = $4,
+			away_numbers = $5,
+		    manual_draw = $6,
+			event_date = $7,
+		    rollover = $8,
+		    state = $9,
+		    label = $10,
+			modified = (now() at time zone 'utc')
+		WHERE id = $11
+	`
+
+	if _, err := tx.ExecContext(ctx, query, g.ord, g.homeTeamName, pq.Array(g.homeNumbers), g.awayTeamName, pq.Array(g.awayNumbers), g.manualDraw, eventDate, g.rollover, g.state, g.label, g.id); err != nil {
 		if err2 := tx.Rollback(); err2 != nil {
 			return fmt.Errorf("error found: %#v. Another error found when trying to rollback: %#v", err, err2)
 		}
@@ -286,7 +309,12 @@ func (g *Grid) Settings() *GridSettings {
 
 // Name returns the name of the grid
 func (g *Grid) Name() string {
-	return fmt.Sprintf("%s vs. %s", g.AwayTeamName(), g.HomeTeamName())
+	vs := fmt.Sprintf("%s vs. %s", g.AwayTeamName(), g.HomeTeamName())
+	if g.label == nil {
+		return vs
+	}
+
+	return fmt.Sprintf("%s: %s", *g.label, vs)
 }
 
 // SetManualNumbers will set numbers manually (user input)
@@ -414,7 +442,7 @@ func (m *Model) gridByRow(scan scanFunc) (*Grid, error) {
 	var homeNumbers, awayNumbers []sql.NullInt64
 	var eventDate *time.Time
 
-	if err := scan(&grid.id, &grid.poolID, &grid.ord, &grid.homeTeamName, pq.Array(&homeNumbers), &grid.awayTeamName, pq.Array(&awayNumbers), &eventDate, &grid.rollover, &grid.state, &grid.created, &grid.modified, &grid.manualDraw); err != nil {
+	if err := scan(&grid.id, &grid.poolID, &grid.ord, &grid.label, &grid.homeTeamName, pq.Array(&homeNumbers), &grid.awayTeamName, pq.Array(&awayNumbers), &eventDate, &grid.rollover, &grid.state, &grid.created, &grid.modified, &grid.manualDraw); err != nil {
 		return nil, err
 	}
 
@@ -446,6 +474,7 @@ const gridColumns = `
 	id,
 	pool_id,
 	ord,
+	label,
 	home_team_name,
 	home_numbers,
 	away_team_name,

@@ -801,6 +801,7 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 			EventDate      string `json:"eventDate"`
 			Notes          string `json:"notes"`
 			Rollover       bool   `json:"rollover"`
+			Label          string `json:"label"`
 			HomeTeamName   string `json:"homeTeamName"`
 			HomeTeamColor1 string `json:"homeTeamColor1"`
 			HomeTeamColor2 string `json:"homeTeamColor2"`
@@ -899,6 +900,7 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 
 			v := validator.New()
 			eventDate := v.Datetime("Event Date", data.Data.EventDate, "00:00", "0", true)
+			label := v.Printable("Label", data.Data.Label, true)
 			homeTeamName := v.Printable("Home Team Name", data.Data.HomeTeamName, true)
 			homeTeamName = v.MaxLength("Home Team Name", homeTeamName, model.TeamNameMaxLength)
 			homeTeamColor1 := v.Color("Home Team Colors", data.Data.HomeTeamColor1, true)
@@ -928,6 +930,7 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 			}
 
 			grid.SetEventDate(eventDate)
+			grid.SetLabel(label)
 			grid.SetHomeTeamName(homeTeamName)
 			grid.SetAwayTeamName(awayTeamName)
 			grid.SetRollover(data.Data.Rollover)
