@@ -382,3 +382,16 @@ func TestArchiving(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(3)))
 }
+
+func TestNumberOfSquares(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	p := Pool{gridType: GridTypeStd25}
+	g.Expect(p.NumberOfSquares()).Should(gomega.Equal(25))
+
+	p.gridType = GridTypeStd100
+	g.Expect(p.NumberOfSquares()).Should(gomega.Equal(100))
+
+	p.gridType = GridTypeRoll100
+	g.Expect(p.NumberOfSquares()).Should(gomega.Equal(100))
+}

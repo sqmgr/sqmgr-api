@@ -22,4 +22,6 @@ const (
 	ctxUserKey sqmgrContext = iota
 	ctxUserIDKey
 	ctxPoolKey
+	ctxGridKey
+	ctxSquareIDKey
 )

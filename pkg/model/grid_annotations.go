@@ -95,7 +95,7 @@ WHERE
 	id = $2
 `
 
-	_, err := a.model.DB.ExecContext(ctx, a.Annotation, a.ID)
+	_, err := a.model.DB.ExecContext(ctx, query, a.Annotation, a.ID)
 	return err
 }
 

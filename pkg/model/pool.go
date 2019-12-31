@@ -154,6 +154,16 @@ func (p *Pool) SetGridType(gridType GridType) {
 	p.gridType = gridType
 }
 
+// NumberOfSquares will return the number of squares in the pool
+func (p *Pool) NumberOfSquares() int {
+	switch p.gridType {
+	case GridTypeStd25:
+		return 25
+	default:
+		return 100
+	}
+}
+
 // JSON returns JSON that can be sent to the front-end
 func (p *Pool) JSON() *PoolJSON {
 	return &PoolJSON{

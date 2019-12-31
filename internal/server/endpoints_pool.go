@@ -74,6 +74,59 @@ func (s *Server) poolHandler(next http.Handler) http.Handler {
 	})
 }
 
+func (s *Server) poolGridHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
+
+		gridID, err := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, err)
+			return
+		}
+
+		grid, err := pool.GridByID(r.Context(), gridID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				s.writeErrorResponse(w, http.StatusNotFound, nil)
+				return
+			}
+
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxGridKey, grid)))
+	})
+}
+
+func (s *Server) poolGridSquareAdminHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
+		user := r.Context().Value(ctxUserKey).(*model.User)
+
+		squareID, err := strconv.Atoi(mux.Vars(r)["square_id"])
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, err)
+			return
+		}
+
+		if squareID < 0 || squareID >= pool.NumberOfSquares() {
+			s.writeErrorResponse(w, http.StatusBadRequest, errors.New("invalid square ID"))
+			return
+		}
+
+		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		} else if !isAdmin {
+			s.writeErrorResponse(w, http.StatusForbidden, nil)
+			return
+		}
+
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxSquareIDKey, squareID)))
+	})
+}
+
 func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 	type payload struct {
 		Action          string  `json:"action"`
@@ -494,6 +547,11 @@ func (s *Server) getPoolTokenGridIDEndpoint() http.HandlerFunc {
 			return
 		}
 
+		if err := grid.LoadAnnotations(r.Context()); err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
 		s.writeJSONResponse(w, http.StatusOK, grid.JSON())
 	}
 }
@@ -856,6 +914,11 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
 			}
+
+			if err := grid.LoadAnnotations(r.Context()); err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
 		} else if data.Action != "save" {
 			s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("cannot call action %s without an ID", data.Action))
 			return
@@ -956,6 +1019,69 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 		}
 
 		s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("unsupported action %s", data.Action))
+		return
+	}
+}
+
+func (s *Server) postPoolTokenGridIDSquareSquareIDAnnotationEndpoint() http.HandlerFunc {
+	type payload struct {
+		Annotation string `json:"annotation"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		grid := r.Context().Value(ctxGridKey).(*model.Grid)
+		squareID := r.Context().Value(ctxSquareIDKey).(int)
+
+		var payloadData payload
+		if err := json.NewDecoder(r.Body).Decode(&payloadData); err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, err)
+			return
+		}
+
+		v := validator.New()
+		annotation := v.Printable("annotation", payloadData.Annotation, false)
+		if !v.OK() {
+			s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
+				Status:           statusError,
+				Error:            "There were one or more validation errors",
+				ValidationErrors: v.Errors,
+			})
+			return
+		}
+
+		a, err := grid.AnnotationBySquareID(r.Context(), squareID)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		a.Annotation = annotation
+		isNew := a.Created.IsZero()
+		if err := a.Save(r.Context()); err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		status := http.StatusOK
+		if isNew {
+			status = http.StatusCreated
+		}
+
+		s.writeJSONResponse(w, status, a)
+	}
+}
+
+func (s *Server) deletePoolTokenGridIDSquareSquareIDAnnotationEndpoint() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		grid := r.Context().Value(ctxGridKey).(*model.Grid)
+		squareID := r.Context().Value(ctxSquareIDKey).(int)
+
+		if err := grid.DeleteAnnotationBySquareID(r.Context(), squareID); err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 }

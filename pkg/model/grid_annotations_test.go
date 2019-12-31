@@ -52,6 +52,14 @@ func TestAnnotationBySquareID(t *testing.T) {
 	g.Expect(annotation.Annotation).Should(gomega.Equal("My Test"))
 	g.Expect(annotation.Created.IsZero()).Should(gomega.BeFalse(), "has created date")
 	g.Expect(annotation.Modified.IsZero()).Should(gomega.BeFalse(), "has modified date")
+	g.Expect(annotation.Created).Should(gomega.Equal(annotation.Modified))
+
+	annotation.Annotation = "My Test-Updated"
+	g.Expect(annotation.Save(ctx)).Should(gomega.Succeed())
+
+	annotation, err = grid.AnnotationBySquareID(ctx, 1)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(annotation.Modified.After(annotation.Created)).Should(gomega.BeTrue())
 
 	annotation, err = grid.AnnotationBySquareID(ctx, 2)
 	g.Expect(err).Should(gomega.Succeed())
@@ -62,6 +70,6 @@ func TestAnnotationBySquareID(t *testing.T) {
 	annotations, err := grid.Annotations(ctx)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(annotations)).Should(gomega.Equal(2))
-	g.Expect(annotations[1].Annotation).Should(gomega.Equal("My Test"))
+	g.Expect(annotations[1].Annotation).Should(gomega.Equal("My Test-Updated"))
 	g.Expect(annotations[2].Annotation).Should(gomega.Equal("Second Test"))
 }

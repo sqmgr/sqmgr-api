@@ -67,25 +67,27 @@ type Grid struct {
 	created      time.Time
 	modified     time.Time
 
-	settings *GridSettings
+	settings    *GridSettings
+	annotations map[int]*GridAnnotation
 }
 
 // GridJSON represents grid metadata that can be sent to the front-end
 type GridJSON struct {
-	ID           int64         `json:"id"`
-	Name         string        `json:"name"`
-	Label        string        `json:"label"`
-	HomeTeamName string        `json:"homeTeamName"`
-	HomeNumbers  []int         `json:"homeNumbers"`
-	AwayTeamName string        `json:"awayTeamName"`
-	AwayNumbers  []int         `json:"awayNumbers"`
-	ManualDraw   bool          `json:"manualDraw"`
-	EventDate    time.Time     `json:"eventDate"`
-	Rollover     bool          `json:"rollover"`
-	State        State         `json:"state"`
-	Created      time.Time     `json:"created"`
-	Modified     time.Time     `json:"modified"`
-	Settings     *GridSettings `json:"settings"`
+	ID           int64                   `json:"id"`
+	Name         string                  `json:"name"`
+	Label        string                  `json:"label"`
+	HomeTeamName string                  `json:"homeTeamName"`
+	HomeNumbers  []int                   `json:"homeNumbers"`
+	AwayTeamName string                  `json:"awayTeamName"`
+	AwayNumbers  []int                   `json:"awayNumbers"`
+	ManualDraw   bool                    `json:"manualDraw"`
+	EventDate    time.Time               `json:"eventDate"`
+	Rollover     bool                    `json:"rollover"`
+	State        State                   `json:"state"`
+	Created      time.Time               `json:"created"`
+	Modified     time.Time               `json:"modified"`
+	Settings     *GridSettings           `json:"settings"`
+	Annotations  map[int]*GridAnnotation `json:"annotations"`
 }
 
 // JSON will marshal the JSON using a custom marshaller
@@ -105,6 +107,7 @@ func (g *Grid) JSON() *GridJSON {
 		Created:      g.Created(),
 		Modified:     g.modified,
 		Settings:     g.settings,
+		Annotations:  g.annotations,
 	}
 }
 
@@ -415,6 +418,17 @@ func (g *Grid) LoadSettings(ctx context.Context) error {
 		&g.settings.notes,
 		&g.settings.modified,
 	)
+}
+
+// LoadAnnotations will load the annotations for the grid
+func (g *Grid) LoadAnnotations(ctx context.Context) error {
+	annotations, err := g.Annotations(ctx)
+	if err != nil {
+		return err
+	}
+
+	g.annotations = annotations
+	return nil
 }
 
 func randomNumbers() ([]int, error) {
