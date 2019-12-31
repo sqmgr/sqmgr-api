@@ -575,3 +575,18 @@ ALTER TABLE grids
 ADD COLUMN label text;
 
 --rollback ALTER TABLE grids DROP COLUMN label;
+
+
+--changeset weters:14
+
+CREATE TABLE grid_annotations (
+    id bigserial primary key,
+    grid_id bigint not null references grids (id),
+    square_id int not null,
+    annotation text not null,
+    created timestamp not null default (now() at time zone 'utc'),
+    modified timestamp not null default (now() at time zone 'utc'),
+    UNIQUE (grid_id, square_id)
+);
+
+--rollback DROP TABLE grid_annotations;
