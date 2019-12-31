@@ -110,7 +110,7 @@ func (s *Server) poolGridSquareAdminHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		if squareID < 0 || squareID >= pool.NumberOfSquares() {
+		if squareID < 1 || squareID > pool.NumberOfSquares() {
 			s.writeErrorResponse(w, http.StatusBadRequest, errors.New("invalid square ID"))
 			return
 		}
