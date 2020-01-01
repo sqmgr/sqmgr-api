@@ -53,4 +53,8 @@ var AnnotationIcons = GridAnnotationIconMapping{
 		Name:    "dice",
 		Unicode: "f522",
 	},
+	5: {
+		Name: "arrow-alt-circle-right",
+		Unicode: "f35a",
+	},
 }
