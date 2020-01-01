@@ -335,13 +335,14 @@ func (s *Server) getPoolConfiguration() http.HandlerFunc {
 	}
 
 	resp := struct {
-		ClaimantMaxLength     int                     `json:"claimantMaxLength"`
-		NameMaxLength         int                     `json:"nameMaxLength"`
-		NotesMaxLength        int                     `json:"notesMaxLength"`
-		TeamNameMaxLength     int                     `json:"teamNameMaxLength"`
-		PoolSquareStates      []model.PoolSquareState `json:"poolSquareStates"`
-		GridTypes             []keyDescription        `json:"gridTypes"`
-		MinJoinPasswordLength int                     `json:"minJoinPasswordLength"`
+		ClaimantMaxLength     int                             `json:"claimantMaxLength"`
+		NameMaxLength         int                             `json:"nameMaxLength"`
+		NotesMaxLength        int                             `json:"notesMaxLength"`
+		TeamNameMaxLength     int                             `json:"teamNameMaxLength"`
+		PoolSquareStates      []model.PoolSquareState         `json:"poolSquareStates"`
+		GridTypes             []keyDescription                `json:"gridTypes"`
+		MinJoinPasswordLength int                             `json:"minJoinPasswordLength"`
+		GridAnnotationIcons   model.GridAnnotationIconMapping `json:"gridAnnotationIcons"`
 	}{
 		ClaimantMaxLength:     model.ClaimantMaxLength,
 		NameMaxLength:         model.NameMaxLength,
@@ -350,6 +351,7 @@ func (s *Server) getPoolConfiguration() http.HandlerFunc {
 		PoolSquareStates:      model.PoolSquareStates,
 		GridTypes:             gridTypesSlice,
 		MinJoinPasswordLength: minJoinPasswordLength,
+		GridAnnotationIcons:   model.AnnotationIcons,
 	}
 
 	jsonResp, err := json.Marshal(resp)
@@ -1026,6 +1028,7 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 func (s *Server) postPoolTokenGridIDSquareSquareIDAnnotationEndpoint() http.HandlerFunc {
 	type payload struct {
 		Annotation string `json:"annotation"`
+		Icon       int16  `json:"icon"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -1040,6 +1043,11 @@ func (s *Server) postPoolTokenGridIDSquareSquareIDAnnotationEndpoint() http.Hand
 
 		v := validator.New()
 		annotation := v.Printable("annotation", payloadData.Annotation, false)
+
+		if !model.AnnotationIcons.IsValidIcon(payloadData.Icon) {
+			v.AddError("icon", "%d is not a valid annotation icon", payloadData.Icon)
+		}
+
 		if !v.OK() {
 			s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
 				Status:           statusError,
@@ -1056,6 +1064,7 @@ func (s *Server) postPoolTokenGridIDSquareSquareIDAnnotationEndpoint() http.Hand
 		}
 
 		a.Annotation = annotation
+		a.Icon = payloadData.Icon
 		isNew := a.Created.IsZero()
 		if err := a.Save(r.Context()); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)

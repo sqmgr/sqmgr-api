@@ -97,6 +97,15 @@ func (v *Validator) Printable(key, val string, isOptional ...bool) string {
 	return v.InverseRegexp(key, val, nonPrintableRx, isOptional...)
 }
 
+// IntInRange will validate that an integer is within the provided range. "max" is exclusive
+func (v *Validator) IntInRange(key string, val, min, max int) int {
+	if val < min || val >= max {
+		v.AddError(key, "%d must be >= %d and < %d", val, min, max)
+	}
+
+	return val
+}
+
 // PrintableWithNewline will ensure that all characters in the string can be printed to string (i.e. no control characters except for \r\n)
 func (v *Validator) PrintableWithNewline(key, val string, isOptional ...bool) string {
 	return v.InverseRegexp(key, val, nonPrintableExcludeNewlineRx, isOptional...)

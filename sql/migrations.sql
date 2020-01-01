@@ -590,3 +590,12 @@ CREATE TABLE grid_annotations (
 );
 
 --rollback DROP TABLE grid_annotations;
+
+
+
+--changeset weters:15
+
+ALTER TABLE grid_annotations
+    ADD COLUMN icon smallint NOT NULL DEFAULT 0;
+
+--rollback ALTER TABLE grid_annotations DROP COLUMN icon;

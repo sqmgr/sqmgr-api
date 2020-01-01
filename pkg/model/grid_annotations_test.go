@@ -39,10 +39,12 @@ func TestAnnotationBySquareID(t *testing.T) {
 	annotation, err := grid.AnnotationBySquareID(ctx, 1)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(annotation.Annotation).Should(gomega.Equal(""))
+	g.Expect(annotation.Icon).Should(gomega.Equal(int16(0)))
 	g.Expect(annotation.Created.IsZero()).Should(gomega.BeTrue(), "no created date")
 	g.Expect(annotation.Modified.IsZero()).Should(gomega.BeTrue(), "no modified date")
 
 	annotation.Annotation = "My Test"
+	annotation.Icon = 1
 	g.Expect(annotation.Save(ctx)).Should(gomega.Succeed())
 	g.Expect(annotation.Created.IsZero()).Should(gomega.BeFalse(), "has created date")
 	g.Expect(annotation.Modified.IsZero()).Should(gomega.BeFalse(), "has modified date")
@@ -50,11 +52,13 @@ func TestAnnotationBySquareID(t *testing.T) {
 	annotation, err = grid.AnnotationBySquareID(ctx, 1)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(annotation.Annotation).Should(gomega.Equal("My Test"))
+	g.Expect(annotation.Icon).Should(gomega.Equal(int16(1)))
 	g.Expect(annotation.Created.IsZero()).Should(gomega.BeFalse(), "has created date")
 	g.Expect(annotation.Modified.IsZero()).Should(gomega.BeFalse(), "has modified date")
 	g.Expect(annotation.Created).Should(gomega.Equal(annotation.Modified))
 
 	annotation.Annotation = "My Test-Updated"
+	annotation.Icon = 2
 	g.Expect(annotation.Save(ctx)).Should(gomega.Succeed())
 
 	annotation, err = grid.AnnotationBySquareID(ctx, 1)
@@ -71,5 +75,6 @@ func TestAnnotationBySquareID(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(annotations)).Should(gomega.Equal(2))
 	g.Expect(annotations[1].Annotation).Should(gomega.Equal("My Test-Updated"))
+	g.Expect(annotations[1].Icon).Should(gomega.Equal(int16(2)))
 	g.Expect(annotations[2].Annotation).Should(gomega.Equal("Second Test"))
 }

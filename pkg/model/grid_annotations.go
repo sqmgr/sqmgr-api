@@ -29,11 +29,12 @@ type GridAnnotation struct {
 	GridID     int64     `json:"grid_id"`
 	SquareID   int       `json:"square_id"`
 	Annotation string    `json:"annotation"`
+	Icon       int16     `json:"icon"`
 	Created    time.Time `json:"created"`
 	Modified   time.Time `json:"modified"`
 }
 
-const gridAnnotationColumns = `id, grid_id, square_id, annotation, created, modified`
+const gridAnnotationColumns = `id, grid_id, square_id, annotation, icon, created, modified`
 
 // DeleteAnnotationBySquareID will delete the annotation
 func (g *Grid) DeleteAnnotationBySquareID(ctx context.Context, squareID int) error {
@@ -68,13 +69,13 @@ func (a *GridAnnotation) Save(ctx context.Context) error {
 	if a.ID == 0 {
 		const query = `
 INSERT INTO grid_annotations
-	(grid_id, square_id, annotation)
+	(grid_id, square_id, annotation, icon)
 VALUES
-	($1, $2, $3)
+	($1, $2, $3, $4)
 RETURNING ` + gridAnnotationColumns
 
 		model := a.model
-		row := model.DB.QueryRowContext(ctx, query, a.GridID, a.SquareID, a.Annotation)
+		row := model.DB.QueryRowContext(ctx, query, a.GridID, a.SquareID, a.Annotation, a.Icon)
 		a2, err := model.gridAnnotationByRow(row.Scan)
 		if err != nil {
 			return err
@@ -90,12 +91,13 @@ UPDATE
 	grid_annotations
 SET
 	annotation = $1,
+    icon = $2,
 	modified = (NOW() AT TIME ZONE 'UTC')
 WHERE
-	id = $2
+	id = $3
 `
 
-	_, err := a.model.DB.ExecContext(ctx, query, a.Annotation, a.ID)
+	_, err := a.model.DB.ExecContext(ctx, query, a.Annotation, a.Icon, a.ID)
 	return err
 }
 
@@ -130,7 +132,7 @@ WHERE
 
 func (m *Model) gridAnnotationByRow(scan scanFunc) (*GridAnnotation, error) {
 	ga := GridAnnotation{}
-	if err := scan(&ga.ID, &ga.GridID, &ga.SquareID, &ga.Annotation, &ga.Created, &ga.Modified); err != nil {
+	if err := scan(&ga.ID, &ga.GridID, &ga.SquareID, &ga.Annotation, &ga.Icon, &ga.Created, &ga.Modified); err != nil {
 		return nil, err
 	}
 
