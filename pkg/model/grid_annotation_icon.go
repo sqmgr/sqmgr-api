@@ -49,4 +49,8 @@ var AnnotationIcons = GridAnnotationIconMapping{
 		Name:    "exclamation-circle",
 		Unicode: "f06a",
 	},
+	4: {
+		Name:    "dice",
+		Unicode: "f522",
+	},
 }

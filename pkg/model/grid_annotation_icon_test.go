@@ -26,6 +26,6 @@ func TestGridAnnotationIcon(t *testing.T) {
 
 	g.Expect(len(AnnotationIcons) > 0).Should(gomega.BeTrue())
 	g.Expect(AnnotationIcons.IsValidIcon(-1)).Should(gomega.BeFalse())
-	g.Expect(AnnotationIcons.IsValidIcon(4)).Should(gomega.BeFalse())
-	g.Expect(AnnotationIcons.IsValidIcon(3)).Should(gomega.BeTrue())
+	g.Expect(AnnotationIcons.IsValidIcon(5)).Should(gomega.BeFalse())
+	g.Expect(AnnotationIcons.IsValidIcon(4)).Should(gomega.BeTrue())
 }
