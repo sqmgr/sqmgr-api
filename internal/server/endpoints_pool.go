@@ -749,7 +749,13 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 				Note:       "user: initial claim",
 			}); err != nil {
 				_ = tx.Rollback()
-				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+
+				if err == model.ErrSquareAlreadyClaimed {
+					s.writeErrorResponse(w, http.StatusBadRequest, err)
+				} else {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				}
+
 				return
 			}
 
