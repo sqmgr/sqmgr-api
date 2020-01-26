@@ -28,8 +28,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/sirupsen/logrus"
-	"github.com/weters/pwned"
-	"github.com/weters/sqmgr-api/pkg/model"
+	"github.com/sqmgr/sqmgr-api/pkg/model"
 )
 
 var nonPrintableRx = regexp.MustCompile(`\p{C}`)
@@ -133,27 +132,6 @@ func (v *Validator) Color(key, val string, isOptional ...bool) string {
 	}
 
 	return val
-}
-
-// NotPwnedPassword will ensure that the password provided has not been pwned.
-func (v *Validator) NotPwnedPassword(key, pw string) string {
-	count, err := pwned.Count(pw)
-	if err != nil {
-		// if we can't detect, just make a note of it, but don't fail
-		logrus.WithError(err).Errorln("could not determined if password has been pwned")
-	}
-
-	if count > 0 {
-		times := "times"
-		if count == 1 {
-			times = "time"
-		}
-
-		v.AddError(key, "the password you provided has been compromised at least %d %s. please use a different password", count, times)
-		return ""
-	}
-
-	return pw
 }
 
 // Password will ensure that the confirmation matches the password and that they are a certain length

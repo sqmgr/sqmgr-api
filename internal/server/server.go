@@ -20,10 +20,10 @@ import (
 	"database/sql"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
-	"github.com/weters/sqmgr-api/internal/config"
-	"github.com/weters/sqmgr-api/internal/keylocker"
-	"github.com/weters/sqmgr-api/pkg/model"
-	"github.com/weters/sqmgr-api/pkg/smjwt"
+	"github.com/sqmgr/sqmgr-api/internal/config"
+	"github.com/sqmgr/sqmgr-api/internal/keylocker"
+	"github.com/sqmgr/sqmgr-api/pkg/model"
+	"github.com/sqmgr/sqmgr-api/pkg/smjwt"
 )
 
 // Server represents the SqMGR server

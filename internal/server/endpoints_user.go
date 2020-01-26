@@ -24,7 +24,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
-	"github.com/weters/sqmgr-api/pkg/model"
+	"github.com/sqmgr/sqmgr-api/pkg/model"
 	"net/http"
 	"strconv"
 	"time"

@@ -19,7 +19,7 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/weters/sqmgr-api/internal/config"
+	"github.com/sqmgr/sqmgr-api/internal/config"
 	"net/http"
 	"os"
 	"os/signal"
@@ -28,8 +28,8 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/sirupsen/logrus"
-	"github.com/weters/sqmgr-api/internal/database"
-	"github.com/weters/sqmgr-api/internal/server"
+	"github.com/sqmgr/sqmgr-api/internal/database"
+	"github.com/sqmgr/sqmgr-api/internal/server"
 
 	_ "github.com/lib/pq"
 )

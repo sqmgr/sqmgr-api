@@ -19,7 +19,7 @@ package server
 import (
 	"encoding/json"
 	"github.com/sirupsen/logrus"
-	"github.com/weters/sqmgr-api/internal/validator"
+	"github.com/sqmgr/sqmgr-api/internal/validator"
 	"net/http"
 )
 

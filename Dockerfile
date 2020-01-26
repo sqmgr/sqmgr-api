@@ -5,8 +5,8 @@ RUN go mod download
 COPY cmd/ cmd/
 COPY internal/ internal/
 COPY pkg/ pkg/
-RUN CGO_ENABLED=0 GOOS=linux go build -o sqmgr-api github.com/weters/sqmgr-api/cmd/sqmgr-api \
- && CGO_ENABLED=0 GOOS=linux go build -o sqmgr-guest-user-cleanup github.com/weters/sqmgr-api/cmd/sqmgr-guest-user-cleanup
+RUN CGO_ENABLED=0 GOOS=linux go build -o sqmgr-api github.com/sqmgr/sqmgr-api/cmd/sqmgr-api \
+ && CGO_ENABLED=0 GOOS=linux go build -o sqmgr-guest-user-cleanup github.com/sqmgr/sqmgr-api/cmd/sqmgr-guest-user-cleanup
 
 FROM alpine:latest
 EXPOSE 5000

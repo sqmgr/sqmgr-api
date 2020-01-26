@@ -18,7 +18,7 @@ package database
 
 import (
 	"database/sql"
-	"github.com/weters/sqmgr-api/internal/config"
+	"github.com/sqmgr/sqmgr-api/internal/config"
 )
 
 // Open will open a database based on an environment variable DSN

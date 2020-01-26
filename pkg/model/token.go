@@ -18,8 +18,7 @@ package model
 
 import (
 	"errors"
-
-	"github.com/weters/sqmgr-api/pkg/tokengen"
+	"github.com/sqmgr/sqmgr-api/pkg/tokengen"
 )
 
 // ErrRetryLimitExceeded is an error when too many attempts were made

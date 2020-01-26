@@ -20,15 +20,15 @@ import (
 	"bufio"
 	"context"
 	"flag"
-	"github.com/weters/sqmgr-api/internal/config"
+	"github.com/sqmgr/sqmgr-api/internal/config"
+	"github.com/sqmgr/sqmgr-api/internal/database"
+	"github.com/sqmgr/sqmgr-api/pkg/model"
 	"math/rand"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/weters/sqmgr-api/internal/database"
-	"github.com/weters/sqmgr-api/pkg/model"
 
 	_ "github.com/lib/pq"
 )

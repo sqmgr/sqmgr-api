@@ -19,8 +19,8 @@ package main
 import (
 	"flag"
 	"github.com/sirupsen/logrus"
-	"github.com/weters/sqmgr-api/internal/config"
-	"github.com/weters/sqmgr-api/internal/database"
+	"github.com/sqmgr/sqmgr-api/internal/config"
+	"github.com/sqmgr/sqmgr-api/internal/database"
 	_ "github.com/lib/pq"
 )
 
