@@ -3,6 +3,7 @@ on:
     branches:
 env:
   IMAGE: weters/sqmgr-api
+  LB_IMAGE: weters/sqmgr-lb
 jobs:
   build:
     name: 'Test and Build'
@@ -12,15 +13,19 @@ jobs:
         with:
           fetch-depth: 0
       - run: git fetch origin +refs/tags/*:refs/tags/*
-      - name: set image name
+      - name: set version
         run: echo "::set-env name=VERSION::$(git describe --always --dirty)"
       - name: docker log in
         run:  echo ${{ secrets.DOCKER_PASSWORD }} | base64 --decode | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
 
       - name: docker-build
-        run: docker build --build-arg version=${{ env.VERSION }} -t ${{ env.IMAGE }}:${{ env.VERSION }} .
+        run: |
+          docker build -t ${{ env.LB_IMAGE }}:${{ env.VERSION }} -f Dockerfile-liquibase .
+          docker build --build-arg version=${{ env.VERSION }} -t ${{ env.IMAGE }}:${{ env.VERSION }} .
       - name: docker-push
-        run: docker push ${{ env.IMAGE }}:${{ env.VERSION }}
+        run: |
+          docker push ${{ env.LB_IMAGE }}:${{ env.VERSION }}
+          docker push ${{ env.IMAGE }}:${{ env.VERSION }}
 
   deploy:
     name: 'Deploy'
@@ -33,10 +38,19 @@ jobs:
           fetch-depth: 0
       - run: git fetch origin +refs/tags/*:refs/tags/*
       - name: set image name
-        run: echo "::set-env name=IMAGE_TAG::$IMAGE:$(git describe --always --dirty)"
+        run: |
+          echo "::set-env name=IMAGE_TAG::$IMAGE:$(git describe --always --dirty)"
+          echo "::set-env name=LB_IMAGE_TAG::$LB_IMAGE:$(git describe --always --dirty)"
       - name: docker log in
         run:  echo ${{ secrets.DOCKER_PASSWORD }} | base64 --decode | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
 
+      - name: tag latest
+        run: |
+          docker pull ${{ env.LB_IMAGE_TAG }}
+          docker pull ${{ env.IMAGE_TAG }}
+          docker tag ${{ env.LB_IMAGE_TAG }} $LB_IMAGE:latest
+          docker tag ${{ env.IMAGE_TAG }} $IMAGE:latest
+          docker push $LB_IMAGE:latest
       - name: k8s-deploy
         uses: actions-hub/kubectl@master
         env:
@@ -49,8 +63,6 @@ jobs:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
           args: rollout status deploy sqmgr-api
-      - name: tag latest
+      - name: push latest
         run: |
-          docker pull ${{ env.IMAGE_TAG }}
-          docker tag ${{ env.IMAGE_TAG }} $IMAGE:latest
           docker push $IMAGE:latest
