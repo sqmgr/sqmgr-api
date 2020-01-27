@@ -2,6 +2,7 @@
 
 [![.github/workflows/workflow.yaml](https://github.com/sqmgr/sqmgr-api/workflows/.github/workflows/workflow.yaml/badge.svg?branch=master)](https://github.com/sqmgr/sqmgr-api/actions?query=workflow%3A.github%2Fworkflows%2Fworkflow.yaml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sqmgr/sqmgr-api)](https://goreportcard.com/report/github.com/sqmgr/sqmgr-api)
+[![Uptime Robot ratio (7 days)](https://img.shields.io/uptimerobot/ratio/7/m784218446-a4670157ea1065a5c3b1e700)](https://monitor.sqmgr.com/784218446)
 
 ## To start development
 
