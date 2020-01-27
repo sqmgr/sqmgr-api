@@ -1,6 +1,6 @@
 # sqmgr-api - The backend for SqMGR
 
-![.github/workflows/workflow.yaml](https://github.com/sqmgr/sqmgr-api/workflows/.github/workflows/workflow.yaml/badge.svg?branch=master)
+[![.github/workflows/workflow.yaml](https://github.com/sqmgr/sqmgr-api/workflows/.github/workflows/workflow.yaml/badge.svg?branch=master)](https://github.com/sqmgr/sqmgr-api/actions?query=workflow%3A.github%2Fworkflows%2Fworkflow.yaml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sqmgr/sqmgr-api)](https://goreportcard.com/report/github.com/sqmgr/sqmgr-api)
 
 ## To start development
