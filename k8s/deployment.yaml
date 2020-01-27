@@ -17,6 +17,8 @@ spec:
         app: sqmgr-api
         tier: backend
     spec:
+      imagePullSecrets:
+        - name: github
       initContainers:
         - name: liquibase
           image: weters/sqmgr-lb:latest
@@ -63,5 +65,3 @@ spec:
         - name: jwt-keys
           secret:
             secretName: sqmgr-jwt-keys
-      imagePullSecrets:
-      - name: docker-hub

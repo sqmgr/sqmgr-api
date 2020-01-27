@@ -20,28 +20,6 @@ DEPLOY_NAME ?= "sqmgr-api"
 run: .keys/private.pem .keys/public.pem
 	go run cmd/sqmgr-api/*.go -dev
 
-.PHONY: docker-build
-docker-build: test-integration
-	docker build -t ${IMG}:${VERSION} --build-arg VERSION=${VERSION} .
-	docker tag ${IMG}:${VERSION} ${IMG}:latest
-	docker build -t ${LB_IMG}:${VERSION} -f Dockerfile-liquibase .
-	docker tag ${LB_IMG}:${VERSION} ${LB_IMG}:latest
-
-.PHONY: docker-push
-docker-push:
-	docker push ${IMG}:${VERSION}
-	docker push ${IMG}:latest
-	docker push ${LB_IMG}:${VERSION}
-	docker push ${LB_IMG}:latest
-
-.PHONY: k8s-deploy
-k8s-deploy:
-	kubectl set image deploy ${DEPLOY_NAME} sqmgr=$(IMG):${VERSION} --record
-	kubectl rollout status deploy ${DEPLOY_NAME}
-
-.PHONY: release
-release: docker-build docker-push k8s-deploy
-
 .PHONY: test
 test:
 	golint -set_exit_status ./...

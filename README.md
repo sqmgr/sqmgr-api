@@ -1,5 +1,7 @@
 # sqmgr-api - The backend for SqMGR
 
+![.github/workflows/workflow.yaml](https://github.com/sqmgr/sqmgr-api/workflows/.github/workflows/workflow.yaml/badge.svg?branch=master)
+
 ## To start development
 
 Get a working [Go](https://golang.org/doc/install) and [Docker](https://docs.docker.com/install/) environment setup. Then you can start the development server using the following:
