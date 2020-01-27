@@ -177,8 +177,6 @@ func (p *Pool) JSON() *PoolJSON {
 	}
 }
 
-
-
 func (m *Model) poolByRow(scan scanFunc) (*Pool, error) {
 	s := Pool{model: m}
 	var locks *time.Time

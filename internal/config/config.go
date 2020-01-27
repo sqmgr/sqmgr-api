@@ -23,9 +23,9 @@ import (
 )
 
 type config struct {
-	dsn                string
-	jwtPrivateKey      string
-	jwtPublicKey       string
+	dsn           string
+	jwtPrivateKey string
+	jwtPublicKey  string
 }
 
 var instance *config
@@ -75,9 +75,9 @@ func Load() error {
 	}
 
 	instance = &config{
-		dsn:                viper.GetString("dsn"),
-		jwtPrivateKey:      viperGetStringOrFatal("jwt_private_key"),
-		jwtPublicKey:       viperGetStringOrFatal("jwt_public_key"),
+		dsn:           viper.GetString("dsn"),
+		jwtPrivateKey: viperGetStringOrFatal("jwt_private_key"),
+		jwtPublicKey:  viperGetStringOrFatal("jwt_public_key"),
 	}
 
 	return nil

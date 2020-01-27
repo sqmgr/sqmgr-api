@@ -23,7 +23,7 @@ import (
 	"net/http"
 )
 
-var optionsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { })
+var optionsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 
 func (s *Server) setupRoutes() {
 
@@ -70,7 +70,6 @@ func (s *Server) setupRoutes() {
 
 	pathTemplates := make(map[string]bool)
 
-
 	// add OPTIONS route
 	if err := s.Router.Walk(func(route *mux.Route, _ *mux.Router, _ []*mux.Route) error {
 		path, err := route.GetPathTemplate()
@@ -87,10 +86,9 @@ func (s *Server) setupRoutes() {
 		s.Router.Path(tpl).Methods(http.MethodOptions).Handler(optionsHandler)
 	}
 
-
 	c := cors.New(cors.Options{
-		AllowedMethods:         []string{http.MethodGet, http.MethodDelete, http.MethodPost, http.MethodPatch},
-		AllowedHeaders:         []string{"Authorization","Content-Type"},
+		AllowedMethods: []string{http.MethodGet, http.MethodDelete, http.MethodPost, http.MethodPatch},
+		AllowedHeaders: []string{"Authorization", "Content-Type"},
 	})
 	s.Router.Use(c.Handler)
 }

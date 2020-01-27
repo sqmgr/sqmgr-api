@@ -23,15 +23,15 @@ type GridType string
 
 // Allowed grid types
 const (
-	GridTypeStd100 GridType = "std100"
-	GridTypeStd25  GridType = "std25"
+	GridTypeStd100  GridType = "std100"
+	GridTypeStd25   GridType = "std25"
 	GridTypeRoll100 GridType = "roll100"
 )
 
 var validGridTypes = map[GridType]bool{
-	GridTypeStd100: true,
-	GridTypeStd25:  true,
-	GridTypeRoll100:  true,
+	GridTypeStd100:  true,
+	GridTypeStd25:   true,
+	GridTypeRoll100: true,
 }
 
 // ErrInvalidGridType is an error when a string has been typecast to a grid type that does not exist

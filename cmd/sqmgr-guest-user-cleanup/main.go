@@ -18,10 +18,10 @@ package main
 
 import (
 	"flag"
+	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	"github.com/sqmgr/sqmgr-api/internal/config"
 	"github.com/sqmgr/sqmgr-api/internal/database"
-	_ "github.com/lib/pq"
 )
 
 var dryrun = flag.Bool("dry-run", false, "only output what will be deleted")
@@ -67,7 +67,7 @@ func main() {
 		}
 
 		log.WithFields(logrus.Fields{
-			"store": store,
+			"store":   store,
 			"storeID": storeID,
 		}).Info("delete user")
 		if !*dryrun {

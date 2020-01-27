@@ -30,9 +30,9 @@ import (
 type Server struct {
 	*mux.Router
 	model     *model.Model
-	version string
+	version   string
 	keyLocker *keylocker.KeyLocker
-	smjwt *smjwt.SMJWT
+	smjwt     *smjwt.SMJWT
 }
 
 // New returns a new server object

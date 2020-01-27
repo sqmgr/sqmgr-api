@@ -23,6 +23,7 @@ run: .keys/private.pem .keys/public.pem
 .PHONY: test
 test:
 	golint -set_exit_status ./...
+	./hack/gofmt-check.sh
 	go vet ./...
 	go test -coverprofile=coverage.out ./...
 
@@ -95,3 +96,7 @@ testdata:
 .PHONY: wait
 wait:
 	sleep 1
+
+.PHONY: format
+format:
+	find . -type f -name '*.go' | xargs -L 1 gofmt -s -w

@@ -27,25 +27,25 @@ func (g GridAnnotationIconMapping) IsValidIcon(icon int16) bool {
 
 // GridAnnotationIcon is a font-awesome icon
 type GridAnnotationIcon struct {
-	Name    string `json:"name"`
+	Name string `json:"name"`
 }
 
 // AnnotationIcons maps "icon" values to a GridAnnotationIcon object
 var AnnotationIcons = GridAnnotationIconMapping{
 	0: {
-		Name:    "trophy",
+		Name: "trophy",
 	},
 	1: {
-		Name:    "dollar-sign",
+		Name: "dollar-sign",
 	},
 	2: {
-		Name:    "money-bill",
+		Name: "money-bill",
 	},
 	3: {
-		Name:    "exclamation-circle",
+		Name: "exclamation-circle",
 	},
 	4: {
-		Name:    "dice",
+		Name: "dice",
 	},
 	5: {
 		Name: "arrow-alt-circle-right",

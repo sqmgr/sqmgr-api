@@ -45,33 +45,31 @@ func (a ActionError) Error() string {
 // method will return the error, which will be the reason why. If the error returned is
 // an ActionError, it can be safely shown to the end user. Any other error should be interpreted
 // as a 500.
-func (m *Model) Can(ctx context.Context, action Action, u *User) error{
+func (m *Model) Can(ctx context.Context, action Action, u *User) error {
 	switch action {
 	// NOTE: we will probably want to do something a little more efficient in the future,
 	// like having a true "leaky bucket" rate limiting or something similar.
 	case ActionCreatePool:
 		count, err := u.PoolsCreatedWithin(ctx, time.Minute)
 		if err != nil {
-			return  err
+			return err
 		}
 
 		if count >= maxPoolsPerMinute {
-			return  ActionError(fmt.Sprintf("You cannot create more than %d pools per minute", maxPoolsPerMinute))
+			return ActionError(fmt.Sprintf("You cannot create more than %d pools per minute", maxPoolsPerMinute))
 		}
 
-		count, err = u.PoolsCreatedWithin(ctx, time.Hour * 24)
+		count, err = u.PoolsCreatedWithin(ctx, time.Hour*24)
 		if err != nil {
-			return  err
+			return err
 		}
 
 		if count >= maxPoolsPerDay {
-			return  ActionError(fmt.Sprintf("You cannot create more than %d pools per day", maxPoolsPerDay))
+			return ActionError(fmt.Sprintf("You cannot create more than %d pools per day", maxPoolsPerDay))
 		}
 
-		return  nil
+		return nil
 	}
 
 	panic(fmt.Sprintf("unsupported action %d", action))
 }
-
-

@@ -20,7 +20,7 @@ import "net/http"
 
 func (s *Server) getHealthEndpoint() http.HandlerFunc {
 	ok := map[string]string{
-		"status": "OK",
+		"status":  "OK",
 		"version": s.version,
 	}
 

@@ -195,7 +195,7 @@ func (u *User) IsAdminOf(ctx context.Context, p *Pool) (bool, error) {
 // PoolsCreatedWithin will return the number of pools a user has created within a given duration period
 func (u *User) PoolsCreatedWithin(ctx context.Context, within time.Duration) (int, error) {
 	const query = "SELECT COUNT(*) FROM pools WHERE user_id = $1 AND created > NOW() - INTERVAL '1 microsecond' * $2"
-	row := u.DB.QueryRowContext(ctx, query, u.ID, within / time.Microsecond)
+	row := u.DB.QueryRowContext(ctx, query, u.ID, within/time.Microsecond)
 	var count int
 	if err := row.Scan(&count); err != nil {
 		return 0, err
@@ -203,4 +203,3 @@ func (u *User) PoolsCreatedWithin(ctx context.Context, within time.Duration) (in
 
 	return count, nil
 }
-

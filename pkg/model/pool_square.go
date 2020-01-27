@@ -74,7 +74,7 @@ type PoolSquare struct {
 	userID         int64
 	SquareID       int             `json:"-"`
 	ParentSquareID int             `json:"-"`
-	ChildSquareIDs []int8           `json:"-"`
+	ChildSquareIDs []int8          `json:"-"`
 	State          PoolSquareState `json:"-"`
 	claimant       string
 	Modified       time.Time        `json:"-"`
@@ -112,7 +112,7 @@ type PoolSquareJSON struct {
 	UserID         int64            `json:"userId"`
 	SquareID       int              `json:"squareId"`
 	ParentSquareID int              `json:"parentSquareId"`
-	ChildSquareIDs []int8            `json:"childSquareIds"`
+	ChildSquareIDs []int8           `json:"childSquareIds"`
 	State          PoolSquareState  `json:"state"`
 	Claimant       string           `json:"claimant"`
 	Modified       time.Time        `json:"modified"`

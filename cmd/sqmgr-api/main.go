@@ -102,4 +102,3 @@ func main() {
 	}
 	logrus.Infoln("shutdown complete")
 }
-

@@ -27,14 +27,14 @@ const statusError = "error"
 
 // ErrorResponse represents an error
 type ErrorResponse struct {
-	Status string `json:"status"`
-	Error string `json:"error"`
+	Status           string           `json:"status"`
+	Error            string           `json:"error"`
 	ValidationErrors validator.Errors `json:"validationErrors,omitempty"`
 }
 
 func (s *Server) writeErrorResponse(w http.ResponseWriter, statusCode int, err error) {
 	msg := ""
-	if statusCode / 100 == 5 {
+	if statusCode/100 == 5 {
 		msg = http.StatusText(statusCode)
 
 		if err != nil {
@@ -67,7 +67,7 @@ func (s *Server) parseJSONPayload(w http.ResponseWriter, r *http.Request, obj in
 		return false
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(obj)	; err != nil {
+	if err := json.NewDecoder(r.Body).Decode(obj); err != nil {
 		s.writeErrorResponse(w, http.StatusBadRequest, err)
 		return false
 	}

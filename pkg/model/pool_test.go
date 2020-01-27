@@ -340,7 +340,7 @@ func TestArchiving(t *testing.T) {
 	g := gomega.NewWithT(t)
 	m := New(getDB())
 
-	user, err := m.GetUser(context.Background(), IssuerAuth0, "auth0|" + randString())
+	user, err := m.GetUser(context.Background(), IssuerAuth0, "auth0|"+randString())
 	g.Expect(err).Should(gomega.Succeed())
 
 	for i := 0; i < 3; i++ {
