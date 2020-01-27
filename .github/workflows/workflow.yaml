@@ -21,7 +21,7 @@ jobs:
       - name: docker-build
         run: |
           docker build -t ${{ env.LB_IMAGE }}:${{ env.VERSION }} -f Dockerfile-liquibase .
-          docker build --build-arg version=${{ env.VERSION }} -t ${{ env.IMAGE }}:${{ env.VERSION }} .
+          docker build --build-arg VERSION=${{ env.VERSION }} -t ${{ env.IMAGE }}:${{ env.VERSION }} .
       - name: docker-push
         run: |
           docker push ${{ env.LB_IMAGE }}:${{ env.VERSION }}
