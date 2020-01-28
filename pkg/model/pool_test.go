@@ -35,8 +35,13 @@ func getDB() *sql.DB {
 		return db
 	}
 
+	dsn := "sslmode=disable user=postgres database=integration"
+	if env := os.Getenv("SQMGR_CONF_DSN"); env != "" {
+		dsn = env
+	}
+
 	var err error
-	db, err = sql.Open("postgres", "sslmode=disable user=postgres database=integration")
+	db, err = sql.Open("postgres", dsn)
 	if err != nil {
 		panic(err)
 	}
