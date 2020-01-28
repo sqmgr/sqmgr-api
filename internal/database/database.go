@@ -81,4 +81,3 @@ func (m migrateLogger) Printf(format string, v ...interface{}) {
 func (m migrateLogger) Verbose() bool {
 	return false
 }
-
