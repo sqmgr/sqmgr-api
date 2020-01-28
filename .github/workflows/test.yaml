@@ -18,7 +18,7 @@ jobs:
       - run: |
           go mod download
           go install -tags postgres github.com/golang-migrate/migrate/v4/cmd/migrate
-          migrate -path ./sql -source "postgres://postgres:@localhost:5432?/postgres?sslmode=disable up
+          migrate -path ./sql -source postgres://postgres:@localhost:5432?/postgres?sslmode=disable up
           golint -set_exit_status ./...
           ./hack/gofmt-check.sh
           go vet ./...
