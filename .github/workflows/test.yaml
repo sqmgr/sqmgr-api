@@ -15,10 +15,10 @@ jobs:
       - uses: actions/setup-go@v1
         with:
           go-version: '1.12'
+      - run: go mod download
+      - run: go build -o migrate -tags postgres github.com/golang-migrate/migrate/v4/cmd/migrate
+      - run: ./migrate -path ./sql -database postgres://postgres:@localhost:5432/postgres?sslmode=disable up
       - run: |
-          go mod download
-          go build -o migrate -tags postgres github.com/golang-migrate/migrate/v4/cmd/migrate
-          ./migrate -path ./sql -source postgres://postgres:@localhost:5432?/postgres?sslmode=disable up
           golint -set_exit_status ./...
           ./hack/gofmt-check.sh
           go vet ./...
