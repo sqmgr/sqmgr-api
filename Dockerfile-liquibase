@@ -1,2 +1,0 @@
-FROM weters/pg-liquibase
-COPY sql/ sql/

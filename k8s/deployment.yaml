@@ -19,23 +19,6 @@ spec:
     spec:
       imagePullSecrets:
         - name: github
-      initContainers:
-        - name: liquibase
-          image: weters/sqmgr-lb:latest
-          imagePullPolicy: Always
-          envFrom:
-            - secretRef:
-                name: sqmgr-config
-          args:
-            - '--url'
-            - 'jdbc:postgresql://$(PG_HOST):$(PG_PORT)/$(PG_DBNAME)'
-            - '--username'
-            - '$(PG_USER)'
-            - '--password'
-            - '$(PG_PASSWORD)'
-            - '--changeLogFile'
-            - './sql/migrations.sql'
-            - 'update'
       containers:
       - name: sqmgr
         envFrom:
