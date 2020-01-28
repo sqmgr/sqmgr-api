@@ -18,4 +18,4 @@ limitations under the License.
 
 package internal
 
-import _ "golang.org/x/lint/golint"
+import _ "golang.org/x/lint/golint" // make sure this gets included in go mod
