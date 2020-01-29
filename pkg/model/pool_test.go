@@ -335,7 +335,7 @@ func TestLocks(t *testing.T) {
 	g.Expect(p.Locks()).Should(gomega.Equal(then))
 	g.Expect(p.IsLocked()).Should(gomega.BeFalse())
 
-	p.SetLocks(time.Now())
+	p.SetLocks(time.Now().Add(time.Second * -1))
 	g.Expect(p.IsLocked()).Should(gomega.BeTrue())
 }
 
