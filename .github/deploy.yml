@@ -1,6 +1,4 @@
 # deliverybot
 production:
-  required_contexts:
-    - Integration Tests
-    - Build
+  required_contexts: [Build]
   environment: production
