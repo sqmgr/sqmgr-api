@@ -28,18 +28,18 @@ jobs:
       - name: push version
         run: docker push ${{ env.IMAGE }}:${{ env.VERSION }}
 
-#      - name: k8s-deploy
-#        uses: actions-hub/kubectl@master
-#        env:
-#          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-#        with:
-#          args: set image deploy sqmgr-api sqmgr=${{ env.IMAGE_TAG }} --record
-#      - name: k8s-rollout
-#        uses: actions-hub/kubectl@master
-#        env:
-#          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-#        with:
-#          args: rollout status deploy sqmgr-api
+      - name: k8s-deploy
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: set image deploy sqmgr-api sqmgr=${{ env.IMAGE }}:${{ env.VERSION }} --record
+      - name: k8s-rollout
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: rollout status deploy sqmgr-api
 
       - name: push latest
         run: |

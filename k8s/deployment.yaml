@@ -33,6 +33,8 @@ spec:
           value: /opt/sqmgr/jwt-keys/private.pem
         image: weters/sqmgr-api:latest
         imagePullPolicy: Always
+        args:
+          - '-migrate'
         volumeMounts:
           - mountPath: /opt/sqmgr/jwt-keys
             name: jwt-keys
