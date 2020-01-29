@@ -42,5 +42,4 @@ jobs:
           args: rollout status deploy sqmgr-api
 
       - name: push latest
-        run: |
-          docker push $IMAGE:latest
+        run: docker push $IMAGE:latest
