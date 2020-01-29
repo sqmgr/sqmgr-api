@@ -15,6 +15,7 @@ RUN apk add --no-cache ca-certificates
 COPY --from=build-go /build/sqmgr-api /bin/sqmgr-api
 COPY --from=build-go /build/sqmgr-guest-user-cleanup /bin/sqmgr-guest-user-cleanup
 COPY --from=build-go /usr/share/zoneinfo/America/New_York /usr/share/zoneinfo/America/New_York
+COPY ./sql ./
 ARG VERSION
 ENV SQMGR_VERSION=${VERSION}
 ENTRYPOINT [ "/bin/sqmgr-api" ]
