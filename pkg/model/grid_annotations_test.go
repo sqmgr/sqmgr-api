@@ -19,10 +19,15 @@ package model
 import (
 	"context"
 	"github.com/onsi/gomega"
+	"os"
 	"testing"
 )
 
 func TestAnnotationBySquareID(t *testing.T) {
+	if len(os.Getenv("INTEGRATION")) == 0 {
+		t.Skip("skipping. to run, use -integration flag")
+	}
+
 	g := gomega.NewWithT(t)
 	m := New(getDB())
 	ctx := context.Background()
