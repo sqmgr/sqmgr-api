@@ -39,7 +39,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 EOF
 
-chomp( my @files = `find . \! -path '*/third-party/*' \! -path '*/node_modules/*' \! -path '*/vendor/*' \! -path '*/.git/*' -type f \\( -name '*.go' -o -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.vue' \\)` );
+chomp( my @files = `find . \! -path '*/third-party/*' \! -path '*/node_modules/*' \! -path '*/vendor/*' \! -path '*/.git/*' -type f \\( -name '*.go' -o -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.vue' -o -name '*.sql' \\)` );
 
 for my $file (@files) {
 	open my $fh, '<', $file
@@ -51,17 +51,23 @@ for my $file (@files) {
 		next;
 	}
 
-	my $opening_comment = '/*';
-	my $closing_comment = '*/';
-
-	if ( $file =~ /\.html\z/ ) {
-		$opening_comment = '{{/*';
-		$closing_comment = '*/}}';
-	}
-
 	my $tmp = File::Temp->new;
-	print $tmp "$opening_comment\n$license$closing_comment\n\n$content"
-		or die "could not write to tempfile: $!\n";
+	if ($file =~ /\.sql\z/) {
+		(my $local_license = $license) =~ s/^/-- /mg;
+		print $tmp "$local_license\n\n$content"
+			or die "could not write to tempfile: $!\n";
+	} else {
+		my $opening_comment = '/*';
+		my $closing_comment = '*/';
+
+		if ( $file =~ /\.html\z/ ) {
+			$opening_comment = '{{/*';
+			$closing_comment = '*/}}';
+		}
+
+		print $tmp "$opening_comment\n$license$closing_comment\n\n$content"
+			or die "could not write to tempfile: $!\n";
+	}
 	close $tmp
 		or die "could not close tempfile: $!\n";
 

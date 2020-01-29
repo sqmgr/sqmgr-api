@@ -67,35 +67,21 @@ integration-db: dev-db clean-integration
 .PHONY: dev-db-reset
 dev-db-reset: dev-db-delete dev-db wait migrations
 
-.PHONY: migrations
-migrations:
-	liquibase \
-		--changeLogFile ./sql/migrations.sql \
-		--driver org.postgresql.Driver \
-		--classpath ./third_party/jdbc/postgresql/postgresql-42.2.5.jar \
-		--url "jdbc:postgresql://${PG_HOST}:${PG_PORT}/${PG_DATABASE}" \
-		--username ${PG_USERNAME} \
-		--password ${PG_PASSWORD} \
-		update
-
-.PHONY: migrations-down
-migrations-down:
-	liquibase \
-		--changeLogFile ./sql/migrations.sql \
-		--driver org.postgresql.Driver \
-		--classpath ./third_party/jdbc/postgresql/postgresql-42.2.5.jar \
-		--url "jdbc:postgresql://${PG_HOST}:${PG_PORT}/${PG_DATABASE}" \
-		--username ${PG_USERNAME} \
-		--password ${PG_PASSWORD} \
-		rollbackCount ${ROLLBACK_COUNT}
-
 .PHONY: testdata
 testdata:
 	go run hack/testdata/*.go
 
+.PHONY: migrations
+migrations:
+	migrate -path ./sql -database postgres://postgres:@${PG_HOST}:${PG_PORT}/${PG_DATABASE}?sslmode=disable up
+
+.PHONY: migrations-down
+migrations-down:
+	migrate -path ./sql -database postgres://postgres:@${PG_HOST}:${PG_PORT}/${PG_DATABASE}?sslmode=disable down ${ROLLBACK_COUNT}
+
 .PHONY: wait
 wait:
-	sleep 1
+	sleep 2
 
 .PHONY: format
 format:

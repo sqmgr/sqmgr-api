@@ -35,7 +35,8 @@ import (
 )
 
 var addr = flag.String("addr", ":5000", "address for the server to listen on")
-var dev = flag.Bool("dev", false, "enabling dev mode turns on debug logging and template reloads")
+var sql = flag.String("sql", "./sql", "path to the SQL migrations")
+var migrate = flag.Bool("migrate", false, "whether to run the database migrations")
 
 const (
 	readTimeout  = time.Second * 5
@@ -44,13 +45,22 @@ const (
 
 func main() {
 	flag.Parse()
+
+	setupLogger()
+
 	if err := config.Load(); err != nil {
-		logrus.Fatalf("could not load config: %v", err)
+		logrus.WithError(err).Fatal("could not load config")
 	}
 
 	db, err := database.Open()
 	if err != nil {
-		logrus.Fatalf("could not open database: %v", err)
+		logrus.WithError(err).Fatal("could not open database")
+	}
+
+	if *migrate {
+		if err := database.ApplyMigrations(db, *sql); err != nil {
+			logrus.WithError(err).Fatal("could not apply migrations")
+		}
 	}
 
 	version := os.Getenv("SQMGR_VERSION")
@@ -59,20 +69,6 @@ func main() {
 	}
 
 	s := server.New(version, db)
-	if *dev {
-		logrus.Infof("enabling template reload")
-
-		logrus.SetLevel(logrus.DebugLevel)
-	}
-
-	if os.Getenv("LOG_LEVEL") != "" {
-		lvl, err := logrus.ParseLevel(os.Getenv("LOG_LEVEL"))
-		if err != nil {
-			logrus.WithError(err).Fatal("could not parse LOG_LEVEL")
-		}
-
-		logrus.SetLevel(lvl)
-	}
 
 	srv := &http.Server{
 		Addr:         *addr,
@@ -101,4 +97,15 @@ func main() {
 		logrus.WithError(err).Fatalln("could not shut down server")
 	}
 	logrus.Infoln("shutdown complete")
+}
+
+func setupLogger() {
+	if os.Getenv("LOG_LEVEL") != "" {
+		lvl, err := logrus.ParseLevel(os.Getenv("LOG_LEVEL"))
+		if err != nil {
+			logrus.WithError(err).Fatal("could not parse LOG_LEVEL")
+		}
+
+		logrus.SetLevel(lvl)
+	}
 }

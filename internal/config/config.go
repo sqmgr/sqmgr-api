@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"os"
 )
 
 type config struct {
@@ -32,6 +33,7 @@ var instance *config
 
 // DSN returns a database's data source name
 func DSN() string {
+	fmt.Fprintln(os.Stderr, instance.dsn)
 	mustHaveInstance()
 	return instance.dsn
 }

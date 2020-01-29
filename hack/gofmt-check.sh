@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 BAD_FILES=$(
   find . -type f -name '*.go' |
     xargs gofmt -l
