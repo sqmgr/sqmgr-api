@@ -11,12 +11,23 @@ Get a working [Go](https://golang.org/doc/install) and [Docker](https://docs.doc
 
 ```
 $ make git-hooks   # install any necessary git-hooks
-$ make dev-db      # starts a local PostgreSQL database in docker
-$ make migrations  # runs db migrations
 $ make run         # run the web server
 ```
 
 Verify you get a response by querying [localhost:5000](http://localhost:5000).
+
+### Makefile
+
+Below is a list of the most common Makefile commands you'll want to run.
+
+Command | Description
+--- | ---
+`make run` | This will run the web server. It will also ensure your keys have been generated and your dev database is running
+`make test` | Runs the unit and integration tests
+`make cover` | Generates a code coverage report
+`make testdata` | Creates test data for your database
+`make clean` | Tears down your dev environment. Removes any tools.
+`make fmt` | Runs gofmt on your go code
 
 ## Configuration
 
