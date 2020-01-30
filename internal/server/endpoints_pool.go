@@ -57,7 +57,6 @@ func (s *Server) poolHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		fmt.Println(pool.IsLocked(), pool.OpenAccessOnLock())
 		if pool.IsLocked() && pool.OpenAccessOnLock() {
 			// no auth required
 		} else {
