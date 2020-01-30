@@ -129,12 +129,12 @@ func (s *Server) poolGridSquareAdminHandler(next http.Handler) http.Handler {
 
 func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 	type payload struct {
-		Action          string  `json:"action"`
-		IDs             []int64 `json:"ids"`
-		Name            string  `json:"name"`
-		Password        string  `json:"password"`
-		ResetMembership bool    `json:"resetMembership"`
-		OpenAccessOnLock bool `json:"openAccessOnLock"`
+		Action           string  `json:"action"`
+		IDs              []int64 `json:"ids"`
+		Name             string  `json:"name"`
+		Password         string  `json:"password"`
+		ResetMembership  bool    `json:"resetMembership"`
+		OpenAccessOnLock bool    `json:"openAccessOnLock"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {

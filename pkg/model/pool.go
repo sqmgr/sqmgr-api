@@ -361,8 +361,9 @@ SET name = $1,
     locks = $4,
     check_id = $5,
     archived = $6,
+    open_access_on_lock = $7,
     modified = (NOW() AT TIME ZONE 'utc')
-WHERE id = $7`
+WHERE id = $8`
 
 	var locks *time.Time
 	if !p.locks.IsZero() {
@@ -370,7 +371,7 @@ WHERE id = $7`
 		locks = &locksInUTC
 	}
 
-	_, err := p.model.DB.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.archived, p.id)
+	_, err := p.model.DB.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.archived, p.openAccessOnLock, p.id)
 	return err
 }
 
