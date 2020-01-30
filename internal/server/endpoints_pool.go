@@ -134,6 +134,7 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 		Name            string  `json:"name"`
 		Password        string  `json:"password"`
 		ResetMembership bool    `json:"resetMembership"`
+		OpenAccessOnLock bool `json:"openAccessOnLock"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -160,6 +161,9 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 			err = pool.Save(r.Context())
 		case "unlock":
 			pool.SetLocks(time.Time{})
+			err = pool.Save(r.Context())
+		case "accessOnLock":
+			pool.SetOpenAccessOnLock(resp.OpenAccessOnLock)
 			err = pool.Save(r.Context())
 		case "reorderGrids":
 			err = pool.SetGridsOrder(r.Context(), resp.IDs)
