@@ -57,17 +57,22 @@ func (s *Server) poolHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		user := r.Context().Value(ctxUserKey).(*model.User)
+		fmt.Println(pool.IsLocked(), pool.OpenAccessOnLock())
+		if pool.IsLocked() && pool.OpenAccessOnLock() {
+			// no auth required
+		} else {
+			user := r.Context().Value(ctxUserKey).(*model.User)
 
-		isMemberOf, err := user.IsMemberOf(r.Context(), pool)
-		if err != nil {
-			s.writeErrorResponse(w, http.StatusInternalServerError, err)
-			return
-		}
+			isMemberOf, err := user.IsMemberOf(r.Context(), pool)
+			if err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
 
-		if !isMemberOf {
-			s.writeErrorResponse(w, http.StatusForbidden, nil)
-			return
+			if !isMemberOf {
+				s.writeErrorResponse(w, http.StatusForbidden, nil)
+				return
+			}
 		}
 
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxPoolKey, pool)))
@@ -129,11 +134,12 @@ func (s *Server) poolGridSquareAdminHandler(next http.Handler) http.Handler {
 
 func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 	type payload struct {
-		Action          string  `json:"action"`
-		IDs             []int64 `json:"ids"`
-		Name            string  `json:"name"`
-		Password        string  `json:"password"`
-		ResetMembership bool    `json:"resetMembership"`
+		Action           string  `json:"action"`
+		IDs              []int64 `json:"ids"`
+		Name             string  `json:"name"`
+		Password         string  `json:"password"`
+		ResetMembership  bool    `json:"resetMembership"`
+		OpenAccessOnLock bool    `json:"openAccessOnLock"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -160,6 +166,9 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 			err = pool.Save(r.Context())
 		case "unlock":
 			pool.SetLocks(time.Time{})
+			err = pool.Save(r.Context())
+		case "accessOnLock":
+			pool.SetOpenAccessOnLock(resp.OpenAccessOnLock)
 			err = pool.Save(r.Context())
 		case "reorderGrids":
 			err = pool.SetGridsOrder(r.Context(), resp.IDs)

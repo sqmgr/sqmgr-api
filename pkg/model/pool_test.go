@@ -96,6 +96,7 @@ func TestPool(t *testing.T) {
 	g.Expect(pool.name).Should(gomega.Equal("My Pool"))
 	g.Expect(pool.passwordHash).ShouldNot(gomega.Equal("my-other-unique-password"))
 	g.Expect(argon2id.Compare(pool.passwordHash, "my-other-unique-password")).Should(gomega.Succeed())
+	g.Expect(pool.OpenAccessOnLock()).Should(gomega.BeFalse())
 
 	originalPasswordHash := pool.passwordHash
 	g.Expect(pool.SetPassword("my-other-unique-password")).Should(gomega.Succeed())
@@ -106,6 +107,7 @@ func TestPool(t *testing.T) {
 
 	pool.IncrementCheckID()
 	pool.SetArchived(true)
+	pool.SetOpenAccessOnLock(true)
 
 	err = pool.Save(context.Background())
 	g.Expect(err).Should(gomega.Succeed())
@@ -118,6 +120,7 @@ func TestPool(t *testing.T) {
 	g.Expect(pool2.gridType).Should(gomega.Equal(GridTypeStd25))
 	g.Expect(pool2.CheckID()).Should(gomega.Equal(1))
 	g.Expect(pool2.Archived()).Should(gomega.BeTrue())
+	g.Expect(pool2.OpenAccessOnLock()).Should(gomega.BeTrue())
 
 	pool3, err := m.PoolByToken(context.Background(), pool2.token)
 	g.Expect(err).Should(gomega.Succeed())

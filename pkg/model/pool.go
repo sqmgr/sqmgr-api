@@ -38,20 +38,33 @@ const MaxGridsPerPool = 50
 // Pool is an individual pool board
 // This object uses getters and setters to help guard against user input.
 type Pool struct {
-	model        *Model
-	id           int64
-	token        string
-	userID       int64
-	name         string
-	gridType     GridType
-	passwordHash string
-	checkID      int
-	archived     bool
-	locks        time.Time
-	created      time.Time
-	modified     time.Time
+	model            *Model
+	id               int64
+	token            string
+	userID           int64
+	name             string
+	gridType         GridType
+	passwordHash     string
+	checkID          int
+	archived         bool
+	openAccessOnLock bool
+	locks            time.Time
+	created          time.Time
+	modified         time.Time
 
 	squares map[int]*PoolSquare
+}
+
+// OpenAccessOnLock returns whether a password is required
+// when the pool has been locked.
+func (p *Pool) OpenAccessOnLock() bool {
+	return p.openAccessOnLock
+}
+
+// SetOpenAccessOnLock sets whether passwords are required
+// when the pool is locked
+func (p *Pool) SetOpenAccessOnLock(openAccess bool) {
+	p.openAccessOnLock = openAccess
 }
 
 // Archived is the getter whether the pool has been archived
@@ -101,13 +114,14 @@ func PoolWithID(id int64) *Pool {
 
 // PoolJSON represents an object that can be exposed to an end-user
 type PoolJSON struct {
-	Token    string    `json:"token"`
-	Name     string    `json:"name"`
-	GridType GridType  `json:"gridType"`
-	Archived bool      `json:"archived"`
-	Locks    time.Time `json:"locks"`
-	Created  time.Time `json:"created"`
-	Modified time.Time `json:"modified"`
+	Token            string    `json:"token"`
+	Name             string    `json:"name"`
+	GridType         GridType  `json:"gridType"`
+	Archived         bool      `json:"archived"`
+	OpenAccessOnLock bool      `json:"openAccessOnLock"`
+	Locks            time.Time `json:"locks"`
+	Created          time.Time `json:"created"`
+	Modified         time.Time `json:"modified"`
 }
 
 // ID returns the id
@@ -167,38 +181,39 @@ func (p *Pool) NumberOfSquares() int {
 // JSON returns JSON that can be sent to the front-end
 func (p *Pool) JSON() *PoolJSON {
 	return &PoolJSON{
-		Token:    p.token,
-		Name:     p.name,
-		Locks:    p.Locks(),
-		Archived: p.Archived(),
-		GridType: p.gridType,
-		Created:  p.created,
-		Modified: p.modified,
+		Token:            p.token,
+		Name:             p.name,
+		OpenAccessOnLock: p.OpenAccessOnLock(),
+		Locks:            p.Locks(),
+		Archived:         p.Archived(),
+		GridType:         p.gridType,
+		Created:          p.created,
+		Modified:         p.modified,
 	}
 }
 
 func (m *Model) poolByRow(scan scanFunc) (*Pool, error) {
-	s := Pool{model: m}
+	pool := Pool{model: m}
 	var locks *time.Time
-	if err := scan(&s.id, &s.token, &s.userID, &s.name, &s.gridType, &s.passwordHash, &locks, &s.created, &s.modified, &s.checkID, &s.archived); err != nil {
+	if err := scan(&pool.id, &pool.token, &pool.userID, &pool.name, &pool.gridType, &pool.passwordHash, &pool.openAccessOnLock, &locks, &pool.created, &pool.modified, &pool.checkID, &pool.archived); err != nil {
 		return nil, err
 	}
 
 	if locks != nil {
-		s.locks = locks.In(locationNewYork)
+		pool.locks = locks.In(locationNewYork)
 	}
 
 	// XXX: do we want the ability to let the user choose the time zone?
-	s.created = s.created.In(locationNewYork)
-	s.modified = s.modified.In(locationNewYork)
+	pool.created = pool.created.In(locationNewYork)
+	pool.modified = pool.modified.In(locationNewYork)
 
-	return &s, nil
+	return &pool, nil
 }
 
 // PoolsJoinedByUserID will return a collection of pools that the user joined
 func (m *Model) PoolsJoinedByUserID(ctx context.Context, userID int64, offset int64, limit int) ([]*Pool, error) {
 	const query = `
-		SELECT pools.*
+		SELECT ` + poolColumns + `
 		FROM pools
 		LEFT JOIN pools_users ON pools.id = pools_users.pool_id
 		WHERE pools_users.user_id = $1
@@ -223,7 +238,7 @@ func (m *Model) PoolsJoinedByUserIDCount(ctx context.Context, userID int64) (int
 // PoolsOwnedByUserID will return a collection of pools that were created by the user
 func (m *Model) PoolsOwnedByUserID(ctx context.Context, userID int64, includeArchived bool, offset int64, limit int) ([]*Pool, error) {
 	const baseQuery = `
-		SELECT *
+		SELECT ` + poolColumns + `
 		FROM pools
 		WHERE user_id = $1%s
 		ORDER BY pools.id DESC
@@ -284,13 +299,13 @@ func (m *Model) poolsCount(row *sql.Row) (int64, error) {
 
 // PoolByToken will return the pools with the matching token
 func (m *Model) PoolByToken(ctx context.Context, token string) (*Pool, error) {
-	row := m.DB.QueryRowContext(ctx, "SELECT * FROM pools WHERE token = $1", token)
+	row := m.DB.QueryRowContext(ctx, "SELECT "+poolColumns+" FROM pools WHERE token = $1", token)
 	return m.poolByRow(row.Scan)
 }
 
 // PoolByID will return the pools with the matching ID
 func (m *Model) PoolByID(id int64) (*Pool, error) {
-	row := m.DB.QueryRow("SELECT * FROM pools WHERE id = $1", id)
+	row := m.DB.QueryRow("SELECT "+poolColumns+" FROM pools WHERE id = $1", id)
 	return m.poolByRow(row.Scan)
 }
 
@@ -311,8 +326,8 @@ func (m *Model) NewPool(ctx context.Context, userID int64, name string, gridType
 	}
 
 	const query = `
-		SELECT *
-		FROM new_pool($1, $2, $3, $4, $5, $6)
+		SELECT ` + poolColumns + `
+		FROM new_pool($1, $2, $3, $4, $5, $6) AS pools
 	`
 
 	row := m.DB.QueryRowContext(ctx, query, token, userID, name, gridType, passwordHash, gridType.Squares())
@@ -346,8 +361,9 @@ SET name = $1,
     locks = $4,
     check_id = $5,
     archived = $6,
+    open_access_on_lock = $7,
     modified = (NOW() AT TIME ZONE 'utc')
-WHERE id = $7`
+WHERE id = $8`
 
 	var locks *time.Time
 	if !p.locks.IsZero() {
@@ -355,7 +371,7 @@ WHERE id = $7`
 		locks = &locksInUTC
 	}
 
-	_, err := p.model.DB.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.archived, p.id)
+	_, err := p.model.DB.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.archived, p.openAccessOnLock, p.id)
 	return err
 }
 
@@ -698,3 +714,18 @@ func (p *Pool) RemoveAllMembers(ctx context.Context) error {
 	_, err := p.model.DB.ExecContext(ctx, "DELETE FROM pools_users WHERE pool_id = $1", p.ID())
 	return err
 }
+
+const poolColumns = `
+pools.id,
+pools.token,
+pools.user_id,
+pools.name,
+pools.grid_type,
+pools.password_hash,
+pools.open_access_on_lock,
+pools.locks,
+pools.created,
+pools.modified,
+pools.check_id,
+pools.archived
+`
