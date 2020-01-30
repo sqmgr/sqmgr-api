@@ -57,17 +57,22 @@ func (s *Server) poolHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		user := r.Context().Value(ctxUserKey).(*model.User)
+		fmt.Println(pool.IsLocked(), pool.OpenAccessOnLock())
+		if pool.IsLocked() && pool.OpenAccessOnLock() {
+			// no auth required
+		} else {
+			user := r.Context().Value(ctxUserKey).(*model.User)
 
-		isMemberOf, err := user.IsMemberOf(r.Context(), pool)
-		if err != nil {
-			s.writeErrorResponse(w, http.StatusInternalServerError, err)
-			return
-		}
+			isMemberOf, err := user.IsMemberOf(r.Context(), pool)
+			if err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
 
-		if !isMemberOf {
-			s.writeErrorResponse(w, http.StatusForbidden, nil)
-			return
+			if !isMemberOf {
+				s.writeErrorResponse(w, http.StatusForbidden, nil)
+				return
+			}
 		}
 
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxPoolKey, pool)))
