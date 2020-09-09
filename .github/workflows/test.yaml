@@ -11,6 +11,13 @@ jobs:
         image: postgres:11
         ports:
           - 5432/tcp
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        env:
+          POSTGRES_PASSWORD: f5Xi2XjwzuyJ
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v1
@@ -19,9 +26,9 @@ jobs:
       - run: go mod download
       - run: go build -o migrate -tags postgres github.com/golang-migrate/migrate/v4/cmd/migrate
       - run: go build -o golint golang.org/x/lint/golint
-      - run: ./migrate -path ./sql -database postgres://postgres:@localhost:${{ job.services.postgres.ports['5432'] }}/postgres?sslmode=disable up
+      - run: ./migrate -path ./sql -database postgres://postgres:f5Xi2XjwzuyJ@localhost:${{ job.services.postgres.ports['5432'] }}/postgres?sslmode=disable up
       - run: |
           ./golint -set_exit_status ./...
           ./hack/gofmt-check.sh
           go vet ./...
-      - run: SQMGR_CONF_DSN="user=postgres port=${{ job.services.postgres.ports['5432'] }} sslmode=disable" INTEGRATION=1 go test -coverprofile=coverage.out ./...
+      - run: SQMGR_CONF_DSN="user=postgres port=${{ job.services.postgres.ports['5432'] }} password=f5Xi2XjwzuyJ sslmode=disable" INTEGRATION=1 go test -coverprofile=coverage.out ./...

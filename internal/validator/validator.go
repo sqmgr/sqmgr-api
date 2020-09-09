@@ -35,7 +35,7 @@ var nonPrintableRx = regexp.MustCompile(`\p{C}`)
 
 // \r\n (\x0d \x0a) is included in \p{C} (specifically \p{Cc}, so we need to work around it
 var nonPrintableExcludeNewlineRx = regexp.MustCompile(`[\p{Cf}\p{Co}\p{Cs}\x00-\x09\x0b\x0c\x0e-\x1f\x7f-\x9f]`)
-var colorRx = regexp.MustCompile(`^#[a-fA-F0-9]{6}\z`)
+var colorRx = regexp.MustCompile(`^#[a-fA-F0-9]{3,6}\z`)
 var wordCharRx = regexp.MustCompile(`[\p{L}\p{N}]`)
 
 // Errors is a mapping of fields to a list of errors
