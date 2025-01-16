@@ -77,7 +77,7 @@ func main() {
 		WriteTimeout: writeTimeout,
 	}
 
-	sig := make(chan os.Signal)
+	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
 
 	go func() {
