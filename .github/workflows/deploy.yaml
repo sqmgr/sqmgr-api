@@ -20,7 +20,7 @@ jobs:
       - run: git fetch origin +refs/tags/*:refs/tags/*
 
       - name: set version
-        run: echo "::set-env name=VERSION::$(git describe --always --dirty)"
+        run: echo "VERSION=$(git describe --always --dirty)" >> $GITHUB_ENV
 
       - name: set image
         uses: actions-hub/kubectl@master
