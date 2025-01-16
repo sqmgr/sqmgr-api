@@ -43,7 +43,7 @@ git-hooks: .git/hooks/pre-commit
 
 .PHONY: dev-db
 dev-db:
-	-docker run --name sqmgr-postgres --detach --publish 5432:5432 postgres:11
+	-docker run --name sqmgr-postgres --detach --publish 5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:11
 	@docker exec sqmgr-postgres bash -c 'for i in {1..30}; do if /usr/bin/pg_isready>/dev/null 2>&1; then break; fi; sleep 0.1; done;'
 
 .PHONY: integration-db

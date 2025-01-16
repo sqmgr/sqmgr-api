@@ -15,7 +15,6 @@
 
 BEGIN;
 
-ALTER TABLE pools
-DROP COLUMN open_access_on_lock;
+CREATE INDEX pool_squares_parent_id_idx ON pool_squares (parent_id);
 
 COMMIT;

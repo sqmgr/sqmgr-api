@@ -398,24 +398,28 @@ func (p *Pool) CheckIDIsValid(check int) bool {
 func (p *Pool) Squares() (map[int]*PoolSquare, error) {
 	if p.squares == nil {
 		const query = `
-		SELECT
-		       ps.id,
-		       ps.square_id,
-		       ps.parent_id,
-		       ps.user_id,
-		       ps.state,
-		       ps.claimant,
-		       ps.modified,
-		       ps2.square_id AS parent_square_id,
-		       (SELECT array_agg(square_id) FROM pool_squares ps3 WHERE ps3.parent_id = ps.id) AS child_square_ids
-		FROM
-		     pool_squares ps
-		LEFT JOIN
-		         pool_squares ps2 ON ps.parent_id = ps2.id
-		WHERE
-		      ps.pool_id = $1
-		ORDER BY
-		         ps.square_id`
+SELECT ps.id,
+       ps.square_id,
+       ps.parent_id,
+       ps.user_id,
+       ps.state,
+       ps.claimant,
+       ps.modified,
+       ps2.square_id                                                                   AS parent_square_id,
+       NULLIF(array_agg(ps3.square_id) FILTER (WHERE ps3.square_id IS NOT NULL), '{}') AS child_square_ids
+FROM pool_squares ps
+         LEFT JOIN pool_squares ps2 ON ps.parent_id = ps2.id
+         LEFT JOIN pool_squares ps3 ON ps.id = ps3.parent_id -- bring in child squares
+WHERE ps.pool_id = $1
+GROUP BY ps.id,
+         ps.square_id,
+         ps.parent_id,
+         ps.user_id,
+         ps.state,
+         ps.claimant,
+         ps.modified,
+         ps2.square_id
+ORDER BY ps.square_id`
 
 		rows, err := p.model.DB.Query(query, p.id)
 		if err != nil {
