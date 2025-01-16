@@ -1,5 +1,6 @@
 name: Deploy
-on: [deployment]
+on:
+  workflow_dispatch:
 env:
   IMAGE: weters/sqmgr-api
 jobs:
