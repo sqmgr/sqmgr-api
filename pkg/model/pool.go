@@ -47,12 +47,23 @@ type Pool struct {
 	passwordHash     string
 	checkID          int
 	archived         bool
+	passwordRequired bool
 	openAccessOnLock bool
 	locks            time.Time
 	created          time.Time
 	modified         time.Time
 
 	squares map[int]*PoolSquare
+}
+
+// PasswordRequired returns whether the password is actually required to join the pool
+func (p *Pool) PasswordRequired() bool {
+	return p.passwordRequired
+}
+
+// SetPasswordRequired will set whether the password is required to join the pool
+func (p *Pool) SetPasswordRequired(passwordRequired bool) {
+	p.passwordRequired = passwordRequired
 }
 
 // OpenAccessOnLock returns whether a password is required
@@ -118,6 +129,7 @@ type PoolJSON struct {
 	Name             string    `json:"name"`
 	GridType         GridType  `json:"gridType"`
 	Archived         bool      `json:"archived"`
+	PasswordRequired bool      `json:"passwordRequired"`
 	OpenAccessOnLock bool      `json:"openAccessOnLock"`
 	Locks            time.Time `json:"locks"`
 	Created          time.Time `json:"created"`
@@ -183,10 +195,11 @@ func (p *Pool) JSON() *PoolJSON {
 	return &PoolJSON{
 		Token:            p.token,
 		Name:             p.name,
+		GridType:         p.gridType,
+		Archived:         p.Archived(),
+		PasswordRequired: p.PasswordRequired(),
 		OpenAccessOnLock: p.OpenAccessOnLock(),
 		Locks:            p.Locks(),
-		Archived:         p.Archived(),
-		GridType:         p.gridType,
 		Created:          p.created,
 		Modified:         p.modified,
 	}
@@ -195,7 +208,7 @@ func (p *Pool) JSON() *PoolJSON {
 func (m *Model) poolByRow(scan scanFunc) (*Pool, error) {
 	pool := Pool{model: m}
 	var locks *time.Time
-	if err := scan(&pool.id, &pool.token, &pool.userID, &pool.name, &pool.gridType, &pool.passwordHash, &pool.openAccessOnLock, &locks, &pool.created, &pool.modified, &pool.checkID, &pool.archived); err != nil {
+	if err := scan(&pool.id, &pool.token, &pool.userID, &pool.name, &pool.gridType, &pool.passwordHash, &pool.passwordRequired, &pool.openAccessOnLock, &locks, &pool.created, &pool.modified, &pool.checkID, &pool.archived); err != nil {
 		return nil, err
 	}
 
@@ -361,9 +374,10 @@ SET name = $1,
     locks = $4,
     check_id = $5,
     archived = $6,
-    open_access_on_lock = $7,
+    password_required = $7,
+    open_access_on_lock = $8,
     modified = (NOW() AT TIME ZONE 'utc')
-WHERE id = $8`
+WHERE id = $9`
 
 	var locks *time.Time
 	if !p.locks.IsZero() {
@@ -371,7 +385,7 @@ WHERE id = $8`
 		locks = &locksInUTC
 	}
 
-	_, err := p.model.DB.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.archived, p.openAccessOnLock, p.id)
+	_, err := p.model.DB.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.archived, p.passwordRequired, p.openAccessOnLock, p.id)
 	return err
 }
 
@@ -726,6 +740,7 @@ pools.user_id,
 pools.name,
 pools.grid_type,
 pools.password_hash,
+pools.password_required,
 pools.open_access_on_lock,
 pools.locks,
 pools.created,

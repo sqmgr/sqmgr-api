@@ -57,7 +57,7 @@ func (s *Server) poolHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		if pool.IsLocked() && pool.OpenAccessOnLock() {
+		if (pool.IsLocked() && pool.OpenAccessOnLock()) || !pool.PasswordRequired() {
 			// no auth required
 		} else {
 			user := r.Context().Value(ctxUserKey).(*model.User)
@@ -138,6 +138,7 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 		Name             string  `json:"name"`
 		Password         string  `json:"password"`
 		ResetMembership  bool    `json:"resetMembership"`
+		PasswordRequired bool    `json:"passwordRequired"`
 		OpenAccessOnLock bool    `json:"openAccessOnLock"`
 	}
 
@@ -165,6 +166,9 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 			err = pool.Save(r.Context())
 		case "unlock":
 			pool.SetLocks(time.Time{})
+			err = pool.Save(r.Context())
+		case "passwordRequired":
+			pool.SetPasswordRequired(resp.PasswordRequired)
 			err = pool.Save(r.Context())
 		case "accessOnLock":
 			pool.SetOpenAccessOnLock(resp.OpenAccessOnLock)
