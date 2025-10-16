@@ -34,7 +34,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
-var addr = flag.String("addr", ":5000", "address for the server to listen on")
+var addr = flag.String("addr", getEnvOrElse("ADDR", ":5000"), "address for the server to listen on")
 var sql = flag.String("sql", "./sql", "path to the SQL migrations")
 var migrate = flag.Bool("migrate", false, "whether to run the database migrations")
 
@@ -108,4 +108,12 @@ func setupLogger() {
 
 		logrus.SetLevel(lvl)
 	}
+}
+
+func getEnvOrElse(key string, def string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+
+	return def
 }

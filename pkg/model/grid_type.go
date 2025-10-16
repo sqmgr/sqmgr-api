@@ -24,12 +24,14 @@ type GridType string
 // Allowed grid types
 const (
 	GridTypeStd100  GridType = "std100"
+	GridTypeStd50   GridType = "std50"
 	GridTypeStd25   GridType = "std25"
 	GridTypeRoll100 GridType = "roll100"
 )
 
 var validGridTypes = map[GridType]bool{
 	GridTypeStd100:  true,
+	GridTypeStd50:   true,
 	GridTypeStd25:   true,
 	GridTypeRoll100: true,
 }
@@ -42,6 +44,8 @@ func (g GridType) Description() string {
 	switch g {
 	case GridTypeStd100:
 		return "Standard, 100 squares"
+	case GridTypeStd50:
+		return "Standard, 50 squares"
 	case GridTypeStd25:
 		return "Standard, 25 squares"
 	case GridTypeRoll100:
@@ -56,6 +60,8 @@ func (g GridType) Squares() int {
 	switch g {
 	case GridTypeStd25:
 		return 25
+	case GridTypeStd50:
+		return 50
 	default:
 		return 100
 	}
@@ -72,5 +78,5 @@ func IsValidGridType(val string) error {
 
 // GridTypes returns a list of allowed grid types
 func GridTypes() []GridType {
-	return []GridType{GridTypeStd100, GridTypeStd25, GridTypeRoll100}
+	return []GridType{GridTypeStd100, GridTypeStd50, GridTypeStd25, GridTypeRoll100}
 }

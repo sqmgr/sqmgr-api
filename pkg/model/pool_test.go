@@ -397,6 +397,9 @@ func TestNumberOfSquares(t *testing.T) {
 	p := Pool{gridType: GridTypeStd25}
 	g.Expect(p.NumberOfSquares()).Should(gomega.Equal(25))
 
+	p.gridType = GridTypeStd50
+	g.Expect(p.NumberOfSquares()).Should(gomega.Equal(50))
+
 	p.gridType = GridTypeStd100
 	g.Expect(p.NumberOfSquares()).Should(gomega.Equal(100))
 
