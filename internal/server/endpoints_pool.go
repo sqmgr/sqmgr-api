@@ -58,7 +58,12 @@ func (s *Server) poolHandler(next http.Handler) http.Handler {
 		}
 
 		if (pool.IsLocked() && pool.OpenAccessOnLock()) || !pool.PasswordRequired() {
-			// no auth required
+			// Auto-join user to pool since no password is required
+			user := r.Context().Value(ctxUserKey).(*model.User)
+			if err := user.JoinPool(r.Context(), pool); err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
 		} else {
 			user := r.Context().Value(ctxUserKey).(*model.User)
 
