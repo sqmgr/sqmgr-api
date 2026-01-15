@@ -20,10 +20,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 var httpClient = &http.Client{Timeout: time.Second * 3}

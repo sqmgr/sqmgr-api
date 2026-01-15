@@ -19,11 +19,12 @@ package server
 import (
 	"context"
 	"errors"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/sirupsen/logrus"
-	"github.com/sqmgr/sqmgr-api/pkg/model"
 	"net/http"
 	"strings"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/sirupsen/logrus"
+	"github.com/sqmgr/sqmgr-api/pkg/model"
 )
 
 const audienceSqMGR = "api.sqmgr.com"
@@ -42,37 +43,39 @@ func (s *Server) authHandler(next http.Handler) http.Handler {
 		token, err := jwt.Parse(parts[1], func(token *jwt.Token) (interface{}, error) {
 			claims := token.Claims.(jwt.MapClaims)
 
-			audSlice, ok := claims["aud"].([]interface{})
-			if ok {
-				audMatched := false
+			// Check audience - handle both string and array formats
+			audMatched := false
+			if audSlice, ok := claims["aud"].([]interface{}); ok {
 				for _, iAud := range audSlice {
-					aud, _ := iAud.(string)
-					if aud == audienceSqMGR {
+					if aud, _ := iAud.(string); aud == audienceSqMGR {
 						audMatched = true
 						break
 					}
 				}
-
-				if !audMatched {
-					return token, errors.New("invalid audience")
-				}
-			} else if !claims.VerifyAudience(audienceSqMGR, true) {
-				return token, errors.New("invalid audience")
+			} else if aud, ok := claims["aud"].(string); ok && aud == audienceSqMGR {
+				audMatched = true
 			}
 
-			if claims.VerifyIssuer(model.IssuerAuth0, true) {
-				issuer = model.IssuerAuth0
-				cert, err := s.keyLocker.GetPEMCert(token)
-				if err != nil {
-					return token, err
-				}
-				return jwt.ParseRSAPublicKeyFromPEM([]byte(cert))
-			} else if claims.VerifyIssuer(model.IssuerSqMGR, true) {
-				issuer = model.IssuerSqMGR
-				return s.smjwt.PublicKey(), nil
+			if !audMatched {
+				return nil, errors.New("invalid audience")
 			}
 
-			return token, errors.New("invalid issuer")
+			// Check issuer and return appropriate key
+			if iss, ok := claims["iss"].(string); ok {
+				if iss == model.IssuerAuth0 {
+					issuer = model.IssuerAuth0
+					cert, err := s.keyLocker.GetPEMCert(token)
+					if err != nil {
+						return nil, err
+					}
+					return jwt.ParseRSAPublicKeyFromPEM([]byte(cert))
+				} else if iss == model.IssuerSqMGR {
+					issuer = model.IssuerSqMGR
+					return s.smjwt.PublicKey(), nil
+				}
+			}
+
+			return nil, errors.New("invalid issuer")
 		})
 
 		if err != nil {
