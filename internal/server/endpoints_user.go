@@ -21,13 +21,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/google/uuid"
-	"github.com/gorilla/mux"
-	"github.com/sqmgr/sqmgr-api/pkg/model"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+	"github.com/sqmgr/sqmgr-api/pkg/model"
 )
 
 // User has 7 days on this token
@@ -197,9 +198,18 @@ func (s *Server) postUserIDGuestJWT() http.HandlerFunc {
 			return
 		}
 
-		claims := token.Claims.(*jwt.StandardClaims)
-		if !claims.VerifyIssuer(model.IssuerSqMGR, true) ||
-			!claims.VerifyAudience(audienceSqMGR, true) {
+		claims := token.Claims.(*jwt.RegisteredClaims)
+
+		// Verify audience
+		audValid := false
+		for _, aud := range claims.Audience {
+			if aud == audienceSqMGR {
+				audValid = true
+				break
+			}
+		}
+
+		if claims.Issuer != model.IssuerSqMGR || !audValid {
 			s.writeErrorResponse(w, http.StatusBadRequest, errors.New("invalid guest JWT"))
 			return
 		}
@@ -244,10 +254,10 @@ func (s *Server) postUserGuestEndpoint() http.HandlerFunc {
 		expiresAt := time.Now().Add(guestJWTExpiresDuration)
 
 		uid := fmt.Sprintf("sqmgr|%s", u.String())
-		claims := jwt.StandardClaims{
-			Audience:  audienceSqMGR,
-			ExpiresAt: expiresAt.Unix(),
-			IssuedAt:  time.Now().Unix(),
+		claims := jwt.RegisteredClaims{
+			Audience:  jwt.ClaimStrings{audienceSqMGR},
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    model.IssuerSqMGR,
 			Subject:   uid,
 		}

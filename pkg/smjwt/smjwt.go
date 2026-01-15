@@ -19,8 +19,9 @@ package smjwt
 import (
 	"crypto/rsa"
 	"errors"
-	"github.com/dgrijalva/jwt-go"
-	"io/ioutil"
+	"os"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // ErrNoPrivateKeySpecified is an error when a private key hasn't been specified
@@ -51,7 +52,7 @@ func New() *SMJWT {
 
 // LoadPublicKey will load the public key from the specified filename.
 func (s *SMJWT) LoadPublicKey(filename string) error {
-	file, err := ioutil.ReadFile(filename)
+	file, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
@@ -67,7 +68,7 @@ func (s *SMJWT) LoadPublicKey(filename string) error {
 
 // LoadPrivateKey will load the private key from the specified filename.
 func (s *SMJWT) LoadPrivateKey(filename string) error {
-	file, err := ioutil.ReadFile(filename)
+	file, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
@@ -94,7 +95,7 @@ func (s *SMJWT) Sign(claims jwt.Claims) (string, error) {
 
 // Validate will return the token if there were no errors and everything is fully valid. This method takes
 // an optional second argument of a jwt.Claims object that can be used to specify the claims type. If this is left out,
-// it will default to jwt.StandardClaims.
+// it will default to jwt.RegisteredClaims.
 // You MUST call LoadPublicKey before you can use this method.
 func (s *SMJWT) Validate(tokenStr string, customClaims ...jwt.Claims) (*jwt.Token, error) {
 	if s.publicKey == nil {
@@ -105,10 +106,10 @@ func (s *SMJWT) Validate(tokenStr string, customClaims ...jwt.Claims) (*jwt.Toke
 	if len(customClaims) > 0 {
 		claimsType = customClaims[0]
 	} else {
-		claimsType = &jwt.StandardClaims{}
+		claimsType = &jwt.RegisteredClaims{}
 	}
 
-	token, err := jwt.ParseWithClaims(tokenStr, claimsType, func(token *jwt.Token) (i interface{}, e error) {
+	token, err := jwt.ParseWithClaims(tokenStr, claimsType, func(token *jwt.Token) (interface{}, error) {
 		return s.publicKey, nil
 	})
 
@@ -117,7 +118,7 @@ func (s *SMJWT) Validate(tokenStr string, customClaims ...jwt.Claims) (*jwt.Toke
 		return token, nil
 	}
 
-	if ve, ok := err.(*jwt.ValidationError); ok && ve.Errors&jwt.ValidationErrorExpired > 0 {
+	if errors.Is(err, jwt.ErrTokenExpired) {
 		return nil, ErrExpired
 	}
 

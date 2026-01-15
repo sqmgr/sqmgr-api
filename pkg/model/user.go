@@ -21,8 +21,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // ErrUserExists is an error when the user already exists (when trying to create a new account)

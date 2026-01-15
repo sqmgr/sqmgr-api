@@ -22,14 +22,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"github.com/sqmgr/sqmgr-api/internal/validator"
 	"github.com/sqmgr/sqmgr-api/pkg/model"
-	"net/http"
-	"strconv"
-	"time"
 )
 
 const minJoinPasswordLength = 6
@@ -39,7 +40,7 @@ const sqmgrInviteAudience = "com.sqmgr.invite"
 var inviteTokenTTL = time.Hour * 24 * 365 // 1 year
 
 type inviteClaims struct {
-	*jwt.StandardClaims
+	jwt.RegisteredClaims
 	CheckID int `json:"chid"`
 }
 
@@ -474,11 +475,10 @@ func (s *Server) getPoolTokenInviteTokenEndpoint() http.HandlerFunc {
 		}
 
 		claim := &inviteClaims{
-			StandardClaims: &jwt.StandardClaims{
-				Audience:  sqmgrInviteAudience,
-				ExpiresAt: time.Now().Add(inviteTokenTTL).Unix(),
+			RegisteredClaims: jwt.RegisteredClaims{
+				Audience:  jwt.ClaimStrings{sqmgrInviteAudience},
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(inviteTokenTTL)),
 				Issuer:    model.IssuerSqMGR,
-				NotBefore: 0,
 				Subject:   pool.Token(),
 			},
 			CheckID: pool.CheckID(),
@@ -1152,8 +1152,17 @@ func (s *Server) postPoolTokenMemberEndpoint() http.HandlerFunc {
 
 			claims := j.Claims.(*inviteClaims)
 
-			if !claims.VerifyAudience(sqmgrInviteAudience, true) ||
-				!claims.VerifyIssuer(model.IssuerSqMGR, true) ||
+			// Verify audience
+			audValid := false
+			for _, aud := range claims.Audience {
+				if aud == sqmgrInviteAudience {
+					audValid = true
+					break
+				}
+			}
+
+			if !audValid ||
+				claims.Issuer != model.IssuerSqMGR ||
 				!pool.CheckIDIsValid(claims.CheckID) {
 				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("invalid join token"))
 				return
