@@ -39,8 +39,8 @@ jobs:
       - run: ./migrate -path ./sql -database postgres://postgres:test_password@localhost:5432/sqmgr_test?sslmode=disable up
       - name: Lint and vet
         run: |
-          go install golang.org/x/lint/golint@latest
-          golint -set_exit_status ./...
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck ./...
           ./hack/gofmt-check.sh
           go vet ./...
       - name: Test

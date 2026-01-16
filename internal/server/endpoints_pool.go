@@ -1044,7 +1044,6 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 		}
 
 		s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("unsupported action %s", data.Action))
-		return
 	}
 }
 
@@ -1114,7 +1113,6 @@ func (s *Server) deletePoolTokenGridIDSquareSquareIDAnnotationEndpoint() http.Ha
 		}
 
 		w.WriteHeader(http.StatusNoContent)
-		return
 	}
 }
 

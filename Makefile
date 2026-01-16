@@ -17,9 +17,9 @@ bin/migrate:
 	mkdir -p bin
 	go build -o bin/migrate -tags postgres github.com/golang-migrate/migrate/v4/cmd/migrate
 
-bin/golint:
+bin/staticcheck:
 	mkdir -p bin
-	go build -o bin/golint golang.org/x/lint/golint
+	GOBIN=$(shell pwd)/bin go install honnef.co/go/tools/cmd/staticcheck@latest
 
 .PHONY: run
 run: .keys/public.pem dev-db
@@ -27,8 +27,8 @@ run: .keys/public.pem dev-db
 
 .PHONY: test
 test: PG_DATABASE=integration
-test: bin/golint integration-db migrations
-	bin/golint -set_exit_status ./...
+test: bin/staticcheck integration-db migrations
+	bin/staticcheck ./...
 	./hack/gofmt-check.sh
 	go vet ./...
 	go vet ./...
@@ -71,5 +71,5 @@ format:
 clean:
 	-docker rm -f -v sqmgr-postgres
 	rm -rf bin/migrate
-	rm -rf bin/golint
+	rm -rf bin/staticcheck
 	rm -rf .keys/*.pem

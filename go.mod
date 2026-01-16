@@ -16,7 +16,6 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.4.0
 	github.com/synacor/argon2id v0.0.0-20190318165710-18569dfc600b
-	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f
 )
 
 require (

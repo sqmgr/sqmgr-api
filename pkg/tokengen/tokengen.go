@@ -24,7 +24,6 @@ import (
 
 var max = big.NewInt(62) // 26 lower, 26 upper, 10 numbers
 
-const ascii0 = 48
 const asciiA = 65
 const asciia = 97
 
