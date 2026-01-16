@@ -31,7 +31,7 @@ spec:
           value: /opt/sqmgr/jwt-keys/public.pem
         - name: SQMGR_CONF_JWT_PRIVATE_KEY
           value: /opt/sqmgr/jwt-keys/private.pem
-        image: weters/sqmgr-api:latest
+        image: ghcr.io/sqmgr/sqmgr-api:latest
         imagePullPolicy: Always
         args:
           - '-migrate'

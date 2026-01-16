@@ -19,7 +19,7 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: sqmgr-guest-user-cleanup
-              image: weters/sqmgr-api:latest
+              image: ghcr.io/sqmgr/sqmgr-api:latest
               command:
                 - '/bin/sqmgr-guest-user-cleanup'
               envFrom:
@@ -33,5 +33,5 @@ spec:
                 - name: SQMGR_CONF_JWT_PUBLIC_KEY
                   value: '-'
           imagePullSecrets:
-            - name: docker-hub
+            - name: github
   schedule: '0 5 * * *'
