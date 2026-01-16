@@ -22,7 +22,18 @@
       "Bash(npm install)",
       "Bash(npm run build:*)",
       "Bash(wc:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(npm outdated:*)",
+      "WebFetch(domain:cli.vuejs.org)",
+      "WebFetch(domain:vuex.vuejs.org)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run lint)",
+      "Bash(ls:*)",
+      "Bash(timeout 5 npm run dev:*)",
+      "Bash(npx simple-git-hooks)",
+      "Bash(cat:*)",
+      "Bash(node --version)"
     ]
   }
 }
