@@ -27,6 +27,7 @@ type config struct {
 	dsn           string
 	jwtPrivateKey string
 	jwtPublicKey  string
+	auth0JWKSURL  string
 }
 
 var instance *config
@@ -49,6 +50,12 @@ func JWTPrivateKey() string {
 	return instance.jwtPrivateKey
 }
 
+// Auth0JWKSURL returns the URL to the Auth0 JWKS endpoint
+func Auth0JWKSURL() string {
+	mustHaveInstance()
+	return instance.auth0JWKSURL
+}
+
 func mustHaveInstance() {
 	if instance == nil {
 		panic("config: must call Load() first")
@@ -64,8 +71,10 @@ func Load() error {
 	_ = viper.BindEnv("dsn")
 	_ = viper.BindEnv("jwt_private_key")
 	_ = viper.BindEnv("jwt_public_key")
+	_ = viper.BindEnv("auth0_jwks_url")
 
 	viper.SetDefault("dsn", "host=localhost port=5432 user=postgres sslmode=disable")
+	viper.SetDefault("auth0_jwks_url", "https://sqmgr.auth0.com/.well-known/jwks.json")
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, isNotFoundError := err.(viper.ConfigFileNotFoundError); !isNotFoundError {
@@ -79,6 +88,7 @@ func Load() error {
 		dsn:           viper.GetString("dsn"),
 		jwtPrivateKey: viperGetStringOrFatal("jwt_private_key"),
 		jwtPublicKey:  viperGetStringOrFatal("jwt_public_key"),
+		auth0JWKSURL:  viper.GetString("auth0_jwks_url"),
 	}
 
 	return nil

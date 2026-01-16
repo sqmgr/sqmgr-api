@@ -29,10 +29,11 @@ import (
 // Server represents the SqMGR server
 type Server struct {
 	*mux.Router
-	model     *model.Model
-	version   string
-	keyLocker *keylocker.KeyLocker
-	smjwt     *smjwt.SMJWT
+	model       *model.Model
+	version     string
+	keyLocker   *keylocker.KeyLocker
+	smjwt       *smjwt.SMJWT
+	rateLimiter *RateLimiter
 }
 
 // New returns a new server object
@@ -45,12 +46,16 @@ func New(version string, db *sql.DB) *Server {
 		logrus.WithError(err).Fatal("could not load private key")
 	}
 
+	// Rate limit: 10 requests per second with burst of 20
+	rl := NewRateLimiter(10, 20)
+
 	s := &Server{
-		Router:    mux.NewRouter(),
-		model:     model.New(db),
-		keyLocker: keylocker.New("https://sqmgr.auth0.com/.well-known/jwks.json"),
-		smjwt:     sj,
-		version:   version,
+		Router:      mux.NewRouter(),
+		model:       model.New(db),
+		keyLocker:   keylocker.New(config.Auth0JWKSURL()),
+		smjwt:       sj,
+		version:     version,
+		rateLimiter: rl,
 	}
 
 	s.setupRoutes()

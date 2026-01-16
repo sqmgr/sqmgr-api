@@ -5,7 +5,15 @@
       "Bash(go build:*)",
       "Bash(go mod tidy:*)",
       "Bash(go doc:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(go list:*)",
+      "Bash(go mod why:*)",
+      "Bash(grep:*)",
+      "Bash(go tool cover:*)",
+      "Bash(git -C /Users/tom/GolandProjects/sqmgr-api log --oneline --all)",
+      "Bash(go get:*)",
+      "Bash(go vet:*)",
+      "Bash(gofmt:*)"
     ]
   }
 }

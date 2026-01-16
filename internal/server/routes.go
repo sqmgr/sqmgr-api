@@ -26,6 +26,8 @@ import (
 var optionsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 
 func (s *Server) setupRoutes() {
+	// Apply rate limiting to all routes
+	s.Router.Use(s.rateLimiter.Limit)
 
 	// these routes do NOT require auth
 	s.Router.Path("/").Methods(http.MethodGet).Handler(s.getHealthEndpoint())

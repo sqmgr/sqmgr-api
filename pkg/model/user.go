@@ -86,7 +86,7 @@ func (m *Model) userByRow(row *sql.Row) (*User, error) {
 	var u User
 	u.Model = m
 	if err := row.Scan(&u.ID, &u.Store, &u.StoreID, &u.Created); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("scanning user row: %w", err)
 	}
 
 	return &u, nil
@@ -113,20 +113,22 @@ func (m *Model) GetUser(ctx context.Context, issuer, storeID string) (*User, err
 func (u *User) JoinPool(ctx context.Context, p *Pool) error {
 	// no-op
 	if isAdmin, err := u.IsAdminOf(ctx, p); err != nil {
-		return err
+		return fmt.Errorf("checking admin status: %w", err)
 	} else if isAdmin {
 		return nil
 	}
 
-	_, err := u.DB.ExecContext(ctx, "INSERT INTO pools_users (pool_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", p.id, u.ID)
-	return err
+	if _, err := u.DB.ExecContext(ctx, "INSERT INTO pools_users (pool_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", p.id, u.ID); err != nil {
+		return fmt.Errorf("inserting pool user: %w", err)
+	}
+	return nil
 }
 
 // LeavePool will unlink a user from a pool
 func (u *User) LeavePool(ctx context.Context, p *Pool) error {
 	_, err := u.DB.ExecContext(ctx, "DELETE FROM pools_users WHERE pool_id = $1 AND user_id = $2", p.ID(), u.ID)
 	if err != nil {
-		return fmt.Errorf("could not delete pools_users: %v", err)
+		return fmt.Errorf("deleting pool user: %w", err)
 	}
 
 	return nil
@@ -149,7 +151,7 @@ func (u *User) IsMemberOf(ctx context.Context, p *Pool) (bool, error) {
 			return false, nil
 		}
 
-		return false, err
+		return false, fmt.Errorf("checking pool membership: %w", err)
 	}
 
 	return ok, nil
@@ -167,8 +169,11 @@ SET
 WHERE
 	pool_id = $2 AND
   	user_id = $3`, isAdmin, p.ID(), u.ID)
+	if err != nil {
+		return fmt.Errorf("updating admin status: %w", err)
+	}
 
-	return err
+	return nil
 }
 
 // IsAdminOf will return true if the user is the admin of the grid
@@ -187,7 +192,7 @@ func (u *User) IsAdminOf(ctx context.Context, p *Pool) (bool, error) {
 			return false, nil
 		}
 
-		return false, err
+		return false, fmt.Errorf("checking admin status: %w", err)
 	}
 
 	return ok, nil
@@ -199,7 +204,7 @@ func (u *User) PoolsCreatedWithin(ctx context.Context, within time.Duration) (in
 	row := u.DB.QueryRowContext(ctx, query, u.ID, within/time.Microsecond)
 	var count int
 	if err := row.Scan(&count); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("counting pools created within duration: %w", err)
 	}
 
 	return count, nil
