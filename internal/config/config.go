@@ -18,6 +18,7 @@ package config
 
 import (
 	"fmt"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -81,15 +82,6 @@ func Load() error {
 	}
 
 	return nil
-}
-
-func viperGetStringOrWarn(key string) string {
-	val := viper.GetString(key)
-	if val == "" {
-		logrus.WithField("key", key).Warn("configuration key not specified")
-	}
-
-	return val
 }
 
 func viperGetStringOrFatal(key string) string {
