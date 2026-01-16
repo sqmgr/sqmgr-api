@@ -204,7 +204,7 @@ func (m *Model) poolByRow(scan scanFunc) (*Pool, error) {
 	pool := Pool{model: m}
 	var locks *time.Time
 	if err := scan(&pool.id, &pool.token, &pool.userID, &pool.name, &pool.gridType, &pool.passwordHash, &pool.passwordRequired, &pool.openAccessOnLock, &locks, &pool.created, &pool.modified, &pool.checkID, &pool.archived); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("scanning pool row: %w", err)
 	}
 
 	if locks != nil {
@@ -279,7 +279,7 @@ func (m *Model) PoolsOwnedByUserIDCount(ctx context.Context, userID int64, inclu
 
 func (m *Model) poolsByRows(rows *sql.Rows, err error) ([]*Pool, error) {
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("querying pools: %w", err)
 	}
 	defer rows.Close()
 
@@ -299,7 +299,7 @@ func (m *Model) poolsByRows(rows *sql.Rows, err error) ([]*Pool, error) {
 func (m *Model) poolsCount(row *sql.Row) (int64, error) {
 	var count int64
 	if err := row.Scan(&count); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("counting pools: %w", err)
 	}
 
 	return count, nil
@@ -320,17 +320,17 @@ func (m *Model) PoolByID(id int64) (*Pool, error) {
 // NewPool will save new pool into the database
 func (m *Model) NewPool(ctx context.Context, userID int64, name string, gridType GridType, password string) (*Pool, error) {
 	if err := IsValidGridType(string(gridType)); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("validating grid type: %w", err)
 	}
 
 	token, err := m.NewToken()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("generating token: %w", err)
 	}
 
 	passwordHash, err := argon2id.DefaultHashPassword(password)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hashing password: %w", err)
 	}
 
 	const query = `
@@ -342,7 +342,7 @@ func (m *Model) NewPool(ctx context.Context, userID int64, name string, gridType
 
 	pool, err := m.poolByRow(row.Scan)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating pool: %w", err)
 	}
 
 	return pool, nil
@@ -352,7 +352,7 @@ func (m *Model) NewPool(ctx context.Context, userID int64, name string, gridType
 func (p *Pool) SetPassword(password string) error {
 	passwordHash, err := argon2id.DefaultHashPassword(password)
 	if err != nil {
-		return err
+		return fmt.Errorf("hashing password: %w", err)
 	}
 
 	p.passwordHash = passwordHash
@@ -381,7 +381,10 @@ WHERE id = $9`
 	}
 
 	_, err := p.model.DB.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.archived, p.passwordRequired, p.openAccessOnLock, p.id)
-	return err
+	if err != nil {
+		return fmt.Errorf("saving pool: %w", err)
+	}
+	return nil
 }
 
 // PasswordIsValid is will return true if the password matches

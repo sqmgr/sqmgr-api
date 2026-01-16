@@ -79,14 +79,14 @@ func (s *Server) authHandler(next http.Handler) http.Handler {
 		})
 
 		if err != nil {
-			logrus.WithError(err).WithField("token", parts[1]).Warn("could not validate token")
+			logrus.WithError(err).Warn("could not validate token")
 			s.writeErrorResponse(w, http.StatusUnauthorized, nil)
 			return
 		}
 
 		sub, ok := token.Claims.(jwt.MapClaims)["sub"].(string)
 		if !ok {
-			logrus.WithField("token", parts[1]).Error("token did not have sub")
+			logrus.Error("token did not have sub")
 			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
 		}
 
