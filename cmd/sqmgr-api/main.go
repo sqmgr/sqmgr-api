@@ -19,12 +19,13 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/sqmgr/sqmgr-api/internal/config"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/sqmgr/sqmgr-api/internal/config"
 
 	"github.com/gorilla/handlers"
 	"github.com/sirupsen/logrus"
@@ -72,7 +73,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         *addr,
-		Handler:      handlers.CombinedLoggingHandler(os.Stdout, handlers.ProxyHeaders(s)),
+		Handler:      handlers.ProxyHeaders(handlers.CombinedLoggingHandler(os.Stdout, s)),
 		ReadTimeout:  readTimeout,
 		WriteTimeout: writeTimeout,
 	}
