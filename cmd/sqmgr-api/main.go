@@ -19,13 +19,13 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/sqmgr/sqmgr-api/internal/config"
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
+
+	"github.com/sqmgr/sqmgr-api/internal/config"
 
 	"github.com/gorilla/handlers"
 	"github.com/sirupsen/logrus"
@@ -73,7 +73,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         *addr,
-		Handler:      trustProxy(handlers.CombinedLoggingHandler(os.Stdout, s)),
+		Handler:      handlers.ProxyHeaders(handlers.CombinedLoggingHandler(os.Stdout, s)),
 		ReadTimeout:  readTimeout,
 		WriteTimeout: writeTimeout,
 	}
@@ -117,25 +117,4 @@ func getEnvOrElse(key string, def string) string {
 	}
 
 	return def
-}
-
-func trustProxy(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logrus.WithFields(logrus.Fields{
-			"X-Forwarded-For": r.Header.Get("X-Forwarded-For"),
-			"X-Real-Ip":       r.Header.Get("X-Real-Ip"),
-			"RemoteAddr":      r.RemoteAddr,
-		}).Info("Request IP headers")
-
-		if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
-			if index := strings.Index(ip, ","); index != -1 {
-				r.RemoteAddr = strings.TrimSpace(ip[:index])
-			} else {
-				r.RemoteAddr = strings.TrimSpace(ip)
-			}
-		} else if ip := r.Header.Get("X-Real-Ip"); ip != "" {
-			r.RemoteAddr = ip
-		}
-		next.ServeHTTP(w, r)
-	})
 }
