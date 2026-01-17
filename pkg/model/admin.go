@@ -32,14 +32,15 @@ type AdminStats struct {
 
 // AdminPool represents a pool in the admin list with additional metadata
 type AdminPool struct {
-	Token       string   `json:"token"`
-	Name        string   `json:"name"`
-	GridType    GridType `json:"gridType"`
-	Archived    bool     `json:"archived"`
-	OwnerID     int64    `json:"ownerId"`
-	MemberCount int64    `json:"memberCount"`
-	GridCount   int64    `json:"gridCount"`
-	Created     string   `json:"created"`
+	Token        string   `json:"token"`
+	Name         string   `json:"name"`
+	GridType     GridType `json:"gridType"`
+	Archived     bool     `json:"archived"`
+	OwnerID      int64    `json:"ownerId"`
+	MemberCount  int64    `json:"memberCount"`
+	GridCount    int64    `json:"gridCount"`
+	ClaimedCount int64    `json:"claimedCount"`
+	Created      string   `json:"created"`
 }
 
 // GetAdminStats returns site-wide statistics
@@ -90,6 +91,7 @@ func (m *Model) GetAllPools(ctx context.Context, search string, offset int64, li
 			p.user_id,
 			(SELECT COUNT(*) FROM pools_users pu WHERE pu.pool_id = p.id) as member_count,
 			(SELECT COUNT(*) FROM grids g WHERE g.pool_id = p.id AND g.state = 'active') as grid_count,
+			(SELECT COUNT(*) FROM pool_squares ps WHERE ps.pool_id = p.id AND ps.state != 'unclaimed') as claimed_count,
 			p.created
 		FROM pools p
 		%s
@@ -134,6 +136,7 @@ func scanAdminPools(rows interface {
 			&pool.OwnerID,
 			&pool.MemberCount,
 			&pool.GridCount,
+			&pool.ClaimedCount,
 			&pool.Created,
 		); err != nil {
 			return nil, fmt.Errorf("scanning pool row: %w", err)

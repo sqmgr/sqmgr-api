@@ -99,6 +99,8 @@ func TestGetAllPools(t *testing.T) {
 	g.Expect(pools[0].GridType).ShouldNot(gomega.BeEmpty())
 	g.Expect(pools[0].OwnerID).Should(gomega.BeNumerically(">", 0))
 	g.Expect(pools[0].Created).ShouldNot(gomega.BeEmpty())
+	// ClaimedCount should be 0 for new pools with no claimed squares
+	g.Expect(pools[0].ClaimedCount).Should(gomega.BeNumerically(">=", 0))
 
 	// Test offset - skip first pool
 	poolsWithOffset, err := m.GetAllPools(ctx, "", 1, 2)
@@ -181,4 +183,46 @@ func TestGetAllPoolsCount(t *testing.T) {
 	filteredCount, err := m.GetAllPoolsCount(ctx, uniquePrefix)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(filteredCount).Should(gomega.Equal(int64(2)))
+}
+
+func TestGetAllPoolsClaimedCount(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user and pool
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	uniqueName := "ClaimedCountTest " + randString()
+	pool, err := m.NewPool(ctx, user.ID, uniqueName, GridTypeStd25, "password")
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Get the pool via admin query - should have 0 claimed squares initially
+	pools, err := m.GetAllPools(ctx, uniqueName, 0, 1)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(pools)).Should(gomega.Equal(1))
+	g.Expect(pools[0].ClaimedCount).Should(gomega.Equal(int64(0)))
+
+	// Claim a square
+	squares, err := pool.Squares()
+	g.Expect(err).Should(gomega.Succeed())
+
+	square := squares[0]
+	square.SetClaimant("Test Claimant")
+	square.State = PoolSquareStateClaimed
+	square.SetUserID(user.ID)
+	err = square.Save(ctx, m.DB, true, PoolSquareLog{
+		Note:       "Test claim",
+		RemoteAddr: "127.0.0.1",
+	})
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Verify claimed count increased
+	pools, err = m.GetAllPools(ctx, uniqueName, 0, 1)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(pools)).Should(gomega.Equal(1))
+	g.Expect(pools[0].ClaimedCount).Should(gomega.Equal(int64(1)))
 }
