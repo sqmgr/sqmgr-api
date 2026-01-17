@@ -141,6 +141,11 @@ func (p *Pool) ID() int64 {
 	return p.id
 }
 
+// UserID returns the owner's user ID
+func (p *Pool) UserID() int64 {
+	return p.userID
+}
+
 // Token is a getter for the token
 func (p *Pool) Token() string {
 	return p.token

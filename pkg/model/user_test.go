@@ -109,3 +109,29 @@ func ensureIntegration(t *testing.T) {
 		t.Skip("skipping. to run, use -integration flag")
 	}
 }
+
+func TestUserIsAdmin(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(user.IsAdmin).Should(gomega.BeFalse())
+
+	// Set user as admin directly in database
+	_, err = m.DB.ExecContext(ctx, "UPDATE users SET is_admin = true WHERE id = $1", user.ID)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Reload user via GetUserByID
+	reloadedUser, err := m.GetUserByID(ctx, user.ID)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(reloadedUser.IsAdmin).Should(gomega.BeTrue())
+
+	// Clean up - reset admin status
+	_, err = m.DB.ExecContext(ctx, "UPDATE users SET is_admin = false WHERE id = $1", user.ID)
+	g.Expect(err).Should(gomega.Succeed())
+}

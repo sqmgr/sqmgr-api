@@ -70,6 +70,13 @@ func (s *Server) setupRoutes() {
 	authUserRouter.Path("/user/{id:[0-9]+}/pool/{token:[A-Za-z0-9_-]+}").Methods(http.MethodDelete).Handler(s.deleteUserIDPoolTokenEndpoint())
 	authUserRouter.Path("/user/{id:[0-9]+}/guestjwt").Methods(http.MethodPost).Handler(s.postUserIDGuestJWT())
 
+	// Admin routes - requires site admin privileges
+	adminRouter := authRouter.NewRoute().Subrouter()
+	adminRouter.Use(s.adminHandler)
+	adminRouter.Path("/admin/stats").Methods(http.MethodGet).Handler(s.getAdminStatsEndpoint())
+	adminRouter.Path("/admin/pools").Methods(http.MethodGet).Handler(s.getAdminPoolsEndpoint())
+	adminRouter.Path("/admin/pool/{token:[A-Za-z0-9_-]+}/join").Methods(http.MethodPost).Handler(s.postAdminPoolJoinEndpoint())
+
 	pathTemplates := make(map[string]bool)
 
 	// add OPTIONS route

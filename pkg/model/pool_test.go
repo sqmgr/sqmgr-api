@@ -406,3 +406,22 @@ func TestNumberOfSquares(t *testing.T) {
 	p.gridType = GridTypeRoll100
 	g.Expect(p.NumberOfSquares()).Should(gomega.Equal(100))
 }
+
+func TestPoolUserID(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create a pool owned by this user
+	pool, err := m.NewPool(ctx, user.ID, "Test Pool UserID", GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Verify UserID() returns the owner's ID
+	g.Expect(pool.UserID()).Should(gomega.Equal(user.ID))
+}

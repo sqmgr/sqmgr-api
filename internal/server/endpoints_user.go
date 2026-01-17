@@ -56,6 +56,7 @@ func (s *Server) getUserSelfEndpoint() http.HandlerFunc {
 		UserID  int64           `json:"id"`
 		StoreID string          `json:"store_id"`
 		Store   model.UserStore `json:"store"`
+		IsAdmin bool            `json:"is_admin"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -64,6 +65,7 @@ func (s *Server) getUserSelfEndpoint() http.HandlerFunc {
 			UserID:  user.ID,
 			StoreID: user.StoreID,
 			Store:   user.Store,
+			IsAdmin: user.IsAdmin,
 		})
 	}
 }
