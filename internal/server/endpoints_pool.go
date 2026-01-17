@@ -952,7 +952,7 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 		switch data.Action {
 		case "drawManualNumbers":
 			if err := grid.SetManualNumbers(data.Data.HomeTeamNumbers, data.Data.AwayTeamNumbers); err != nil {
-				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("the numbers supplied are not valid"))
+				s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("could not set manual numbers: %w", err))
 				return
 			}
 
