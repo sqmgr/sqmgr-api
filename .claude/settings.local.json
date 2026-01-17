@@ -33,7 +33,8 @@
       "Bash(timeout 5 npm run dev:*)",
       "Bash(npx simple-git-hooks)",
       "Bash(cat:*)",
-      "Bash(node --version)"
+      "Bash(node --version)",
+      "Bash(go clean:*)"
     ]
   }
 }

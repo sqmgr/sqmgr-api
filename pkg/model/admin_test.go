@@ -209,9 +209,17 @@ func TestGetAllPoolsClaimedCount(t *testing.T) {
 	// Claim a square
 	squares, err := pool.Squares()
 	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(squares)).Should(gomega.Equal(25))
 
-	square := squares[0]
-	square.SetClaimant("Test Claimant")
+	// Get first available square from map
+	var square *PoolSquare
+	for _, sq := range squares {
+		square = sq
+		break
+	}
+	g.Expect(square).ShouldNot(gomega.BeNil())
+
+	square.claimant = "Test Claimant"
 	square.State = PoolSquareStateClaimed
 	square.SetUserID(user.ID)
 	err = square.Save(ctx, m.DB, true, PoolSquareLog{
