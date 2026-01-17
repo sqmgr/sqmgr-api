@@ -83,3 +83,19 @@ func TestAdminHandler_DeniesNonAdmin(t *testing.T) {
 	g.Expect(nextHandlerCalled).Should(gomega.BeFalse())
 	g.Expect(rec.Code).Should(gomega.Equal(http.StatusForbidden))
 }
+
+func TestValidStatsPeriods(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	// Test valid periods
+	g.Expect(validStatsPeriods["all"]).Should(gomega.BeTrue())
+	g.Expect(validStatsPeriods["24h"]).Should(gomega.BeTrue())
+	g.Expect(validStatsPeriods["week"]).Should(gomega.BeTrue())
+	g.Expect(validStatsPeriods["month"]).Should(gomega.BeTrue())
+	g.Expect(validStatsPeriods["year"]).Should(gomega.BeTrue())
+
+	// Test invalid periods
+	g.Expect(validStatsPeriods["invalid"]).Should(gomega.BeFalse())
+	g.Expect(validStatsPeriods[""]).Should(gomega.BeFalse())
+	g.Expect(validStatsPeriods["day"]).Should(gomega.BeFalse())
+}

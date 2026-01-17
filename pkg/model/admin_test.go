@@ -41,7 +41,7 @@ func TestGetAdminStats(t *testing.T) {
 	g.Expect(sqmgrUser.ID).Should(gomega.BeNumerically(">", 0))
 
 	// Get initial stats
-	initialStats, err := m.GetAdminStats(ctx)
+	initialStats, err := m.GetAdminStats(ctx, "all")
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Create an active pool
@@ -56,13 +56,50 @@ func TestGetAdminStats(t *testing.T) {
 	g.Expect(archivedPool.Save(ctx)).Should(gomega.Succeed())
 
 	// Get updated stats
-	stats, err := m.GetAdminStats(ctx)
+	stats, err := m.GetAdminStats(ctx, "all")
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Verify counts increased correctly
 	g.Expect(stats.TotalPools).Should(gomega.Equal(initialStats.TotalPools + 2))
 	g.Expect(stats.ActivePools).Should(gomega.Equal(initialStats.ActivePools + 1))
 	g.Expect(stats.ArchivedPools).Should(gomega.Equal(initialStats.ArchivedPools + 1))
+}
+
+func TestGetAdminStatsWithPeriod(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a test user
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create a test pool
+	pool, err := m.NewPool(ctx, user.ID, "Period Test Pool "+randString(), GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(pool).ShouldNot(gomega.BeNil())
+
+	// Test "all" period - should include the new pool
+	allStats, err := m.GetAdminStats(ctx, "all")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(allStats.TotalPools).Should(gomega.BeNumerically(">", 0))
+
+	// Test "24h" period - should include the just-created pool
+	dayStats, err := m.GetAdminStats(ctx, "24h")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(dayStats.TotalPools).Should(gomega.BeNumerically(">", 0))
+
+	// Test invalid period - should default to "all" behavior (no time filter)
+	invalidStats, err := m.GetAdminStats(ctx, "invalid")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(invalidStats.TotalPools).Should(gomega.Equal(allStats.TotalPools))
+
+	// Test empty period - should default to "all" behavior
+	emptyStats, err := m.GetAdminStats(ctx, "")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(emptyStats.TotalPools).Should(gomega.Equal(allStats.TotalPools))
 }
 
 func TestGetAllPools(t *testing.T) {

@@ -43,36 +43,79 @@ type AdminPool struct {
 	Created      string   `json:"created"`
 }
 
-// GetAdminStats returns site-wide statistics
-func (m *Model) GetAdminStats(ctx context.Context) (*AdminStats, error) {
+// periodToInterval converts a period string to a PostgreSQL interval
+func periodToInterval(period string) string {
+	switch period {
+	case "24h":
+		return "1 day"
+	case "week":
+		return "7 days"
+	case "month":
+		return "30 days"
+	case "year":
+		return "365 days"
+	default:
+		return ""
+	}
+}
+
+// GetAdminStats returns site-wide statistics filtered by time period
+// Supported periods: "24h", "week", "month", "year", "all" (default)
+func (m *Model) GetAdminStats(ctx context.Context, period string) (*AdminStats, error) {
 	stats := &AdminStats{}
 
+	interval := periodToInterval(period)
+	var timeFilter string
+	if interval != "" {
+		timeFilter = fmt.Sprintf(" WHERE created > NOW() - INTERVAL '%s'", interval)
+	}
+
 	// Total pools
-	row := m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM pools")
+	query := "SELECT COUNT(*) FROM pools"
+	if timeFilter != "" {
+		query += timeFilter
+	}
+	row := m.DB.QueryRowContext(ctx, query)
 	if err := row.Scan(&stats.TotalPools); err != nil {
 		return nil, fmt.Errorf("counting total pools: %w", err)
 	}
 
 	// Total users (non-guest)
-	row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE store = 'auth0'")
+	query = "SELECT COUNT(*) FROM users WHERE store = 'auth0'"
+	if interval != "" {
+		query += fmt.Sprintf(" AND created > NOW() - INTERVAL '%s'", interval)
+	}
+	row = m.DB.QueryRowContext(ctx, query)
 	if err := row.Scan(&stats.TotalUsers); err != nil {
 		return nil, fmt.Errorf("counting total users: %w", err)
 	}
 
 	// Guest users
-	row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE store = 'sqmgr'")
+	query = "SELECT COUNT(*) FROM users WHERE store = 'sqmgr'"
+	if interval != "" {
+		query += fmt.Sprintf(" AND created > NOW() - INTERVAL '%s'", interval)
+	}
+	row = m.DB.QueryRowContext(ctx, query)
 	if err := row.Scan(&stats.GuestUsers); err != nil {
 		return nil, fmt.Errorf("counting guest users: %w", err)
 	}
 
 	// Active pools
-	row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM pools WHERE archived = false")
+	query = "SELECT COUNT(*) FROM pools WHERE archived = false"
+	if interval != "" {
+		query += fmt.Sprintf(" AND created > NOW() - INTERVAL '%s'", interval)
+	}
+	row = m.DB.QueryRowContext(ctx, query)
 	if err := row.Scan(&stats.ActivePools); err != nil {
 		return nil, fmt.Errorf("counting active pools: %w", err)
 	}
 
 	// Archived pools
-	row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM pools WHERE archived = true")
+	query = "SELECT COUNT(*) FROM pools WHERE archived = true"
+	if interval != "" {
+		query += fmt.Sprintf(" AND created > NOW() - INTERVAL '%s'", interval)
+	}
+	row = m.DB.QueryRowContext(ctx, query)
 	if err := row.Scan(&stats.ArchivedPools); err != nil {
 		return nil, fmt.Errorf("counting archived pools: %w", err)
 	}

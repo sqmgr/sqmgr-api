@@ -28,10 +28,24 @@ import (
 const defaultAdminPoolsLimit = 25
 const maxAdminPoolsLimit = 100
 
+// validStatsPeriods defines the valid period values for stats filtering
+var validStatsPeriods = map[string]bool{
+	"all":   true,
+	"24h":   true,
+	"week":  true,
+	"month": true,
+	"year":  true,
+}
+
 // getAdminStatsEndpoint returns site-wide statistics
 func (s *Server) getAdminStatsEndpoint() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		stats, err := s.model.GetAdminStats(r.Context())
+		period := r.FormValue("period")
+		if !validStatsPeriods[period] {
+			period = "all"
+		}
+
+		stats, err := s.model.GetAdminStats(r.Context(), period)
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
