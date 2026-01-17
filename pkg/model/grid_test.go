@@ -48,11 +48,11 @@ func TestGridName(t *testing.T) {
 	grid.SetLabel("")
 	g.Expect(grid.Name()).Should(gomega.Equal("Away Team vs. Home Team"))
 
-	grid.SetHomeTeamName(strings.Repeat("á", 50) + "é")
-	g.Expect(grid.HomeTeamName()).Should(gomega.Equal(strings.Repeat("á", 50)))
+	grid.SetHomeTeamName(strings.Repeat("á", 75) + "é")
+	g.Expect(grid.HomeTeamName()).Should(gomega.Equal(strings.Repeat("á", 75)))
 
-	grid.SetAwayTeamName(strings.Repeat("í", 50) + "é")
-	g.Expect(grid.AwayTeamName()).Should(gomega.Equal(strings.Repeat("í", 50)))
+	grid.SetAwayTeamName(strings.Repeat("í", 75) + "é")
+	g.Expect(grid.AwayTeamName()).Should(gomega.Equal(strings.Repeat("í", 75)))
 }
 
 func TestGrid(t *testing.T) {

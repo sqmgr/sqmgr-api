@@ -29,7 +29,7 @@ import (
 )
 
 // TeamNameMaxLength is the maximum length of the team names
-const TeamNameMaxLength = 50
+const TeamNameMaxLength = 75
 
 const (
 	defaultHomeTeamName = "Home Team"
