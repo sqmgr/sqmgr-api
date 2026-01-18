@@ -46,6 +46,8 @@ type AdminPool struct {
 // periodToInterval converts a period string to a PostgreSQL interval
 func periodToInterval(period string) string {
 	switch period {
+	case "1h":
+		return "1 hour"
 	case "24h":
 		return "1 day"
 	case "week":

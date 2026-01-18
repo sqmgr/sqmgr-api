@@ -22,6 +22,7 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 	"github.com/sqmgr/sqmgr-api/pkg/model"
 )
 
@@ -31,6 +32,7 @@ const maxAdminPoolsLimit = 100
 // validStatsPeriods defines the valid period values for stats filtering
 var validStatsPeriods = map[string]bool{
 	"all":   true,
+	"1h":    true,
 	"24h":   true,
 	"week":  true,
 	"month": true,
@@ -41,10 +43,12 @@ var validStatsPeriods = map[string]bool{
 func (s *Server) getAdminStatsEndpoint() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		period := r.FormValue("period")
+		logrus.WithField("form period", period).Info("getting admin stats")
 		if !validStatsPeriods[period] {
 			period = "all"
 		}
 
+		logrus.WithField("set period", period).Info("getting admin stats")
 		stats, err := s.model.GetAdminStats(r.Context(), period)
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
