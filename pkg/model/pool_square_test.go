@@ -38,3 +38,49 @@ func TestPoolSquare_Claimant(t *testing.T) {
 	g.Expect(s.Claimant()).ShouldNot(gomega.Equal(tooLongClaimant))
 	g.Expect(s.Claimant()).Should(gomega.Equal(string([]rune(tooLongClaimant)[0:30])))
 }
+
+func TestSquareUserInfoJSON_RegisteredUser(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	userInfo := &SquareUserInfoJSON{
+		UserType: "registered",
+		Email:    "john@example.com",
+	}
+
+	g.Expect(userInfo.UserType).Should(gomega.Equal("registered"))
+	g.Expect(userInfo.Email).Should(gomega.Equal("john@example.com"))
+}
+
+func TestSquareUserInfoJSON_GuestUser(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	userInfo := &SquareUserInfoJSON{
+		UserType: "guest",
+	}
+
+	g.Expect(userInfo.UserType).Should(gomega.Equal("guest"))
+	g.Expect(userInfo.Email).Should(gomega.BeEmpty())
+}
+
+func TestPoolSquareJSON_WithUserInfo(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	s := &PoolSquare{
+		SquareID: 42,
+		State:    PoolSquareStateClaimed,
+	}
+	s.SetClaimant("John Doe")
+
+	json := s.JSON()
+	g.Expect(json.UserInfo).Should(gomega.BeNil())
+
+	// Add user info
+	json.UserInfo = &SquareUserInfoJSON{
+		UserType: "registered",
+		Email:    "john@example.com",
+	}
+
+	g.Expect(json.UserInfo).ShouldNot(gomega.BeNil())
+	g.Expect(json.UserInfo.UserType).Should(gomega.Equal("registered"))
+	g.Expect(json.UserInfo.Email).Should(gomega.Equal("john@example.com"))
+}

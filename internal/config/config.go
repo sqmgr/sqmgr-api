@@ -24,10 +24,13 @@ import (
 )
 
 type config struct {
-	dsn           string
-	jwtPrivateKey string
-	jwtPublicKey  string
-	auth0JWKSURL  string
+	dsn                string
+	jwtPrivateKey      string
+	jwtPublicKey       string
+	auth0JWKSURL       string
+	auth0MgmtDomain    string
+	auth0MgmtClientID  string
+	auth0MgmtClientSec string
 }
 
 var instance *config
@@ -56,6 +59,24 @@ func Auth0JWKSURL() string {
 	return instance.auth0JWKSURL
 }
 
+// Auth0MgmtDomain returns the Auth0 Management API domain
+func Auth0MgmtDomain() string {
+	mustHaveInstance()
+	return instance.auth0MgmtDomain
+}
+
+// Auth0MgmtClientID returns the Auth0 Management API client ID
+func Auth0MgmtClientID() string {
+	mustHaveInstance()
+	return instance.auth0MgmtClientID
+}
+
+// Auth0MgmtClientSecret returns the Auth0 Management API client secret
+func Auth0MgmtClientSecret() string {
+	mustHaveInstance()
+	return instance.auth0MgmtClientSec
+}
+
 func mustHaveInstance() {
 	if instance == nil {
 		panic("config: must call Load() first")
@@ -72,6 +93,9 @@ func Load() error {
 	_ = viper.BindEnv("jwt_private_key")
 	_ = viper.BindEnv("jwt_public_key")
 	_ = viper.BindEnv("auth0_jwks_url")
+	_ = viper.BindEnv("auth0_mgmt_domain")
+	_ = viper.BindEnv("auth0_mgmt_client_id")
+	_ = viper.BindEnv("auth0_mgmt_client_secret")
 
 	viper.SetDefault("dsn", "host=localhost port=5432 user=postgres sslmode=disable")
 	viper.SetDefault("auth0_jwks_url", "https://sqmgr.auth0.com/.well-known/jwks.json")
@@ -85,10 +109,13 @@ func Load() error {
 	}
 
 	instance = &config{
-		dsn:           viper.GetString("dsn"),
-		jwtPrivateKey: viperGetStringOrFatal("jwt_private_key"),
-		jwtPublicKey:  viperGetStringOrFatal("jwt_public_key"),
-		auth0JWKSURL:  viper.GetString("auth0_jwks_url"),
+		dsn:                viper.GetString("dsn"),
+		jwtPrivateKey:      viperGetStringOrFatal("jwt_private_key"),
+		jwtPublicKey:       viperGetStringOrFatal("jwt_public_key"),
+		auth0JWKSURL:       viper.GetString("auth0_jwks_url"),
+		auth0MgmtDomain:    viper.GetString("auth0_mgmt_domain"),
+		auth0MgmtClientID:  viper.GetString("auth0_mgmt_client_id"),
+		auth0MgmtClientSec: viper.GetString("auth0_mgmt_client_secret"),
 	}
 
 	return nil

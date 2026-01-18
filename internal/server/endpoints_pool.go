@@ -611,6 +611,8 @@ func (s *Server) getPoolTokenSquareIDEndpoint() http.HandlerFunc {
 			return
 		}
 
+		squareJSON := square.JSON()
+
 		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
@@ -619,9 +621,44 @@ func (s *Server) getPoolTokenSquareIDEndpoint() http.HandlerFunc {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
 			}
+			squareJSON.Logs = square.Logs
+
+			// Add user info for admins
+			if square.UserID() > 0 {
+				squareUser, err := s.model.GetUserByID(r.Context(), square.UserID())
+				if err != nil {
+					logrus.WithError(err).WithField("userId", square.UserID()).Warn("could not get square user")
+				} else {
+					userInfo := &model.SquareUserInfoJSON{}
+
+					if squareUser.Store == model.UserStoreAuth0 {
+						userInfo.UserType = "registered"
+
+						// Get email: first try local, then fallback to Auth0 API
+						if squareUser.Email != nil && *squareUser.Email != "" {
+							userInfo.Email = *squareUser.Email
+						} else if s.auth0Client.IsConfigured() {
+							email, err := s.auth0Client.GetUserEmail(r.Context(), squareUser.StoreID)
+							if err != nil {
+								logrus.WithError(err).WithField("storeId", squareUser.StoreID).Warn("could not get email from Auth0")
+							} else if email != "" {
+								userInfo.Email = email
+								// Cache the email for next time
+								if err := squareUser.SetEmail(r.Context(), email); err != nil {
+									logrus.WithError(err).Warn("could not cache user email")
+								}
+							}
+						}
+					} else {
+						userInfo.UserType = "guest"
+					}
+
+					squareJSON.UserInfo = userInfo
+				}
+			}
 		}
 
-		s.writeJSONResponse(w, http.StatusOK, square.JSON())
+		s.writeJSONResponse(w, http.StatusOK, squareJSON)
 	}
 }
 

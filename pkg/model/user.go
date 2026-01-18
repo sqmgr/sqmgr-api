@@ -59,6 +59,7 @@ type User struct {
 	Store   UserStore
 	StoreID string
 	IsAdmin bool
+	Email   *string
 	Created time.Time
 
 	// not stored in the database
@@ -86,7 +87,7 @@ func (u *User) HasPermission(action Permission) bool {
 func (m *Model) userByRow(row *sql.Row) (*User, error) {
 	var u User
 	u.Model = m
-	if err := row.Scan(&u.ID, &u.Store, &u.StoreID, &u.IsAdmin, &u.Created); err != nil {
+	if err := row.Scan(&u.ID, &u.Store, &u.StoreID, &u.IsAdmin, &u.Email, &u.Created); err != nil {
 		return nil, fmt.Errorf("scanning user row: %w", err)
 	}
 
@@ -95,7 +96,7 @@ func (m *Model) userByRow(row *sql.Row) (*User, error) {
 
 // GetUserByID will return a user by its ID.
 func (m *Model) GetUserByID(ctx context.Context, id int64) (*User, error) {
-	row := m.DB.QueryRowContext(ctx, "SELECT id, store, store_id, is_admin, created FROM users WHERE id = $1", id)
+	row := m.DB.QueryRowContext(ctx, "SELECT id, store, store_id, is_admin, email, created FROM users WHERE id = $1", id)
 	return m.userByRow(row)
 }
 
@@ -106,7 +107,7 @@ func (m *Model) GetUser(ctx context.Context, issuer, storeID string) (*User, err
 		return nil, fmt.Errorf("invalid issuer: %s", issuer)
 	}
 
-	row := m.DB.QueryRowContext(ctx, "SELECT id, store, store_id, is_admin, created FROM get_user($1, $2)", store, storeID)
+	row := m.DB.QueryRowContext(ctx, "SELECT id, store, store_id, is_admin, email, created FROM get_user($1, $2)", store, storeID)
 	return m.userByRow(row)
 }
 
@@ -209,4 +210,14 @@ func (u *User) PoolsCreatedWithin(ctx context.Context, within time.Duration) (in
 	}
 
 	return count, nil
+}
+
+// SetEmail updates the user's email in the database
+func (u *User) SetEmail(ctx context.Context, email string) error {
+	_, err := u.DB.ExecContext(ctx, "UPDATE users SET email = $1 WHERE id = $2", email, u.ID)
+	if err != nil {
+		return fmt.Errorf("updating user email: %w", err)
+	}
+	u.Email = &email
+	return nil
 }
