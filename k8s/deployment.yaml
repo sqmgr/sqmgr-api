@@ -24,6 +24,8 @@ spec:
         envFrom:
           - secretRef:
               name: sqmgr-config
+          - secretRef:
+              name: sqmgr-auth0
         env:
         - name: SQMGR_CONF_DSN
           value: 'dbname=$(PG_DBNAME) host=$(PG_HOST) port=$(PG_PORT) user=$(PG_USER) sslmode=$(PG_SSLMODE) password=$(PG_PASSWORD)'

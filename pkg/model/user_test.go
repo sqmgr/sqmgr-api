@@ -135,3 +135,53 @@ func TestUserIsAdmin(t *testing.T) {
 	_, err = m.DB.ExecContext(ctx, "UPDATE users SET is_admin = false WHERE id = $1", user.ID)
 	g.Expect(err).Should(gomega.Succeed())
 }
+
+func TestUserEmail(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(user.Email).Should(gomega.BeNil())
+
+	// Set email
+	testEmail := "test@example.com"
+	err = user.SetEmail(ctx, testEmail)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(user.Email).ShouldNot(gomega.BeNil())
+	g.Expect(*user.Email).Should(gomega.Equal(testEmail))
+
+	// Reload user and verify email persisted
+	reloadedUser, err := m.GetUserByID(ctx, user.ID)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(reloadedUser.Email).ShouldNot(gomega.BeNil())
+	g.Expect(*reloadedUser.Email).Should(gomega.Equal(testEmail))
+
+	// Update email
+	newEmail := "new@example.com"
+	err = reloadedUser.SetEmail(ctx, newEmail)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(*reloadedUser.Email).Should(gomega.Equal(newEmail))
+}
+
+func TestUserEmailNullable(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user without email
+	user, err := m.GetUser(ctx, IssuerSqMGR, randString())
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(user.Email).Should(gomega.BeNil())
+
+	// Reload and verify email is still nil
+	reloadedUser, err := m.GetUserByID(ctx, user.ID)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(reloadedUser.Email).Should(gomega.BeNil())
+}

@@ -107,16 +107,23 @@ func (p *PoolSquare) SetUserID(userID int64) {
 	p.userID = userID
 }
 
+// SquareUserInfoJSON contains user info for a square (admin only)
+type SquareUserInfoJSON struct {
+	UserType string `json:"userType"`
+	Email    string `json:"email,omitempty"`
+}
+
 // PoolSquareJSON represents JSON that can be sent to the front-end
 type PoolSquareJSON struct {
-	UserID         int64            `json:"userId"`
-	SquareID       int              `json:"squareId"`
-	ParentSquareID int              `json:"parentSquareId"`
-	ChildSquareIDs []int8           `json:"childSquareIds"`
-	State          PoolSquareState  `json:"state"`
-	Claimant       string           `json:"claimant"`
-	Modified       time.Time        `json:"modified"`
-	Logs           []*PoolSquareLog `json:"logs,omitempty"`
+	UserID         int64               `json:"userId"`
+	SquareID       int                 `json:"squareId"`
+	ParentSquareID int                 `json:"parentSquareId"`
+	ChildSquareIDs []int8              `json:"childSquareIds"`
+	State          PoolSquareState     `json:"state"`
+	Claimant       string              `json:"claimant"`
+	Modified       time.Time           `json:"modified"`
+	Logs           []*PoolSquareLog    `json:"logs,omitempty"`
+	UserInfo       *SquareUserInfoJSON `json:"userInfo,omitempty"`
 }
 
 // JSON will custom JSON encode a PoolSquare

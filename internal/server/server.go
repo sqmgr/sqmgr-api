@@ -18,10 +18,12 @@ package server
 
 import (
 	"database/sql"
+
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"github.com/sqmgr/sqmgr-api/internal/config"
 	"github.com/sqmgr/sqmgr-api/internal/keylocker"
+	"github.com/sqmgr/sqmgr-api/pkg/auth0"
 	"github.com/sqmgr/sqmgr-api/pkg/model"
 	"github.com/sqmgr/sqmgr-api/pkg/smjwt"
 )
@@ -34,6 +36,7 @@ type Server struct {
 	keyLocker   *keylocker.KeyLocker
 	smjwt       *smjwt.SMJWT
 	rateLimiter *RateLimiter
+	auth0Client *auth0.Client
 }
 
 // New returns a new server object
@@ -49,6 +52,13 @@ func New(version string, db *sql.DB) *Server {
 	// Rate limit: 10 requests per second with burst of 20
 	rl := NewRateLimiter(10, 20)
 
+	// Initialize Auth0 Management API client
+	auth0Client := auth0.NewClient(auth0.Config{
+		Domain:       config.Auth0MgmtDomain(),
+		ClientID:     config.Auth0MgmtClientID(),
+		ClientSecret: config.Auth0MgmtClientSecret(),
+	})
+
 	s := &Server{
 		Router:      mux.NewRouter(),
 		model:       model.New(db),
@@ -56,6 +66,7 @@ func New(version string, db *sql.DB) *Server {
 		smjwt:       sj,
 		version:     version,
 		rateLimiter: rl,
+		auth0Client: auth0Client,
 	}
 
 	s.setupRoutes()
