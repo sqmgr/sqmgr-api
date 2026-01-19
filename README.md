@@ -18,7 +18,7 @@ make git-hooks   # install git pre-commit hooks
 make run         # start the development server
 ```
 
-Verify you get a response by querying [localhost:5000](http://localhost:5000).
+Verify you get a response by querying [localhost:8000](http://localhost:8000).
 
 ## Project Structure
 
@@ -78,7 +78,7 @@ Key | Description | Default
 
 Flag | Description | Default
 --- | --- | ---
-`-addr` | Server listen address | `:5000` (or `ADDR` env var)
+`-addr` | Server listen address | `:8000` (or `ADDR` env var)
 `-sql` | Path to SQL migrations directory | `./sql`
 `-migrate` | Run database migrations on startup | `false`
 
@@ -152,7 +152,7 @@ Build the Docker image:
 docker build --build-arg SQMGR_VERSION=1.0.0 -t sqmgr-api .
 ```
 
-The image exposes port 5000 and includes both `sqmgr-api` and `sqmgr-guest-user-cleanup` binaries.
+The image exposes port 8000 and includes both `sqmgr-api` and `sqmgr-guest-user-cleanup` binaries.
 
 ## Deployment
 

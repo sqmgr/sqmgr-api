@@ -9,7 +9,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o sqmgr-api github.com/sqmgr/sqmgr-api/cm
  && CGO_ENABLED=0 GOOS=linux go build -o sqmgr-guest-user-cleanup github.com/sqmgr/sqmgr-api/cmd/sqmgr-guest-user-cleanup
 
 FROM alpine:latest
-EXPOSE 5000
+EXPOSE 8000
 WORKDIR /app
 RUN apk add --no-cache ca-certificates
 COPY --from=build-go /build/sqmgr-api /bin/sqmgr-api
