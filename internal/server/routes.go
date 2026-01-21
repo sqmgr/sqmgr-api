@@ -32,6 +32,7 @@ func (s *Server) setupRoutes() {
 	// these routes do NOT require auth
 	s.Router.Path("/").Methods(http.MethodGet).Handler(s.getHealthEndpoint())
 	s.Router.Path("/pool/configuration").Methods(http.MethodGet).Handler(s.getPoolConfiguration())
+	s.Router.Path("/pool/{token:[A-Za-z0-9_-]+}/squares/public").Methods(http.MethodGet).Handler(s.getPoolTokenSquaresPublicEndpoint())
 	s.Router.Path("/user/guest").Methods(http.MethodPost).Handler(s.postUserGuestEndpoint())
 
 	// these routes REQUIRE AUTH

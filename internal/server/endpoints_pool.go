@@ -594,6 +594,50 @@ func (s *Server) getPoolTokenSquareEndpoint() http.HandlerFunc {
 	}
 }
 
+func (s *Server) getPoolTokenSquaresPublicEndpoint() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := mux.Vars(r)["token"]
+
+		// Load pool from database
+		pool, err := s.model.PoolByToken(r.Context(), token)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				s.writeErrorResponse(w, http.StatusNotFound, nil)
+				return
+			}
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		// Auth required when password is required AND pool is not in open-access state
+		// Open access: !PasswordRequired() OR (IsLocked() AND OpenAccessOnLock())
+		authRequired := pool.PasswordRequired() && (!pool.IsLocked() || !pool.OpenAccessOnLock())
+		if authRequired {
+			_, password, ok := r.BasicAuth()
+			if !ok || !pool.PasswordIsValid(password) {
+				w.Header().Set("WWW-Authenticate", `Basic realm="Pool Access"`)
+				s.writeErrorResponse(w, http.StatusUnauthorized, errors.New("authentication required"))
+				return
+			}
+		}
+
+		// Retrieve squares
+		squares, err := pool.Squares()
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		// Convert to JSON (no admin fields populated by default)
+		squaresJSON := make(map[int]*model.PoolSquareJSON)
+		for key, square := range squares {
+			squaresJSON[key] = square.JSON()
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, squaresJSON)
+	}
+}
+
 func (s *Server) getPoolTokenSquareIDEndpoint() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
