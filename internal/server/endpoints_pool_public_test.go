@@ -17,120 +17,329 @@ limitations under the License.
 package server
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/gorilla/mux"
 	"github.com/onsi/gomega"
 	"github.com/sqmgr/sqmgr-api/pkg/model"
+	"github.com/synacor/argon2id"
 )
 
-// computeAuthRequired replicates the authorization logic from getPoolTokenSquaresPublicEndpoint
-// Auth required when password is required AND pool is not in open-access state
-// Open access: !PasswordRequired() OR (IsLocked() AND OpenAccessOnLock())
-func computeAuthRequired(pool *model.Pool) bool {
-	return pool.PasswordRequired() && (!pool.IsLocked() || !pool.OpenAccessOnLock())
-}
-
-// createPoolWithSettings creates a Pool with the specified settings for testing
-func createPoolWithSettings(passwordRequired, locked, openAccessOnLock bool) *model.Pool {
-	pool := &model.Pool{}
-	pool.SetPasswordRequired(passwordRequired)
-	pool.SetOpenAccessOnLock(openAccessOnLock)
-	if locked {
-		// Set locks time to the past to make IsLocked() return true
-		pool.SetLocks(time.Now().Add(-time.Hour))
-	}
-	return pool
-}
-
-// TestGetPoolSquaresPublic_NoPasswordRequired_Returns200 verifies that pools without
-// password requirement don't need authentication
-func TestGetPoolSquaresPublic_NoPasswordRequired_Returns200(t *testing.T) {
-	g := gomega.NewWithT(t)
-
-	// PasswordRequired=false, IsLocked=false -> no auth needed
-	pool := createPoolWithSettings(false, false, false)
-	g.Expect(computeAuthRequired(pool)).Should(gomega.BeFalse())
-
-	// PasswordRequired=false, IsLocked=true -> no auth needed (password not required)
-	pool = createPoolWithSettings(false, true, false)
-	g.Expect(computeAuthRequired(pool)).Should(gomega.BeFalse())
-
-	// PasswordRequired=false, IsLocked=true, OpenAccessOnLock=true -> no auth needed
-	pool = createPoolWithSettings(false, true, true)
-	g.Expect(computeAuthRequired(pool)).Should(gomega.BeFalse())
-}
-
-// TestGetPoolSquaresPublic_PasswordRequired_Open_Returns401 verifies that an open pool
-// with password required needs authentication (this is the main bug scenario)
-func TestGetPoolSquaresPublic_PasswordRequired_Open_Returns401(t *testing.T) {
-	g := gomega.NewWithT(t)
-
-	// PasswordRequired=true, IsLocked=false -> auth required
-	// This is the main bug: previously this case did NOT require auth
-	pool := createPoolWithSettings(true, false, false)
-	g.Expect(computeAuthRequired(pool)).Should(gomega.BeTrue())
-
-	// OpenAccessOnLock doesn't matter when not locked
-	pool = createPoolWithSettings(true, false, true)
-	g.Expect(computeAuthRequired(pool)).Should(gomega.BeTrue())
-}
-
-// TestGetPoolSquaresPublic_PasswordRequired_Locked_NoOpenAccess_Returns401 verifies that
-// a locked pool with password required and no open access needs authentication
-func TestGetPoolSquaresPublic_PasswordRequired_Locked_NoOpenAccess_Returns401(t *testing.T) {
-	g := gomega.NewWithT(t)
-
-	// PasswordRequired=true, IsLocked=true, OpenAccessOnLock=false -> auth required
-	pool := createPoolWithSettings(true, true, false)
-	g.Expect(computeAuthRequired(pool)).Should(gomega.BeTrue())
-}
-
-// TestGetPoolSquaresPublic_PasswordRequired_Locked_OpenAccess_Returns200 verifies that
-// a locked pool with open access enabled doesn't need authentication
-func TestGetPoolSquaresPublic_PasswordRequired_Locked_OpenAccess_Returns200(t *testing.T) {
-	g := gomega.NewWithT(t)
-
-	// PasswordRequired=true, IsLocked=true, OpenAccessOnLock=true -> no auth (open access)
-	pool := createPoolWithSettings(true, true, true)
-	g.Expect(computeAuthRequired(pool)).Should(gomega.BeFalse())
-}
-
-// TestAuthRequiredTruthTable verifies all combinations of the authorization logic
-// as specified in the implementation plan
-func TestAuthRequiredTruthTable(t *testing.T) {
-	g := gomega.NewWithT(t)
-
-	testCases := []struct {
-		name             string
-		passwordRequired bool
-		locked           bool
-		openAccessOnLock bool
-		expectedAuth     bool
-	}{
-		// PasswordRequired=false cases (no auth needed regardless of other settings)
-		{"no password, unlocked", false, false, false, false},
-		{"no password, locked, no open access", false, true, false, false},
-		{"no password, locked, open access", false, true, true, false},
-
-		// PasswordRequired=true, unlocked cases (auth always required)
-		{"password required, unlocked, no open access", true, false, false, true},
-		{"password required, unlocked, open access flag set", true, false, true, true},
-
-		// PasswordRequired=true, locked cases (depends on OpenAccessOnLock)
-		{"password required, locked, no open access", true, true, false, true},
-		{"password required, locked, open access", true, true, true, false},
+// setupTestServerWithMock creates a test server with a mocked database
+func setupTestServerWithMock(t *testing.T) (*Server, sqlmock.Sqlmock) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			pool := createPoolWithSettings(tc.passwordRequired, tc.locked, tc.openAccessOnLock)
-			authRequired := computeAuthRequired(pool)
-			g.Expect(authRequired).Should(gomega.Equal(tc.expectedAuth),
-				"Expected authRequired=%v for passwordRequired=%v, locked=%v, openAccessOnLock=%v",
-				tc.expectedAuth, tc.passwordRequired, tc.locked, tc.openAccessOnLock)
-		})
+	s := &Server{
+		Router: mux.NewRouter(),
+		model:  model.New(db),
 	}
+
+	// Register the public squares endpoint
+	s.Router.Path("/pool/{token:[A-Za-z0-9_-]+}/squares/public").Methods(http.MethodGet).Handler(s.getPoolTokenSquaresPublicEndpoint())
+
+	return s, mock
+}
+
+// poolColumns matches the order from pool.go poolColumns constant
+var testPoolColumns = []string{
+	"id", "token", "user_id", "name", "grid_type", "password_hash",
+	"password_required", "open_access_on_lock", "locks", "created", "modified",
+	"check_id", "archived",
+}
+
+// squaresColumns matches the columns returned by Pool.Squares() query
+var testSquaresColumns = []string{
+	"id", "square_id", "parent_id", "user_id", "state", "claimant",
+	"modified", "parent_square_id", "child_square_ids",
+}
+
+func TestGetPoolTokenSquaresPublicEndpoint_PoolNotFound(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock := setupTestServerWithMock(t)
+
+	// Mock pool lookup - returns no rows
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs("nonexistent-token").
+		WillReturnRows(sqlmock.NewRows(testPoolColumns))
+
+	req := httptest.NewRequest(http.MethodGet, "/pool/nonexistent-token/squares/public", nil)
+	rec := httptest.NewRecorder()
+
+	s.Router.ServeHTTP(rec, req)
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusNotFound))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestGetPoolTokenSquaresPublicEndpoint_NoPasswordRequired(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock := setupTestServerWithMock(t)
+
+	now := time.Now()
+
+	// Mock pool lookup - passwordRequired=false
+	poolRows := sqlmock.NewRows(testPoolColumns).AddRow(
+		1,               // id
+		"test-token",    // token
+		100,             // user_id
+		"Test Pool",     // name
+		"std100",        // grid_type
+		"hash",          // password_hash
+		false,           // password_required
+		false,           // open_access_on_lock
+		nil,             // locks (nil = not locked)
+		now,             // created
+		now,             // modified
+		1,               // check_id
+		false,           // archived
+	)
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs("test-token").
+		WillReturnRows(poolRows)
+
+	// Mock squares lookup - return empty squares
+	squaresRows := sqlmock.NewRows(testSquaresColumns)
+	mock.ExpectQuery("SELECT .+ FROM pool_squares").
+		WithArgs(1). // pool_id
+		WillReturnRows(squaresRows)
+
+	req := httptest.NewRequest(http.MethodGet, "/pool/test-token/squares/public", nil)
+	rec := httptest.NewRecorder()
+
+	s.Router.ServeHTTP(rec, req)
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var result map[int]*model.PoolSquareJSON
+	err := json.Unmarshal(rec.Body.Bytes(), &result)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	g.Expect(result).Should(gomega.BeEmpty())
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestGetPoolTokenSquaresPublicEndpoint_PasswordRequired_NoCredentials(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock := setupTestServerWithMock(t)
+
+	now := time.Now()
+
+	// Mock pool lookup - passwordRequired=true, unlocked
+	poolRows := sqlmock.NewRows(testPoolColumns).AddRow(
+		1,               // id
+		"test-token",    // token
+		100,             // user_id
+		"Test Pool",     // name
+		"std100",        // grid_type
+		"hash",          // password_hash
+		true,            // password_required
+		false,           // open_access_on_lock
+		nil,             // locks (nil = not locked)
+		now,             // created
+		now,             // modified
+		1,               // check_id
+		false,           // archived
+	)
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs("test-token").
+		WillReturnRows(poolRows)
+
+	req := httptest.NewRequest(http.MethodGet, "/pool/test-token/squares/public", nil)
+	rec := httptest.NewRecorder()
+
+	s.Router.ServeHTTP(rec, req)
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusUnauthorized))
+	g.Expect(rec.Header().Get("WWW-Authenticate")).Should(gomega.Equal(`Basic realm="Pool Access"`))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestGetPoolTokenSquaresPublicEndpoint_PasswordRequired_WrongPassword(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock := setupTestServerWithMock(t)
+
+	now := time.Now()
+
+	// Generate a valid password hash for "correct-password"
+	correctPasswordHash, err := argon2id.DefaultHashPassword("correct-password")
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Mock pool lookup - passwordRequired=true, unlocked
+	poolRows := sqlmock.NewRows(testPoolColumns).AddRow(
+		1,                   // id
+		"test-token",        // token
+		100,                 // user_id
+		"Test Pool",         // name
+		"std100",            // grid_type
+		correctPasswordHash, // password_hash
+		true,                // password_required
+		false,               // open_access_on_lock
+		nil,                 // locks (nil = not locked)
+		now,                 // created
+		now,                 // modified
+		1,                   // check_id
+		false,               // archived
+	)
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs("test-token").
+		WillReturnRows(poolRows)
+
+	req := httptest.NewRequest(http.MethodGet, "/pool/test-token/squares/public", nil)
+	req.SetBasicAuth("user", "wrong-password")
+	rec := httptest.NewRecorder()
+
+	s.Router.ServeHTTP(rec, req)
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusUnauthorized))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestGetPoolTokenSquaresPublicEndpoint_PasswordRequired_CorrectPassword(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock := setupTestServerWithMock(t)
+
+	now := time.Now()
+
+	// Generate a valid password hash for "correct-password"
+	correctPasswordHash, err := argon2id.DefaultHashPassword("correct-password")
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Mock pool lookup - passwordRequired=true, unlocked
+	poolRows := sqlmock.NewRows(testPoolColumns).AddRow(
+		1,                   // id
+		"test-token",        // token
+		100,                 // user_id
+		"Test Pool",         // name
+		"std100",            // grid_type
+		correctPasswordHash, // password_hash
+		true,                // password_required
+		false,               // open_access_on_lock
+		nil,                 // locks (nil = not locked)
+		now,                 // created
+		now,                 // modified
+		1,                   // check_id
+		false,               // archived
+	)
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs("test-token").
+		WillReturnRows(poolRows)
+
+	// Mock squares lookup
+	squaresRows := sqlmock.NewRows(testSquaresColumns).AddRow(
+		1,           // id
+		1,           // square_id
+		nil,         // parent_id
+		nil,         // user_id
+		"unclaimed", // state
+		nil,         // claimant
+		now,         // modified
+		nil,         // parent_square_id
+		nil,         // child_square_ids
+	)
+	mock.ExpectQuery("SELECT .+ FROM pool_squares").
+		WithArgs(1). // pool_id
+		WillReturnRows(squaresRows)
+
+	req := httptest.NewRequest(http.MethodGet, "/pool/test-token/squares/public", nil)
+	req.SetBasicAuth("user", "correct-password")
+	rec := httptest.NewRecorder()
+
+	s.Router.ServeHTTP(rec, req)
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var result map[string]*model.PoolSquareJSON
+	err = json.Unmarshal(rec.Body.Bytes(), &result)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	g.Expect(result).Should(gomega.HaveLen(1))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestGetPoolTokenSquaresPublicEndpoint_LockedWithOpenAccess(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock := setupTestServerWithMock(t)
+
+	now := time.Now()
+	lockedTime := now.Add(-time.Hour) // locked in the past
+
+	// Mock pool lookup - passwordRequired=true, locked=true, openAccessOnLock=true
+	poolRows := sqlmock.NewRows(testPoolColumns).AddRow(
+		1,            // id
+		"test-token", // token
+		100,          // user_id
+		"Test Pool",  // name
+		"std100",     // grid_type
+		"hash",       // password_hash
+		true,         // password_required
+		true,         // open_access_on_lock
+		lockedTime,   // locks (in the past = locked)
+		now,          // created
+		now,          // modified
+		1,            // check_id
+		false,        // archived
+	)
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs("test-token").
+		WillReturnRows(poolRows)
+
+	// Mock squares lookup - no auth required due to open access
+	squaresRows := sqlmock.NewRows(testSquaresColumns)
+	mock.ExpectQuery("SELECT .+ FROM pool_squares").
+		WithArgs(1). // pool_id
+		WillReturnRows(squaresRows)
+
+	req := httptest.NewRequest(http.MethodGet, "/pool/test-token/squares/public", nil)
+	// Note: no authentication provided
+	rec := httptest.NewRecorder()
+
+	s.Router.ServeHTTP(rec, req)
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestGetPoolTokenSquaresPublicEndpoint_LockedNoOpenAccess(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock := setupTestServerWithMock(t)
+
+	now := time.Now()
+	lockedTime := now.Add(-time.Hour) // locked in the past
+
+	// Mock pool lookup - passwordRequired=true, locked=true, openAccessOnLock=false
+	poolRows := sqlmock.NewRows(testPoolColumns).AddRow(
+		1,            // id
+		"test-token", // token
+		100,          // user_id
+		"Test Pool",  // name
+		"std100",     // grid_type
+		"hash",       // password_hash
+		true,         // password_required
+		false,        // open_access_on_lock
+		lockedTime,   // locks (in the past = locked)
+		now,          // created
+		now,          // modified
+		1,            // check_id
+		false,        // archived
+	)
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs("test-token").
+		WillReturnRows(poolRows)
+
+	req := httptest.NewRequest(http.MethodGet, "/pool/test-token/squares/public", nil)
+	rec := httptest.NewRecorder()
+
+	s.Router.ServeHTTP(rec, req)
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusUnauthorized))
+	g.Expect(rec.Header().Get("WWW-Authenticate")).Should(gomega.Equal(`Basic realm="Pool Access"`))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
 }
 
 // TestPoolIsLockedBehavior verifies Pool.IsLocked() behavior with time settings

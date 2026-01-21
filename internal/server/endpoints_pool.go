@@ -601,7 +601,7 @@ func (s *Server) getPoolTokenSquaresPublicEndpoint() http.HandlerFunc {
 		// Load pool from database
 		pool, err := s.model.PoolByToken(r.Context(), token)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				s.writeErrorResponse(w, http.StatusNotFound, nil)
 				return
 			}
