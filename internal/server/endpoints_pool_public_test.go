@@ -87,19 +87,19 @@ func TestGetPoolTokenSquaresPublicEndpoint_NoPasswordRequired(t *testing.T) {
 
 	// Mock pool lookup - passwordRequired=false
 	poolRows := sqlmock.NewRows(testPoolColumns).AddRow(
-		1,               // id
-		"test-token",    // token
-		100,             // user_id
-		"Test Pool",     // name
-		"std100",        // grid_type
-		"hash",          // password_hash
-		false,           // password_required
-		false,           // open_access_on_lock
-		nil,             // locks (nil = not locked)
-		now,             // created
-		now,             // modified
-		1,               // check_id
-		false,           // archived
+		1,            // id
+		"test-token", // token
+		100,          // user_id
+		"Test Pool",  // name
+		"std100",     // grid_type
+		"hash",       // password_hash
+		false,        // password_required
+		false,        // open_access_on_lock
+		nil,          // locks (nil = not locked)
+		now,          // created
+		now,          // modified
+		1,            // check_id
+		false,        // archived
 	)
 	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
 		WithArgs("test-token").
@@ -133,19 +133,19 @@ func TestGetPoolTokenSquaresPublicEndpoint_PasswordRequired_NoCredentials(t *tes
 
 	// Mock pool lookup - passwordRequired=true, unlocked
 	poolRows := sqlmock.NewRows(testPoolColumns).AddRow(
-		1,               // id
-		"test-token",    // token
-		100,             // user_id
-		"Test Pool",     // name
-		"std100",        // grid_type
-		"hash",          // password_hash
-		true,            // password_required
-		false,           // open_access_on_lock
-		nil,             // locks (nil = not locked)
-		now,             // created
-		now,             // modified
-		1,               // check_id
-		false,           // archived
+		1,            // id
+		"test-token", // token
+		100,          // user_id
+		"Test Pool",  // name
+		"std100",     // grid_type
+		"hash",       // password_hash
+		true,         // password_required
+		false,        // open_access_on_lock
+		nil,          // locks (nil = not locked)
+		now,          // created
+		now,          // modified
+		1,            // check_id
+		false,        // archived
 	)
 	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
 		WithArgs("test-token").
