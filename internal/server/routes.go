@@ -41,6 +41,7 @@ func (s *Server) setupRoutes() {
 	authRouter.Path("/pool").Methods(http.MethodPost).Handler(s.postPoolEndpoint())
 	authRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/member").Methods(http.MethodPost).Handler(s.postPoolTokenMemberEndpoint())
 	authRouter.Path("/user/self").Methods(http.MethodGet).Handler(s.getUserSelfEndpoint())
+	authRouter.Path("/user/self/stats").Methods(http.MethodGet).Handler(s.getUserSelfStatsEndpoint())
 
 	authPoolRouter := authRouter.NewRoute().Subrouter()
 	authPoolRouter.Use(s.poolHandler)

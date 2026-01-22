@@ -57,6 +57,8 @@ func (s *Server) getUserSelfEndpoint() http.HandlerFunc {
 		StoreID string          `json:"store_id"`
 		Store   model.UserStore `json:"store"`
 		IsAdmin bool            `json:"is_admin"`
+		Email   *string         `json:"email"`
+		Created time.Time       `json:"created"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -66,6 +68,46 @@ func (s *Server) getUserSelfEndpoint() http.HandlerFunc {
 			StoreID: user.StoreID,
 			Store:   user.Store,
 			IsAdmin: user.IsAdmin,
+			Email:   user.Email,
+			Created: user.Created,
+		})
+	}
+}
+
+func (s *Server) getUserSelfStatsEndpoint() http.HandlerFunc {
+	type response struct {
+		PoolsCreated  int64 `json:"poolsCreated"`
+		PoolsJoined   int64 `json:"poolsJoined"`
+		ActivePools   int64 `json:"activePools"`
+		ArchivedPools int64 `json:"archivedPools"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := r.Context().Value(ctxUserKey).(*model.User)
+
+		poolsCreatedTotal, err := s.model.PoolsOwnedByUserIDCount(r.Context(), user.ID, true)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		poolsCreatedActive, err := s.model.PoolsOwnedByUserIDCount(r.Context(), user.ID, false)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		poolsJoined, err := s.model.PoolsJoinedByUserIDCount(r.Context(), user.ID)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, response{
+			PoolsCreated:  poolsCreatedTotal,
+			PoolsJoined:   poolsJoined,
+			ActivePools:   poolsCreatedActive,
+			ArchivedPools: poolsCreatedTotal - poolsCreatedActive,
 		})
 	}
 }
