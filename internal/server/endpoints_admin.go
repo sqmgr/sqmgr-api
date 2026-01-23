@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"strconv"
@@ -37,6 +38,19 @@ var validStatsPeriods = map[string]bool{
 	"week":  true,
 	"month": true,
 	"year":  true,
+}
+
+// ensureUserEmail fetches and caches the email from Auth0 if needed
+func (s *Server) ensureUserEmail(ctx context.Context, user *model.User) {
+	if user.Store == model.UserStoreAuth0 && (user.Email == nil || *user.Email == "") {
+		if s.auth0Client.IsConfigured() {
+			if email, err := s.auth0Client.GetUserEmail(ctx, user.StoreID); err == nil && email != "" {
+				if cacheErr := user.SetEmail(ctx, email); cacheErr != nil {
+					logrus.WithError(cacheErr).Warn("could not cache user email")
+				}
+			}
+		}
+	}
 }
 
 // getAdminStatsEndpoint returns site-wide statistics
@@ -123,5 +137,120 @@ func (s *Server) postAdminPoolJoinEndpoint() http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// getAdminUserEndpoint returns user profile and stats for admin view
+func (s *Server) getAdminUserEndpoint() http.HandlerFunc {
+	type userResponse struct {
+		ID      int64           `json:"id"`
+		Store   model.UserStore `json:"store"`
+		StoreID string          `json:"storeId"`
+		Email   *string         `json:"email"`
+		IsAdmin bool            `json:"isAdmin"`
+		Created string          `json:"created"`
+	}
+	type response struct {
+		User  userResponse          `json:"user"`
+		Stats *model.AdminUserStats `json:"stats"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := mux.Vars(r)["id"]
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, nil)
+			return
+		}
+
+		user, err := s.model.GetUserByID(r.Context(), id)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				s.writeErrorResponse(w, http.StatusNotFound, nil)
+				return
+			}
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		s.ensureUserEmail(r.Context(), user)
+
+		stats, err := s.model.GetUserStats(r.Context(), id)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, response{
+			User: userResponse{
+				ID:      user.ID,
+				Store:   user.Store,
+				StoreID: user.StoreID,
+				Email:   user.Email,
+				IsAdmin: user.IsAdmin,
+				Created: user.Created.Format("2006-01-02T15:04:05Z07:00"),
+			},
+			Stats: stats,
+		})
+	}
+}
+
+// getAdminUserPoolsEndpoint returns paginated pools created by a specific user
+func (s *Server) getAdminUserPoolsEndpoint() http.HandlerFunc {
+	type response struct {
+		Pools []*model.AdminPool `json:"pools"`
+		Total int64              `json:"total"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := mux.Vars(r)["id"]
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, nil)
+			return
+		}
+
+		// Verify user exists
+		_, err = s.model.GetUserByID(r.Context(), id)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				s.writeErrorResponse(w, http.StatusNotFound, nil)
+				return
+			}
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		offset, _ := strconv.ParseInt(r.FormValue("offset"), 10, 64)
+		if offset < 0 {
+			offset = 0
+		}
+
+		limit, _ := strconv.Atoi(r.FormValue("limit"))
+		if limit <= 0 {
+			limit = defaultAdminPoolsLimit
+		}
+		if limit > maxAdminPoolsLimit {
+			limit = maxAdminPoolsLimit
+		}
+
+		includeArchived := r.FormValue("includeArchived") == "true"
+
+		pools, err := s.model.GetPoolsByUserID(r.Context(), id, includeArchived, offset, limit)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		total, err := s.model.GetPoolsByUserIDCount(r.Context(), id, includeArchived)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, response{
+			Pools: pools,
+			Total: total,
+		})
 	}
 }

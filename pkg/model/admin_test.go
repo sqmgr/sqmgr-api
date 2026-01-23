@@ -271,3 +271,224 @@ func TestGetAllPoolsClaimedCount(t *testing.T) {
 	g.Expect(len(pools)).Should(gomega.Equal(1))
 	g.Expect(pools[0].ClaimedCount).Should(gomega.Equal(int64(1)))
 }
+
+func TestGetAllPoolsOwnerInfo(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create an auth0 user with email
+	auth0User, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	testEmail := "test-" + randString()[:8] + "@example.com"
+	err = auth0User.SetEmail(ctx, testEmail)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create a guest user (no email)
+	guestUser, err := m.GetUser(ctx, IssuerSqMGR, randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create pools for each user
+	uniquePrefix := "OwnerInfo" + randString()[:4]
+	auth0Pool, err := m.NewPool(ctx, auth0User.ID, uniquePrefix+" Auth0 Pool", GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(auth0Pool).ShouldNot(gomega.BeNil())
+
+	guestPool, err := m.NewPool(ctx, guestUser.ID, uniquePrefix+" Guest Pool", GridTypeStd25, "password")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(guestPool).ShouldNot(gomega.BeNil())
+
+	// Get pools with owner info
+	pools, err := m.GetAllPools(ctx, uniquePrefix, 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(pools)).Should(gomega.Equal(2))
+
+	// Find each pool and verify owner info
+	var foundAuth0Pool, foundGuestPool *AdminPool
+	for _, pool := range pools {
+		if pool.OwnerID == auth0User.ID {
+			foundAuth0Pool = pool
+		}
+		if pool.OwnerID == guestUser.ID {
+			foundGuestPool = pool
+		}
+	}
+
+	// Verify auth0 user's pool has email and correct store
+	g.Expect(foundAuth0Pool).ShouldNot(gomega.BeNil())
+	g.Expect(foundAuth0Pool.OwnerStore).Should(gomega.Equal("auth0"))
+	g.Expect(foundAuth0Pool.OwnerEmail).ShouldNot(gomega.BeNil())
+	g.Expect(*foundAuth0Pool.OwnerEmail).Should(gomega.Equal(testEmail))
+
+	// Verify guest user's pool has nil email and correct store
+	g.Expect(foundGuestPool).ShouldNot(gomega.BeNil())
+	g.Expect(foundGuestPool.OwnerStore).Should(gomega.Equal("sqmgr"))
+	g.Expect(foundGuestPool.OwnerEmail).Should(gomega.BeNil())
+}
+
+func TestGetUserStats(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create another user to join pools
+	otherUser, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Get initial stats (should be all zeros for new user)
+	initialStats, err := m.GetUserStats(ctx, user.ID)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(initialStats.PoolsCreated).Should(gomega.Equal(int64(0)))
+	g.Expect(initialStats.PoolsJoined).Should(gomega.Equal(int64(0)))
+	g.Expect(initialStats.ActivePools).Should(gomega.Equal(int64(0)))
+	g.Expect(initialStats.ArchivedPools).Should(gomega.Equal(int64(0)))
+
+	// Create an active pool
+	activePool, err := m.NewPool(ctx, user.ID, "User Stats Active Pool "+randString(), GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(activePool).ShouldNot(gomega.BeNil())
+
+	// Create an archived pool
+	archivedPool, err := m.NewPool(ctx, user.ID, "User Stats Archived Pool "+randString(), GridTypeStd25, "password")
+	g.Expect(err).Should(gomega.Succeed())
+	archivedPool.SetArchived(true)
+	g.Expect(archivedPool.Save(ctx)).Should(gomega.Succeed())
+
+	// Create a pool owned by another user and join it
+	otherPool, err := m.NewPool(ctx, otherUser.ID, "Other User Pool "+randString(), GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+	err = user.JoinPool(ctx, otherPool)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Get updated stats
+	stats, err := m.GetUserStats(ctx, user.ID)
+	g.Expect(err).Should(gomega.Succeed())
+
+	g.Expect(stats.PoolsCreated).Should(gomega.Equal(int64(2)))
+	g.Expect(stats.PoolsJoined).Should(gomega.Equal(int64(1)))
+	g.Expect(stats.ActivePools).Should(gomega.Equal(int64(1)))
+	g.Expect(stats.ArchivedPools).Should(gomega.Equal(int64(1)))
+}
+
+func TestGetPoolsByUserID(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create some pools
+	pool1, err := m.NewPool(ctx, user.ID, "User Pools Test A "+randString(), GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(pool1).ShouldNot(gomega.BeNil())
+
+	pool2, err := m.NewPool(ctx, user.ID, "User Pools Test B "+randString(), GridTypeStd25, "password")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(pool2).ShouldNot(gomega.BeNil())
+
+	archivedPool, err := m.NewPool(ctx, user.ID, "User Pools Test Archived "+randString(), GridTypeStd50, "password")
+	g.Expect(err).Should(gomega.Succeed())
+	archivedPool.SetArchived(true)
+	g.Expect(archivedPool.Save(ctx)).Should(gomega.Succeed())
+
+	// Get active pools only (default)
+	activePools, err := m.GetPoolsByUserID(ctx, user.ID, false, 0, 100)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(activePools)).Should(gomega.Equal(2))
+
+	// Verify all returned pools are not archived
+	for _, pool := range activePools {
+		g.Expect(pool.Archived).Should(gomega.BeFalse())
+		g.Expect(pool.OwnerID).Should(gomega.Equal(user.ID))
+	}
+
+	// Get all pools including archived
+	allPools, err := m.GetPoolsByUserID(ctx, user.ID, true, 0, 100)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(allPools)).Should(gomega.Equal(3))
+
+	// Verify owner info is populated
+	g.Expect(allPools[0].OwnerStore).Should(gomega.Equal("auth0"))
+}
+
+func TestGetPoolsByUserID_Pagination(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create 3 pools
+	for i := 0; i < 3; i++ {
+		_, err := m.NewPool(ctx, user.ID, "Pagination Test Pool "+randString(), GridTypeStd100, "password")
+		g.Expect(err).Should(gomega.Succeed())
+	}
+
+	// Get first 2 pools
+	firstPage, err := m.GetPoolsByUserID(ctx, user.ID, true, 0, 2)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(firstPage)).Should(gomega.Equal(2))
+
+	// Get next page with offset
+	secondPage, err := m.GetPoolsByUserID(ctx, user.ID, true, 2, 2)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(secondPage)).Should(gomega.Equal(1))
+
+	// Verify no overlap
+	g.Expect(secondPage[0].Token).ShouldNot(gomega.Equal(firstPage[0].Token))
+	g.Expect(secondPage[0].Token).ShouldNot(gomega.Equal(firstPage[1].Token))
+}
+
+func TestGetPoolsByUserIDCount(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Initial count should be 0
+	initialCount, err := m.GetPoolsByUserIDCount(ctx, user.ID, true)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(initialCount).Should(gomega.Equal(int64(0)))
+
+	// Create an active pool
+	_, err = m.NewPool(ctx, user.ID, "Count Test Active "+randString(), GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create an archived pool
+	archivedPool, err := m.NewPool(ctx, user.ID, "Count Test Archived "+randString(), GridTypeStd25, "password")
+	g.Expect(err).Should(gomega.Succeed())
+	archivedPool.SetArchived(true)
+	g.Expect(archivedPool.Save(ctx)).Should(gomega.Succeed())
+
+	// Count active only
+	activeCount, err := m.GetPoolsByUserIDCount(ctx, user.ID, false)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(activeCount).Should(gomega.Equal(int64(1)))
+
+	// Count all including archived
+	totalCount, err := m.GetPoolsByUserIDCount(ctx, user.ID, true)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(totalCount).Should(gomega.Equal(int64(2)))
+}

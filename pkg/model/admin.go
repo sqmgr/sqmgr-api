@@ -37,6 +37,8 @@ type AdminPool struct {
 	GridType     GridType `json:"gridType"`
 	Archived     bool     `json:"archived"`
 	OwnerID      int64    `json:"ownerId"`
+	OwnerEmail   *string  `json:"ownerEmail"`
+	OwnerStore   string   `json:"ownerStore"`
 	MemberCount  int64    `json:"memberCount"`
 	GridCount    int64    `json:"gridCount"`
 	ClaimedCount int64    `json:"claimedCount"`
@@ -134,11 +136,14 @@ func (m *Model) GetAllPools(ctx context.Context, search string, offset int64, li
 			p.grid_type,
 			p.archived,
 			p.user_id,
+			u.email,
+			u.store,
 			(SELECT COUNT(*) FROM pools_users pu WHERE pu.pool_id = p.id) as member_count,
 			(SELECT COUNT(*) FROM grids g WHERE g.pool_id = p.id AND g.state = 'active') as grid_count,
 			(SELECT COUNT(*) FROM pool_squares ps WHERE ps.pool_id = p.id AND ps.state != 'unclaimed') as claimed_count,
 			p.created
 		FROM pools p
+		LEFT JOIN users u ON u.id = p.user_id
 		%s
 		ORDER BY p.id DESC
 		OFFSET $%d
@@ -179,6 +184,8 @@ func scanAdminPools(rows interface {
 			&pool.GridType,
 			&pool.Archived,
 			&pool.OwnerID,
+			&pool.OwnerEmail,
+			&pool.OwnerStore,
 			&pool.MemberCount,
 			&pool.GridCount,
 			&pool.ClaimedCount,
@@ -204,6 +211,104 @@ func (m *Model) GetAllPoolsCount(ctx context.Context, search string) (int64, err
 
 	if err := row.Scan(&count); err != nil {
 		return 0, fmt.Errorf("counting pools: %w", err)
+	}
+
+	return count, nil
+}
+
+// AdminUserStats holds statistics for a specific user
+type AdminUserStats struct {
+	PoolsCreated  int64 `json:"poolsCreated"`
+	PoolsJoined   int64 `json:"poolsJoined"`
+	ActivePools   int64 `json:"activePools"`
+	ArchivedPools int64 `json:"archivedPools"`
+}
+
+// GetUserStats returns statistics for a specific user
+func (m *Model) GetUserStats(ctx context.Context, userID int64) (*AdminUserStats, error) {
+	stats := &AdminUserStats{}
+
+	// Pools created
+	row := m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM pools WHERE user_id = $1", userID)
+	if err := row.Scan(&stats.PoolsCreated); err != nil {
+		return nil, fmt.Errorf("counting pools created: %w", err)
+	}
+
+	// Pools joined (excluding owned pools)
+	row = m.DB.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM pools_users pu
+		JOIN pools p ON p.id = pu.pool_id
+		WHERE pu.user_id = $1 AND p.user_id != $1
+	`, userID)
+	if err := row.Scan(&stats.PoolsJoined); err != nil {
+		return nil, fmt.Errorf("counting pools joined: %w", err)
+	}
+
+	// Active pools created
+	row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM pools WHERE user_id = $1 AND archived = false", userID)
+	if err := row.Scan(&stats.ActivePools); err != nil {
+		return nil, fmt.Errorf("counting active pools: %w", err)
+	}
+
+	// Archived pools created
+	row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM pools WHERE user_id = $1 AND archived = true", userID)
+	if err := row.Scan(&stats.ArchivedPools); err != nil {
+		return nil, fmt.Errorf("counting archived pools: %w", err)
+	}
+
+	return stats, nil
+}
+
+// GetPoolsByUserID returns pools created by a specific user
+func (m *Model) GetPoolsByUserID(ctx context.Context, userID int64, includeArchived bool, offset int64, limit int) ([]*AdminPool, error) {
+	baseQuery := `
+		SELECT
+			p.token,
+			p.name,
+			p.grid_type,
+			p.archived,
+			p.user_id,
+			u.email,
+			u.store,
+			(SELECT COUNT(*) FROM pools_users pu WHERE pu.pool_id = p.id) as member_count,
+			(SELECT COUNT(*) FROM grids g WHERE g.pool_id = p.id AND g.state = 'active') as grid_count,
+			(SELECT COUNT(*) FROM pool_squares ps WHERE ps.pool_id = p.id AND ps.state != 'unclaimed') as claimed_count,
+			p.created
+		FROM pools p
+		LEFT JOIN users u ON u.id = p.user_id
+		WHERE p.user_id = $1 %s
+		ORDER BY p.id DESC
+		OFFSET $2
+		LIMIT $3`
+
+	archivedFilter := "AND p.archived = false"
+	if includeArchived {
+		archivedFilter = ""
+	}
+
+	query := fmt.Sprintf(baseQuery, archivedFilter)
+	rowsResult, err := m.DB.QueryContext(ctx, query, userID, offset, limit)
+	if err != nil {
+		return nil, fmt.Errorf("querying user pools: %w", err)
+	}
+	defer rowsResult.Close()
+
+	return scanAdminPools(rowsResult)
+}
+
+// GetPoolsByUserIDCount returns count of pools created by a specific user
+func (m *Model) GetPoolsByUserIDCount(ctx context.Context, userID int64, includeArchived bool) (int64, error) {
+	var count int64
+	var row interface{ Scan(...interface{}) error }
+
+	if includeArchived {
+		row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM pools WHERE user_id = $1", userID)
+	} else {
+		row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM pools WHERE user_id = $1 AND archived = false", userID)
+	}
+
+	if err := row.Scan(&count); err != nil {
+		return 0, fmt.Errorf("counting user pools: %w", err)
 	}
 
 	return count, nil

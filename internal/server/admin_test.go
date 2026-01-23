@@ -22,6 +22,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gorilla/mux"
 	"github.com/onsi/gomega"
 	"github.com/sqmgr/sqmgr-api/pkg/model"
 )
@@ -98,4 +99,56 @@ func TestValidStatsPeriods(t *testing.T) {
 	g.Expect(validStatsPeriods["invalid"]).Should(gomega.BeFalse())
 	g.Expect(validStatsPeriods[""]).Should(gomega.BeFalse())
 	g.Expect(validStatsPeriods["day"]).Should(gomega.BeFalse())
+}
+
+func TestGetAdminUserEndpoint_InvalidID(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	s := &Server{
+		Router: mux.NewRouter(),
+	}
+
+	s.Router.Path("/admin/user/{id:[0-9]+}").Methods(http.MethodGet).Handler(s.getAdminUserEndpoint())
+
+	// Test with non-numeric ID (should not match route)
+	req := httptest.NewRequest(http.MethodGet, "/admin/user/abc", nil)
+	rec := httptest.NewRecorder()
+
+	adminUser := &model.User{IsAdmin: true}
+	ctx := context.WithValue(req.Context(), ctxUserKey, adminUser)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	// Route doesn't match, returns 404
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusNotFound))
+}
+
+func TestGetAdminUserPoolsEndpoint_InvalidID(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	s := &Server{
+		Router: mux.NewRouter(),
+	}
+
+	s.Router.Path("/admin/user/{id:[0-9]+}/pools").Methods(http.MethodGet).Handler(s.getAdminUserPoolsEndpoint())
+
+	// Test with non-numeric ID (should not match route)
+	req := httptest.NewRequest(http.MethodGet, "/admin/user/abc/pools", nil)
+	rec := httptest.NewRecorder()
+
+	adminUser := &model.User{IsAdmin: true}
+	ctx := context.WithValue(req.Context(), ctxUserKey, adminUser)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	// Route doesn't match, returns 404
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusNotFound))
+}
+
+func TestGetAdminUserPoolsEndpoint_DefaultPagination(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	// Verify default pagination values
+	g.Expect(defaultAdminPoolsLimit).Should(gomega.Equal(25))
+	g.Expect(maxAdminPoolsLimit).Should(gomega.Equal(100))
 }
