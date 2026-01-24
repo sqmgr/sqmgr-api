@@ -85,9 +85,9 @@ var validNumberSetConfigs = []NumberSetConfigInfo{
 		SetTypes: []NumberSetType{NumberSetTypeQ1, NumberSetTypeQ2, NumberSetTypeQ3, NumberSetTypeFinal},
 	},
 	{
-		Key:      NumberSetConfigH4,
-		Label:    "Half, 4th",
-		SetTypes: []NumberSetType{NumberSetTypeHalf, NumberSetTypeQ4},
+		Key:      NumberSetConfigHF,
+		Label:    "Half, Final",
+		SetTypes: []NumberSetType{NumberSetTypeHalf, NumberSetTypeFinal},
 	},
 	{
 		Key:      NumberSetConfigQ1234,
@@ -95,9 +95,9 @@ var validNumberSetConfigs = []NumberSetConfigInfo{
 		SetTypes: []NumberSetType{NumberSetTypeQ1, NumberSetTypeQ2, NumberSetTypeQ3, NumberSetTypeQ4},
 	},
 	{
-		Key:      NumberSetConfigHF,
-		Label:    "Half, Final",
-		SetTypes: []NumberSetType{NumberSetTypeHalf, NumberSetTypeFinal},
+		Key:      NumberSetConfigH4,
+		Label:    "Half, 4th",
+		SetTypes: []NumberSetType{NumberSetTypeHalf, NumberSetTypeQ4},
 	},
 }
 
