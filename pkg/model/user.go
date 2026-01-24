@@ -37,8 +37,9 @@ type UserStore string
 
 // constants for the JWT "iss" (issuer) claim
 const (
-	IssuerAuth0 = "https://sqmgr.auth0.com/"
-	IssuerSqMGR = "https://api.sqmgr.com/"
+	IssuerAuth0    = "https://sqmgr.auth0.com/"
+	IssuerSqMGR    = "https://api.sqmgr.com/"
+	ClaimNamespace = "https://sqmgr.com"
 )
 
 // constants for UserStore

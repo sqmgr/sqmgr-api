@@ -103,14 +103,12 @@ func (s *Server) authHandler(next http.Handler) http.Handler {
 
 		user.Token = token
 
-		// Extract and store email from JWT if present (Auth0 tokens include email)
-		if issuer == model.IssuerAuth0 {
-			if email, ok := token.Claims.(jwt.MapClaims)["email"].(string); ok && email != "" {
-				// Only update if email is different or not stored yet
-				if user.Email == nil || *user.Email != email {
-					if err := user.SetEmail(r.Context(), email); err != nil {
-						logrus.WithError(err).Warn("could not save user email")
-					}
+		// Extract and store email for Auth0 users from namespaced claim
+		if issuer == model.IssuerAuth0 && user.Email == nil {
+			email, _ := token.Claims.(jwt.MapClaims)[model.ClaimNamespace+"/email"].(string)
+			if email != "" {
+				if err := user.SetEmail(r.Context(), email); err != nil {
+					logrus.WithError(err).Warn("could not save user email")
 				}
 			}
 		}
