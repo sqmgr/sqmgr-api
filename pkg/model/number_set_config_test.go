@@ -27,11 +27,9 @@ func TestIsValidNumberSetConfig(t *testing.T) {
 
 	// Valid configs
 	g.Expect(IsValidNumberSetConfig("standard")).Should(gomega.BeTrue())
-	g.Expect(IsValidNumberSetConfig("1234")).Should(gomega.BeTrue())
 	g.Expect(IsValidNumberSetConfig("123f")).Should(gomega.BeTrue())
 	g.Expect(IsValidNumberSetConfig("1234f")).Should(gomega.BeFalse())
 	g.Expect(IsValidNumberSetConfig("hf")).Should(gomega.BeTrue())
-	g.Expect(IsValidNumberSetConfig("h4")).Should(gomega.BeTrue())
 
 	// Invalid configs
 	g.Expect(IsValidNumberSetConfig("")).Should(gomega.BeFalse())
@@ -64,21 +62,13 @@ func TestGetSetTypes(t *testing.T) {
 	setTypes := GetSetTypes(NumberSetConfigStandard)
 	g.Expect(setTypes).Should(gomega.Equal([]NumberSetType{NumberSetTypeAll}))
 
-	// q1234 config returns 4 quarters
-	setTypes = GetSetTypes(NumberSetConfigQ1234)
-	g.Expect(setTypes).Should(gomega.Equal([]NumberSetType{NumberSetTypeQ1, NumberSetTypeQ2, NumberSetTypeQ3, NumberSetTypeQ4}))
-
 	// q123f config returns 3 quarters + final
-	setTypes = GetSetTypes(NumberSetConfigQ123F)
+	setTypes = GetSetTypes(NumberSetConfig123F)
 	g.Expect(setTypes).Should(gomega.Equal([]NumberSetType{NumberSetTypeQ1, NumberSetTypeQ2, NumberSetTypeQ3, NumberSetTypeFinal}))
 
 	// hf config returns half + final
 	setTypes = GetSetTypes(NumberSetConfigHF)
 	g.Expect(setTypes).Should(gomega.Equal([]NumberSetType{NumberSetTypeHalf, NumberSetTypeFinal}))
-
-	// h4 config returns half + q4
-	setTypes = GetSetTypes(NumberSetConfigH4)
-	g.Expect(setTypes).Should(gomega.Equal([]NumberSetType{NumberSetTypeHalf, NumberSetTypeQ4}))
 
 	// Invalid config returns nil
 	setTypes = GetSetTypes(NumberSetConfig("invalid"))
@@ -89,7 +79,7 @@ func TestValidNumberSetConfigs(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
 	configs := ValidNumberSetConfigs()
-	g.Expect(len(configs)).Should(gomega.Equal(5))
+	g.Expect(len(configs)).Should(gomega.Equal(3))
 
 	// Check first config is "standard"
 	g.Expect(configs[0].Key).Should(gomega.Equal(NumberSetConfigStandard))
@@ -117,7 +107,7 @@ func TestNumberSetConfigScan(t *testing.T) {
 	// Scan from string
 	err := config.Scan("1234")
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(config).Should(gomega.Equal(NumberSetConfigQ1234))
+	g.Expect(config).Should(gomega.Equal(NumberSetConfig1234))
 
 	// Scan from bytes
 	err = config.Scan([]byte("hf"))

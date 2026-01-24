@@ -27,10 +27,10 @@ type NumberSetConfig string
 const (
 	// NumberSetConfigStandard means one set of numbers for all quarters (legacy behavior)
 	NumberSetConfigStandard NumberSetConfig = "standard"
-	// NumberSetConfigQ1234 means 1st, 2nd, 3rd, 4th quarter
-	NumberSetConfigQ1234 NumberSetConfig = "1234"
-	// NumberSetConfigQ123F means 1st, 2nd, 3rd, Final
-	NumberSetConfigQ123F NumberSetConfig = "123f"
+	// NumberSetConfig1234 means 1st, 2nd, 3rd, 4th quarter
+	NumberSetConfig1234 NumberSetConfig = "1234"
+	// NumberSetConfig123F means 1st, 2nd, 3rd, Final
+	NumberSetConfig123F NumberSetConfig = "123f"
 	// NumberSetConfigHF means Half, Final
 	NumberSetConfigHF NumberSetConfig = "hf"
 	// NumberSetConfigH4 means Half, 4th
@@ -78,7 +78,7 @@ var validNumberSetConfigs = []NumberSetConfigInfo{
 		SetTypes: []NumberSetType{NumberSetTypeAll},
 	},
 	{
-		Key:      NumberSetConfigQ123F,
+		Key:      NumberSetConfig123F,
 		Label:    "1st, 2nd, 3rd, Final",
 		SetTypes: []NumberSetType{NumberSetTypeQ1, NumberSetTypeQ2, NumberSetTypeQ3, NumberSetTypeFinal},
 	},
