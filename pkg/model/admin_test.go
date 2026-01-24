@@ -492,3 +492,220 @@ func TestGetPoolsByUserIDCount(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(totalCount).Should(gomega.Equal(int64(2)))
 }
+
+func TestGetAllUsers(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create test users with emails
+	email1 := "testuser1-" + randString()[:8] + "@example.com"
+	user1, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	err = user1.SetEmail(ctx, email1)
+	g.Expect(err).Should(gomega.Succeed())
+
+	email2 := "testuser2-" + randString()[:8] + "@example.com"
+	user2, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	err = user2.SetEmail(ctx, email2)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create a pool for user1 to verify pools_owned count
+	_, err = m.NewPool(ctx, user1.ID, "User1 Pool "+randString(), GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Test pagination
+	users, err := m.GetAllUsers(ctx, "", 0, 2, "", "")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(users)).Should(gomega.Equal(2))
+
+	// Verify returned fields are populated
+	g.Expect(users[0].ID).Should(gomega.BeNumerically(">", 0))
+	g.Expect(users[0].Store).ShouldNot(gomega.BeEmpty())
+	g.Expect(users[0].Created).ShouldNot(gomega.BeEmpty())
+}
+
+func TestGetAllUsersWithSearch(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create users with searchable emails
+	uniquePrefix := "searchable" + randString()[:4]
+	email1 := uniquePrefix + "-alpha@example.com"
+	user1, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	err = user1.SetEmail(ctx, email1)
+	g.Expect(err).Should(gomega.Succeed())
+
+	email2 := uniquePrefix + "-beta@example.com"
+	user2, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	err = user2.SetEmail(ctx, email2)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Search for users with unique prefix
+	users, err := m.GetAllUsers(ctx, uniquePrefix, 0, 100, "", "")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(users)).Should(gomega.Equal(2))
+
+	// Verify all returned users contain the search term in email
+	for _, user := range users {
+		g.Expect(*user.Email).Should(gomega.ContainSubstring(uniquePrefix))
+	}
+}
+
+func TestGetAllUsersCount(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Get initial count
+	initialCount, err := m.GetAllUsersCount(ctx, "")
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create new users
+	uniquePrefix := "counttest" + randString()[:4]
+	email1 := uniquePrefix + "-one@example.com"
+	user1, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	err = user1.SetEmail(ctx, email1)
+	g.Expect(err).Should(gomega.Succeed())
+
+	email2 := uniquePrefix + "-two@example.com"
+	user2, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	err = user2.SetEmail(ctx, email2)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Test count without search
+	totalCount, err := m.GetAllUsersCount(ctx, "")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(totalCount).Should(gomega.Equal(initialCount + 2))
+
+	// Test count with search filter
+	filteredCount, err := m.GetAllUsersCount(ctx, uniquePrefix)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(filteredCount).Should(gomega.Equal(int64(2)))
+}
+
+func TestGetAllUsersPoolCounts(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user with a searchable email
+	uniquePrefix := "poolcount" + randString()[:4]
+	email := uniquePrefix + "@example.com"
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	err = user.SetEmail(ctx, email)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create another user whose pool we'll join
+	otherUser, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create pools owned by the user
+	_, err = m.NewPool(ctx, user.ID, "Owned Pool 1 "+randString(), GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+
+	_, err = m.NewPool(ctx, user.ID, "Owned Pool 2 "+randString(), GridTypeStd25, "password")
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create a pool owned by another user and have the test user join it
+	otherPool, err := m.NewPool(ctx, otherUser.ID, "Other Pool "+randString(), GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+	err = user.JoinPool(ctx, otherPool)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Fetch the user via GetAllUsers
+	users, err := m.GetAllUsers(ctx, uniquePrefix, 0, 1, "", "")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(users)).Should(gomega.Equal(1))
+
+	// Verify pool counts
+	g.Expect(users[0].PoolsOwned).Should(gomega.Equal(int64(2)))
+	g.Expect(users[0].PoolsJoined).Should(gomega.Equal(int64(1)))
+}
+
+func TestGetAllUsersSorting(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create users with different pool counts
+	uniquePrefix := "sorttest" + randString()[:4]
+
+	// User 1: 2 pools owned
+	email1 := uniquePrefix + "-user1@example.com"
+	user1, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	err = user1.SetEmail(ctx, email1)
+	g.Expect(err).Should(gomega.Succeed())
+	_, err = m.NewPool(ctx, user1.ID, "Sort Pool 1A "+randString(), GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+	_, err = m.NewPool(ctx, user1.ID, "Sort Pool 1B "+randString(), GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+
+	// User 2: 1 pool owned
+	email2 := uniquePrefix + "-user2@example.com"
+	user2, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	err = user2.SetEmail(ctx, email2)
+	g.Expect(err).Should(gomega.Succeed())
+	_, err = m.NewPool(ctx, user2.ID, "Sort Pool 2A "+randString(), GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+
+	// User 3: 3 pools owned
+	email3 := uniquePrefix + "-user3@example.com"
+	user3, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	err = user3.SetEmail(ctx, email3)
+	g.Expect(err).Should(gomega.Succeed())
+	_, err = m.NewPool(ctx, user3.ID, "Sort Pool 3A "+randString(), GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+	_, err = m.NewPool(ctx, user3.ID, "Sort Pool 3B "+randString(), GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+	_, err = m.NewPool(ctx, user3.ID, "Sort Pool 3C "+randString(), GridTypeStd100, "password")
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Test sorting by poolsOwned descending
+	usersDesc, err := m.GetAllUsers(ctx, uniquePrefix, 0, 10, "poolsOwned", "desc")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(usersDesc)).Should(gomega.Equal(3))
+	g.Expect(usersDesc[0].PoolsOwned).Should(gomega.Equal(int64(3)))
+	g.Expect(usersDesc[1].PoolsOwned).Should(gomega.Equal(int64(2)))
+	g.Expect(usersDesc[2].PoolsOwned).Should(gomega.Equal(int64(1)))
+
+	// Test sorting by poolsOwned ascending
+	usersAsc, err := m.GetAllUsers(ctx, uniquePrefix, 0, 10, "poolsOwned", "asc")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(usersAsc)).Should(gomega.Equal(3))
+	g.Expect(usersAsc[0].PoolsOwned).Should(gomega.Equal(int64(1)))
+	g.Expect(usersAsc[1].PoolsOwned).Should(gomega.Equal(int64(2)))
+	g.Expect(usersAsc[2].PoolsOwned).Should(gomega.Equal(int64(3)))
+
+	// Test sorting by created descending (most recent first - user3 was created last)
+	usersCreatedDesc, err := m.GetAllUsers(ctx, uniquePrefix, 0, 10, "created", "desc")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(usersCreatedDesc)).Should(gomega.Equal(3))
+	g.Expect(usersCreatedDesc[0].ID).Should(gomega.Equal(user3.ID))
+	g.Expect(usersCreatedDesc[2].ID).Should(gomega.Equal(user1.ID))
+
+	// Test invalid sort column defaults to id
+	usersInvalidSort, err := m.GetAllUsers(ctx, uniquePrefix, 0, 10, "invalid", "desc")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(usersInvalidSort)).Should(gomega.Equal(3))
+}

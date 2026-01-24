@@ -313,3 +313,112 @@ func (m *Model) GetPoolsByUserIDCount(ctx context.Context, userID int64, include
 
 	return count, nil
 }
+
+// AdminUser represents a user in the admin list
+type AdminUser struct {
+	ID          int64     `json:"id"`
+	Store       UserStore `json:"store"`
+	Email       *string   `json:"email"`
+	IsAdmin     bool      `json:"isAdmin"`
+	PoolsOwned  int64     `json:"poolsOwned"`
+	PoolsJoined int64     `json:"poolsJoined"`
+	Created     string    `json:"created"`
+}
+
+// GetAllUsers returns all users with optional search, pagination, and sorting
+func (m *Model) GetAllUsers(ctx context.Context, search string, offset int64, limit int, sortBy string, sortDir string) ([]*AdminUser, error) {
+	// Validate sortBy to prevent SQL injection
+	validSortColumns := map[string]string{
+		"poolsOwned":  "pools_owned",
+		"poolsJoined": "pools_joined",
+		"created":     "u.created",
+		"id":          "u.id",
+	}
+
+	orderColumn := "u.id"
+	if col, ok := validSortColumns[sortBy]; ok {
+		orderColumn = col
+	}
+
+	orderDir := "DESC"
+	if sortDir == "asc" {
+		orderDir = "ASC"
+	}
+
+	baseQuery := `
+		SELECT
+			u.id,
+			u.store,
+			u.email,
+			u.is_admin,
+			(SELECT COUNT(*) FROM pools p WHERE p.user_id = u.id) as pools_owned,
+			(SELECT COUNT(*) FROM pools_users pu JOIN pools p ON p.id = pu.pool_id WHERE pu.user_id = u.id AND p.user_id != u.id) as pools_joined,
+			u.created
+		FROM users u
+		%s
+		ORDER BY ` + orderColumn + ` ` + orderDir + `
+		OFFSET $%d
+		LIMIT $%d`
+
+	if search != "" {
+		query := fmt.Sprintf(baseQuery, "WHERE u.email ILIKE $1", 2, 3)
+		rowsResult, queryErr := m.DB.QueryContext(ctx, query, "%"+search+"%", offset, limit)
+		if queryErr != nil {
+			return nil, fmt.Errorf("querying users with search: %w", queryErr)
+		}
+		defer rowsResult.Close()
+
+		return scanAdminUsers(rowsResult)
+	}
+
+	query := fmt.Sprintf(baseQuery, "", 1, 2)
+	rowsResult, err := m.DB.QueryContext(ctx, query, offset, limit)
+	if err != nil {
+		return nil, fmt.Errorf("querying users: %w", err)
+	}
+	defer rowsResult.Close()
+
+	return scanAdminUsers(rowsResult)
+}
+
+// scanAdminUsers scans rows into AdminUser slice
+func scanAdminUsers(rows interface {
+	Next() bool
+	Scan(...interface{}) error
+}) ([]*AdminUser, error) {
+	users := make([]*AdminUser, 0)
+	for rows.Next() {
+		user := &AdminUser{}
+		if err := rows.Scan(
+			&user.ID,
+			&user.Store,
+			&user.Email,
+			&user.IsAdmin,
+			&user.PoolsOwned,
+			&user.PoolsJoined,
+			&user.Created,
+		); err != nil {
+			return nil, fmt.Errorf("scanning user row: %w", err)
+		}
+		users = append(users, user)
+	}
+	return users, nil
+}
+
+// GetAllUsersCount returns count of all users with optional search
+func (m *Model) GetAllUsersCount(ctx context.Context, search string) (int64, error) {
+	var count int64
+	var row interface{ Scan(...interface{}) error }
+
+	if search != "" {
+		row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE email ILIKE $1", "%"+search+"%")
+	} else {
+		row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM users")
+	}
+
+	if err := row.Scan(&count); err != nil {
+		return 0, fmt.Errorf("counting users: %w", err)
+	}
+
+	return count, nil
+}

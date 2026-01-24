@@ -77,6 +77,7 @@ func (s *Server) setupRoutes() {
 	adminRouter.Use(s.adminHandler)
 	adminRouter.Path("/admin/stats").Methods(http.MethodGet).Handler(s.getAdminStatsEndpoint())
 	adminRouter.Path("/admin/pools").Methods(http.MethodGet).Handler(s.getAdminPoolsEndpoint())
+	adminRouter.Path("/admin/users").Methods(http.MethodGet).Handler(s.getAdminUsersEndpoint())
 	adminRouter.Path("/admin/pool/{token:[A-Za-z0-9_-]+}/join").Methods(http.MethodPost).Handler(s.postAdminPoolJoinEndpoint())
 	adminRouter.Path("/admin/user/{id:[0-9]+}").Methods(http.MethodGet).Handler(s.getAdminUserEndpoint())
 	adminRouter.Path("/admin/user/{id:[0-9]+}/pools").Methods(http.MethodGet).Handler(s.getAdminUserPoolsEndpoint())

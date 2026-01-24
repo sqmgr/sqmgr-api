@@ -29,6 +29,8 @@ import (
 
 const defaultAdminPoolsLimit = 25
 const maxAdminPoolsLimit = 100
+const defaultAdminUsersLimit = 25
+const maxAdminUsersLimit = 100
 
 // validStatsPeriods defines the valid period values for stats filtering
 var validStatsPeriods = map[string]bool{
@@ -250,6 +252,51 @@ func (s *Server) getAdminUserPoolsEndpoint() http.HandlerFunc {
 
 		s.writeJSONResponse(w, http.StatusOK, response{
 			Pools: pools,
+			Total: total,
+		})
+	}
+}
+
+// getAdminUsersEndpoint returns paginated list of all users
+func (s *Server) getAdminUsersEndpoint() http.HandlerFunc {
+	type response struct {
+		Users []*model.AdminUser `json:"users"`
+		Total int64              `json:"total"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		search := r.FormValue("search")
+
+		offset, _ := strconv.ParseInt(r.FormValue("offset"), 10, 64)
+		if offset < 0 {
+			offset = 0
+		}
+
+		limit, _ := strconv.Atoi(r.FormValue("limit"))
+		if limit <= 0 {
+			limit = defaultAdminUsersLimit
+		}
+		if limit > maxAdminUsersLimit {
+			limit = maxAdminUsersLimit
+		}
+
+		sortBy := r.FormValue("sortBy")
+		sortDir := r.FormValue("sortDir")
+
+		users, err := s.model.GetAllUsers(r.Context(), search, offset, limit, sortBy, sortDir)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		total, err := s.model.GetAllUsersCount(r.Context(), search)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, response{
+			Users: users,
 			Total: total,
 		})
 	}
