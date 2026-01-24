@@ -361,7 +361,7 @@ func (m *Model) GetAllUsers(ctx context.Context, search string, offset int64, li
 		LIMIT $%d`
 
 	if search != "" {
-		query := fmt.Sprintf(baseQuery, "WHERE u.email ILIKE $1", 2, 3)
+		query := fmt.Sprintf(baseQuery, "WHERE u.store = 'auth0' AND u.email ILIKE $1", 2, 3)
 		rowsResult, queryErr := m.DB.QueryContext(ctx, query, "%"+search+"%", offset, limit)
 		if queryErr != nil {
 			return nil, fmt.Errorf("querying users with search: %w", queryErr)
@@ -371,7 +371,7 @@ func (m *Model) GetAllUsers(ctx context.Context, search string, offset int64, li
 		return scanAdminUsers(rowsResult)
 	}
 
-	query := fmt.Sprintf(baseQuery, "", 1, 2)
+	query := fmt.Sprintf(baseQuery, "WHERE u.store = 'auth0'", 1, 2)
 	rowsResult, err := m.DB.QueryContext(ctx, query, offset, limit)
 	if err != nil {
 		return nil, fmt.Errorf("querying users: %w", err)
@@ -411,9 +411,9 @@ func (m *Model) GetAllUsersCount(ctx context.Context, search string) (int64, err
 	var row interface{ Scan(...interface{}) error }
 
 	if search != "" {
-		row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE email ILIKE $1", "%"+search+"%")
+		row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE store = 'auth0' AND email ILIKE $1", "%"+search+"%")
 	} else {
-		row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM users")
+		row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE store = 'auth0'")
 	}
 
 	if err := row.Scan(&count); err != nil {

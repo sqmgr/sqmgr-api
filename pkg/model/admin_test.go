@@ -709,3 +709,53 @@ func TestGetAllUsersSorting(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(usersInvalidSort)).Should(gomega.Equal(3))
 }
+
+func TestGetAllUsersExcludesGuestUsers(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	uniquePrefix := "guestexclude" + randString()[:4]
+
+	// Create a registered user (auth0)
+	registeredEmail := uniquePrefix + "-registered@example.com"
+	registeredUser, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	err = registeredUser.SetEmail(ctx, registeredEmail)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create a guest user (sqmgr) - this should NOT appear in the list
+	_, err = m.GetUser(ctx, IssuerSqMGR, uniquePrefix+"-guest")
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Get initial count of registered users
+	initialCount, err := m.GetAllUsersCount(ctx, "")
+	g.Expect(err).Should(gomega.Succeed())
+
+	// The count should only include registered users
+	// Search for users with our unique prefix - should only return the registered user
+	users, err := m.GetAllUsers(ctx, uniquePrefix, 0, 100, "", "")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(users)).Should(gomega.Equal(1))
+	g.Expect(*users[0].Email).Should(gomega.Equal(registeredEmail))
+	g.Expect(users[0].Store).Should(gomega.Equal(UserStoreAuth0))
+
+	// Verify count with search only includes registered user
+	filteredCount, err := m.GetAllUsersCount(ctx, uniquePrefix)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(filteredCount).Should(gomega.Equal(int64(1)))
+
+	// Create another registered user to verify count increases
+	registeredEmail2 := uniquePrefix + "-registered2@example.com"
+	registeredUser2, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	err = registeredUser2.SetEmail(ctx, registeredEmail2)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Count should increase by 1
+	newCount, err := m.GetAllUsersCount(ctx, "")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(newCount).Should(gomega.Equal(initialCount + 1))
+}
