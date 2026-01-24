@@ -27,9 +27,9 @@ func TestIsValidNumberSetConfig(t *testing.T) {
 
 	// Valid configs
 	g.Expect(IsValidNumberSetConfig("standard")).Should(gomega.BeTrue())
-	g.Expect(IsValidNumberSetConfig("q1234")).Should(gomega.BeTrue())
-	g.Expect(IsValidNumberSetConfig("q123f")).Should(gomega.BeTrue())
-	g.Expect(IsValidNumberSetConfig("q1234f")).Should(gomega.BeFalse())
+	g.Expect(IsValidNumberSetConfig("1234")).Should(gomega.BeTrue())
+	g.Expect(IsValidNumberSetConfig("123f")).Should(gomega.BeTrue())
+	g.Expect(IsValidNumberSetConfig("1234f")).Should(gomega.BeFalse())
 	g.Expect(IsValidNumberSetConfig("hf")).Should(gomega.BeTrue())
 	g.Expect(IsValidNumberSetConfig("h4")).Should(gomega.BeTrue())
 
@@ -115,7 +115,7 @@ func TestNumberSetConfigScan(t *testing.T) {
 	var config NumberSetConfig
 
 	// Scan from string
-	err := config.Scan("q1234")
+	err := config.Scan("1234")
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(config).Should(gomega.Equal(NumberSetConfigQ1234))
 

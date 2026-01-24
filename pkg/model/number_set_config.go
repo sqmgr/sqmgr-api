@@ -28,11 +28,9 @@ const (
 	// NumberSetConfigStandard means one set of numbers for all quarters (legacy behavior)
 	NumberSetConfigStandard NumberSetConfig = "standard"
 	// NumberSetConfigQ1234 means 1st, 2nd, 3rd, 4th quarter
-	NumberSetConfigQ1234 NumberSetConfig = "q1234"
+	NumberSetConfigQ1234 NumberSetConfig = "1234"
 	// NumberSetConfigQ123F means 1st, 2nd, 3rd, Final
-	NumberSetConfigQ123F NumberSetConfig = "q123f"
-	// NumberSetConfigQ1234F means 1st, 2nd, 3rd, 4th, Final
-	NumberSetConfigQ1234F NumberSetConfig = "q1234f"
+	NumberSetConfigQ123F NumberSetConfig = "123f"
 	// NumberSetConfigHF means Half, Final
 	NumberSetConfigHF NumberSetConfig = "hf"
 	// NumberSetConfigH4 means Half, 4th
