@@ -87,16 +87,18 @@ var validNumberSetConfigs = []NumberSetConfigInfo{
 		Label:    "Half, Final",
 		SetTypes: []NumberSetType{NumberSetTypeHalf, NumberSetTypeFinal},
 	},
-	{
-		Key:      NumberSetConfigQ1234,
-		Label:    "1st, 2nd, 3rd, 4th",
-		SetTypes: []NumberSetType{NumberSetTypeQ1, NumberSetTypeQ2, NumberSetTypeQ3, NumberSetTypeQ4},
-	},
-	{
-		Key:      NumberSetConfigH4,
-		Label:    "Half, 4th",
-		SetTypes: []NumberSetType{NumberSetTypeHalf, NumberSetTypeQ4},
-	},
+	/*
+		{
+			Key:      NumberSetConfigQ1234,
+			Label:    "1st, 2nd, 3rd, 4th",
+			SetTypes: []NumberSetType{NumberSetTypeQ1, NumberSetTypeQ2, NumberSetTypeQ3, NumberSetTypeQ4},
+		},
+		{
+			Key:      NumberSetConfigH4,
+			Label:    "Half, 4th",
+			SetTypes: []NumberSetType{NumberSetTypeHalf, NumberSetTypeQ4},
+		},
+	*/
 }
 
 // numberSetTypeInfos contains metadata for all number set types
