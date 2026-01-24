@@ -45,12 +45,12 @@ func TestGetAdminStats(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Create an active pool
-	activePool, err := m.NewPool(ctx, auth0User.ID, "Active Test Pool", GridTypeStd100, "password")
+	activePool, err := m.NewPool(ctx, auth0User.ID, "Active Test Pool", GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(activePool).ShouldNot(gomega.BeNil())
 
 	// Create an archived pool
-	archivedPool, err := m.NewPool(ctx, auth0User.ID, "Archived Test Pool", GridTypeStd25, "password")
+	archivedPool, err := m.NewPool(ctx, auth0User.ID, "Archived Test Pool", GridTypeStd25, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	archivedPool.SetArchived(true)
 	g.Expect(archivedPool.Save(ctx)).Should(gomega.Succeed())
@@ -77,7 +77,7 @@ func TestGetAdminStatsWithPeriod(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Create a test pool
-	pool, err := m.NewPool(ctx, user.ID, "Period Test Pool "+randString(), GridTypeStd100, "password")
+	pool, err := m.NewPool(ctx, user.ID, "Period Test Pool "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(pool).ShouldNot(gomega.BeNil())
 
@@ -121,7 +121,7 @@ func TestGetAllPools(t *testing.T) {
 	}
 
 	for _, name := range poolNames {
-		_, err := m.NewPool(ctx, user.ID, name, GridTypeStd100, "password")
+		_, err := m.NewPool(ctx, user.ID, name, GridTypeStd100, "password", NumberSetConfigStandard)
 		g.Expect(err).Should(gomega.Succeed())
 	}
 
@@ -161,13 +161,13 @@ func TestGetAllPoolsWithSearch(t *testing.T) {
 
 	// Create pools with distinct, searchable names
 	uniquePrefix := "SearchTest" + randString()[:4]
-	_, err = m.NewPool(ctx, user.ID, uniquePrefix+" Alpha Pool", GridTypeStd100, "password")
+	_, err = m.NewPool(ctx, user.ID, uniquePrefix+" Alpha Pool", GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
-	_, err = m.NewPool(ctx, user.ID, uniquePrefix+" Beta Pool", GridTypeStd25, "password")
+	_, err = m.NewPool(ctx, user.ID, uniquePrefix+" Beta Pool", GridTypeStd25, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
-	_, err = m.NewPool(ctx, user.ID, "Different Name Pool", GridTypeStd50, "password")
+	_, err = m.NewPool(ctx, user.ID, "Different Name Pool", GridTypeStd50, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Search for pools with unique prefix (case-insensitive)
@@ -202,13 +202,13 @@ func TestGetAllPoolsCount(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	uniquePrefix := "CountTest" + randString()[:4]
-	_, err = m.NewPool(ctx, user.ID, uniquePrefix+" Pool 1", GridTypeStd100, "password")
+	_, err = m.NewPool(ctx, user.ID, uniquePrefix+" Pool 1", GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
-	_, err = m.NewPool(ctx, user.ID, uniquePrefix+" Pool 2", GridTypeStd25, "password")
+	_, err = m.NewPool(ctx, user.ID, uniquePrefix+" Pool 2", GridTypeStd25, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
-	_, err = m.NewPool(ctx, user.ID, "Other Pool", GridTypeStd50, "password")
+	_, err = m.NewPool(ctx, user.ID, "Other Pool", GridTypeStd50, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Test count without search
@@ -234,7 +234,7 @@ func TestGetAllPoolsClaimedCount(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	uniqueName := "ClaimedCountTest " + randString()
-	pool, err := m.NewPool(ctx, user.ID, uniqueName, GridTypeStd25, "password")
+	pool, err := m.NewPool(ctx, user.ID, uniqueName, GridTypeStd25, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Get the pool via admin query - should have 0 claimed squares initially
@@ -293,11 +293,11 @@ func TestGetAllPoolsOwnerInfo(t *testing.T) {
 
 	// Create pools for each user
 	uniquePrefix := "OwnerInfo" + randString()[:4]
-	auth0Pool, err := m.NewPool(ctx, auth0User.ID, uniquePrefix+" Auth0 Pool", GridTypeStd100, "password")
+	auth0Pool, err := m.NewPool(ctx, auth0User.ID, uniquePrefix+" Auth0 Pool", GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(auth0Pool).ShouldNot(gomega.BeNil())
 
-	guestPool, err := m.NewPool(ctx, guestUser.ID, uniquePrefix+" Guest Pool", GridTypeStd25, "password")
+	guestPool, err := m.NewPool(ctx, guestUser.ID, uniquePrefix+" Guest Pool", GridTypeStd25, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(guestPool).ShouldNot(gomega.BeNil())
 
@@ -353,18 +353,18 @@ func TestGetUserStats(t *testing.T) {
 	g.Expect(initialStats.ArchivedPools).Should(gomega.Equal(int64(0)))
 
 	// Create an active pool
-	activePool, err := m.NewPool(ctx, user.ID, "User Stats Active Pool "+randString(), GridTypeStd100, "password")
+	activePool, err := m.NewPool(ctx, user.ID, "User Stats Active Pool "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(activePool).ShouldNot(gomega.BeNil())
 
 	// Create an archived pool
-	archivedPool, err := m.NewPool(ctx, user.ID, "User Stats Archived Pool "+randString(), GridTypeStd25, "password")
+	archivedPool, err := m.NewPool(ctx, user.ID, "User Stats Archived Pool "+randString(), GridTypeStd25, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	archivedPool.SetArchived(true)
 	g.Expect(archivedPool.Save(ctx)).Should(gomega.Succeed())
 
 	// Create a pool owned by another user and join it
-	otherPool, err := m.NewPool(ctx, otherUser.ID, "Other User Pool "+randString(), GridTypeStd100, "password")
+	otherPool, err := m.NewPool(ctx, otherUser.ID, "Other User Pool "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	err = user.JoinPool(ctx, otherPool)
 	g.Expect(err).Should(gomega.Succeed())
@@ -391,15 +391,15 @@ func TestGetPoolsByUserID(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Create some pools
-	pool1, err := m.NewPool(ctx, user.ID, "User Pools Test A "+randString(), GridTypeStd100, "password")
+	pool1, err := m.NewPool(ctx, user.ID, "User Pools Test A "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(pool1).ShouldNot(gomega.BeNil())
 
-	pool2, err := m.NewPool(ctx, user.ID, "User Pools Test B "+randString(), GridTypeStd25, "password")
+	pool2, err := m.NewPool(ctx, user.ID, "User Pools Test B "+randString(), GridTypeStd25, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(pool2).ShouldNot(gomega.BeNil())
 
-	archivedPool, err := m.NewPool(ctx, user.ID, "User Pools Test Archived "+randString(), GridTypeStd50, "password")
+	archivedPool, err := m.NewPool(ctx, user.ID, "User Pools Test Archived "+randString(), GridTypeStd50, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	archivedPool.SetArchived(true)
 	g.Expect(archivedPool.Save(ctx)).Should(gomega.Succeed())
@@ -437,7 +437,7 @@ func TestGetPoolsByUserID_Pagination(t *testing.T) {
 
 	// Create 3 pools
 	for i := 0; i < 3; i++ {
-		_, err := m.NewPool(ctx, user.ID, "Pagination Test Pool "+randString(), GridTypeStd100, "password")
+		_, err := m.NewPool(ctx, user.ID, "Pagination Test Pool "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
 		g.Expect(err).Should(gomega.Succeed())
 	}
 
@@ -473,11 +473,11 @@ func TestGetPoolsByUserIDCount(t *testing.T) {
 	g.Expect(initialCount).Should(gomega.Equal(int64(0)))
 
 	// Create an active pool
-	_, err = m.NewPool(ctx, user.ID, "Count Test Active "+randString(), GridTypeStd100, "password")
+	_, err = m.NewPool(ctx, user.ID, "Count Test Active "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Create an archived pool
-	archivedPool, err := m.NewPool(ctx, user.ID, "Count Test Archived "+randString(), GridTypeStd25, "password")
+	archivedPool, err := m.NewPool(ctx, user.ID, "Count Test Archived "+randString(), GridTypeStd25, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	archivedPool.SetArchived(true)
 	g.Expect(archivedPool.Save(ctx)).Should(gomega.Succeed())
@@ -514,7 +514,7 @@ func TestGetAllUsers(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Create a pool for user1 to verify pools_owned count
-	_, err = m.NewPool(ctx, user1.ID, "User1 Pool "+randString(), GridTypeStd100, "password")
+	_, err = m.NewPool(ctx, user1.ID, "User1 Pool "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Test pagination
@@ -616,14 +616,14 @@ func TestGetAllUsersPoolCounts(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Create pools owned by the user
-	_, err = m.NewPool(ctx, user.ID, "Owned Pool 1 "+randString(), GridTypeStd100, "password")
+	_, err = m.NewPool(ctx, user.ID, "Owned Pool 1 "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
-	_, err = m.NewPool(ctx, user.ID, "Owned Pool 2 "+randString(), GridTypeStd25, "password")
+	_, err = m.NewPool(ctx, user.ID, "Owned Pool 2 "+randString(), GridTypeStd25, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Create a pool owned by another user and have the test user join it
-	otherPool, err := m.NewPool(ctx, otherUser.ID, "Other Pool "+randString(), GridTypeStd100, "password")
+	otherPool, err := m.NewPool(ctx, otherUser.ID, "Other Pool "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	err = user.JoinPool(ctx, otherPool)
 	g.Expect(err).Should(gomega.Succeed())
@@ -654,9 +654,9 @@ func TestGetAllUsersSorting(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	err = user1.SetEmail(ctx, email1)
 	g.Expect(err).Should(gomega.Succeed())
-	_, err = m.NewPool(ctx, user1.ID, "Sort Pool 1A "+randString(), GridTypeStd100, "password")
+	_, err = m.NewPool(ctx, user1.ID, "Sort Pool 1A "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
-	_, err = m.NewPool(ctx, user1.ID, "Sort Pool 1B "+randString(), GridTypeStd100, "password")
+	_, err = m.NewPool(ctx, user1.ID, "Sort Pool 1B "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
 	// User 2: 1 pool owned
@@ -665,7 +665,7 @@ func TestGetAllUsersSorting(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	err = user2.SetEmail(ctx, email2)
 	g.Expect(err).Should(gomega.Succeed())
-	_, err = m.NewPool(ctx, user2.ID, "Sort Pool 2A "+randString(), GridTypeStd100, "password")
+	_, err = m.NewPool(ctx, user2.ID, "Sort Pool 2A "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
 	// User 3: 3 pools owned
@@ -674,11 +674,11 @@ func TestGetAllUsersSorting(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	err = user3.SetEmail(ctx, email3)
 	g.Expect(err).Should(gomega.Succeed())
-	_, err = m.NewPool(ctx, user3.ID, "Sort Pool 3A "+randString(), GridTypeStd100, "password")
+	_, err = m.NewPool(ctx, user3.ID, "Sort Pool 3A "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
-	_, err = m.NewPool(ctx, user3.ID, "Sort Pool 3B "+randString(), GridTypeStd100, "password")
+	_, err = m.NewPool(ctx, user3.ID, "Sort Pool 3B "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
-	_, err = m.NewPool(ctx, user3.ID, "Sort Pool 3C "+randString(), GridTypeStd100, "password")
+	_, err = m.NewPool(ctx, user3.ID, "Sort Pool 3C "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Test sorting by poolsOwned descending

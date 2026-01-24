@@ -1,0 +1,193 @@
+/*
+Copyright 2024 Tom Peters
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package model
+
+import (
+	"database/sql/driver"
+	"fmt"
+)
+
+// NumberSetConfig represents the configuration for how number sets are organized in a pool
+type NumberSetConfig string
+
+const (
+	// NumberSetConfigStandard means one set of numbers for all quarters (legacy behavior)
+	NumberSetConfigStandard NumberSetConfig = "standard"
+	// NumberSetConfigQ1234 means 1st, 2nd, 3rd, 4th quarter
+	NumberSetConfigQ1234 NumberSetConfig = "q1234"
+	// NumberSetConfigQ123F means 1st, 2nd, 3rd, Final
+	NumberSetConfigQ123F NumberSetConfig = "q123f"
+	// NumberSetConfigQ1234F means 1st, 2nd, 3rd, 4th, Final
+	NumberSetConfigQ1234F NumberSetConfig = "q1234f"
+	// NumberSetConfigHF means Half, Final
+	NumberSetConfigHF NumberSetConfig = "hf"
+	// NumberSetConfigH4 means Half, 4th
+	NumberSetConfigH4 NumberSetConfig = "h4"
+)
+
+// NumberSetType represents an individual number set identifier
+type NumberSetType string
+
+const (
+	// NumberSetTypeAll is used when config is "standard" (legacy)
+	NumberSetTypeAll NumberSetType = "all"
+	// NumberSetTypeQ1 is for 1st quarter
+	NumberSetTypeQ1 NumberSetType = "q1"
+	// NumberSetTypeQ2 is for 2nd quarter
+	NumberSetTypeQ2 NumberSetType = "q2"
+	// NumberSetTypeQ3 is for 3rd quarter
+	NumberSetTypeQ3 NumberSetType = "q3"
+	// NumberSetTypeQ4 is for 4th quarter
+	NumberSetTypeQ4 NumberSetType = "q4"
+	// NumberSetTypeHalf is for halftime
+	NumberSetTypeHalf NumberSetType = "half"
+	// NumberSetTypeFinal is for final score
+	NumberSetTypeFinal NumberSetType = "final"
+)
+
+// NumberSetConfigInfo contains metadata for a number set configuration
+type NumberSetConfigInfo struct {
+	Key      NumberSetConfig `json:"key"`
+	Label    string          `json:"label"`
+	SetTypes []NumberSetType `json:"setTypes"`
+}
+
+// NumberSetTypeInfo contains metadata for a number set type
+type NumberSetTypeInfo struct {
+	Key   NumberSetType `json:"key"`
+	Label string        `json:"label"`
+}
+
+// validNumberSetConfigs contains all valid configurations
+var validNumberSetConfigs = []NumberSetConfigInfo{
+	{
+		Key:      NumberSetConfigStandard,
+		Label:    "Standard",
+		SetTypes: []NumberSetType{NumberSetTypeAll},
+	},
+	{
+		Key:      NumberSetConfigQ123F,
+		Label:    "1st, 2nd, 3rd, Final",
+		SetTypes: []NumberSetType{NumberSetTypeQ1, NumberSetTypeQ2, NumberSetTypeQ3, NumberSetTypeFinal},
+	},
+	{
+		Key:      NumberSetConfigH4,
+		Label:    "Half, 4th",
+		SetTypes: []NumberSetType{NumberSetTypeHalf, NumberSetTypeQ4},
+	},
+	{
+		Key:      NumberSetConfigQ1234,
+		Label:    "1st, 2nd, 3rd, 4th",
+		SetTypes: []NumberSetType{NumberSetTypeQ1, NumberSetTypeQ2, NumberSetTypeQ3, NumberSetTypeQ4},
+	},
+	{
+		Key:      NumberSetConfigHF,
+		Label:    "Half, Final",
+		SetTypes: []NumberSetType{NumberSetTypeHalf, NumberSetTypeFinal},
+	},
+}
+
+// numberSetTypeInfos contains metadata for all number set types
+var numberSetTypeInfos = map[NumberSetType]NumberSetTypeInfo{
+	NumberSetTypeAll:   {Key: NumberSetTypeAll, Label: "All"},
+	NumberSetTypeQ1:    {Key: NumberSetTypeQ1, Label: "1st"},
+	NumberSetTypeQ2:    {Key: NumberSetTypeQ2, Label: "2nd"},
+	NumberSetTypeQ3:    {Key: NumberSetTypeQ3, Label: "3rd"},
+	NumberSetTypeQ4:    {Key: NumberSetTypeQ4, Label: "4th"},
+	NumberSetTypeHalf:  {Key: NumberSetTypeHalf, Label: "Half"},
+	NumberSetTypeFinal: {Key: NumberSetTypeFinal, Label: "Final"},
+}
+
+// ValidNumberSetConfigs returns all valid number set configurations with metadata
+func ValidNumberSetConfigs() []NumberSetConfigInfo {
+	return validNumberSetConfigs
+}
+
+// NumberSetTypeInfos returns metadata for all number set types
+func NumberSetTypeInfos() map[NumberSetType]NumberSetTypeInfo {
+	return numberSetTypeInfos
+}
+
+// GetSetTypes returns the set types required for a given configuration
+func GetSetTypes(config NumberSetConfig) []NumberSetType {
+	for _, c := range validNumberSetConfigs {
+		if c.Key == config {
+			return c.SetTypes
+		}
+	}
+	return nil
+}
+
+// IsValidNumberSetConfig returns true if the config is valid
+func IsValidNumberSetConfig(config string) bool {
+	for _, c := range validNumberSetConfigs {
+		if string(c.Key) == config {
+			return true
+		}
+	}
+	return false
+}
+
+// IsValidNumberSetType returns true if the set type is valid
+func IsValidNumberSetType(setType string) bool {
+	_, ok := numberSetTypeInfos[NumberSetType(setType)]
+	return ok
+}
+
+// Value implements driver.Valuer for database storage
+func (n NumberSetConfig) Value() (driver.Value, error) {
+	return string(n), nil
+}
+
+// Scan implements sql.Scanner for database retrieval
+func (n *NumberSetConfig) Scan(value interface{}) error {
+	if value == nil {
+		*n = NumberSetConfigStandard
+		return nil
+	}
+	switch v := value.(type) {
+	case []byte:
+		*n = NumberSetConfig(v)
+	case string:
+		*n = NumberSetConfig(v)
+	default:
+		return fmt.Errorf("cannot scan %T into NumberSetConfig", value)
+	}
+	return nil
+}
+
+// Value implements driver.Valuer for database storage
+func (n NumberSetType) Value() (driver.Value, error) {
+	return string(n), nil
+}
+
+// Scan implements sql.Scanner for database retrieval
+func (n *NumberSetType) Scan(value interface{}) error {
+	if value == nil {
+		*n = NumberSetTypeAll
+		return nil
+	}
+	switch v := value.(type) {
+	case []byte:
+		*n = NumberSetType(v)
+	case string:
+		*n = NumberSetType(v)
+	default:
+		return fmt.Errorf("cannot scan %T into NumberSetType", value)
+	}
+	return nil
+}

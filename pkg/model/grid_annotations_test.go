@@ -35,7 +35,7 @@ func TestAnnotationBySquareID(t *testing.T) {
 	user, err := m.GetUser(ctx, IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
-	pool, err := m.NewPool(ctx, user.ID, "My Pool", GridTypeStd25, "my-pass")
+	pool, err := m.NewPool(ctx, user.ID, "My Pool", GridTypeStd25, "my-pass", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
 	grid, err := pool.DefaultGrid(ctx)

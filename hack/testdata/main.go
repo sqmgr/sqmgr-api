@@ -82,7 +82,7 @@ func main() {
 
 		name := words.Create(2, " ")
 		logrus.WithFields(logrus.Fields{"name": name, "user": user.ID}).Info("creating pool")
-		pool, err := m.NewPool(context.Background(), user.ID, name, gridType, "joinpw")
+		pool, err := m.NewPool(context.Background(), user.ID, name, gridType, "joinpw", model.NumberSetConfigStandard)
 		if err != nil {
 			panic(err)
 		}

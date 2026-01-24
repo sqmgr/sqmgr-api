@@ -50,7 +50,7 @@ func setupTestServerWithMock(t *testing.T) (*Server, sqlmock.Sqlmock) {
 
 // poolColumns matches the order from pool.go poolColumns constant
 var testPoolColumns = []string{
-	"id", "token", "user_id", "name", "grid_type", "password_hash",
+	"id", "token", "user_id", "name", "grid_type", "number_set_config", "password_hash",
 	"password_required", "open_access_on_lock", "locks", "created", "modified",
 	"check_id", "archived",
 }
@@ -92,6 +92,7 @@ func TestGetPoolTokenSquaresPublicEndpoint_NoPasswordRequired(t *testing.T) {
 		100,          // user_id
 		"Test Pool",  // name
 		"std100",     // grid_type
+		"single",     // number_set_config
 		"hash",       // password_hash
 		false,        // password_required
 		false,        // open_access_on_lock
@@ -138,6 +139,7 @@ func TestGetPoolTokenSquaresPublicEndpoint_PasswordRequired_NoCredentials(t *tes
 		100,          // user_id
 		"Test Pool",  // name
 		"std100",     // grid_type
+		"single",     // number_set_config
 		"hash",       // password_hash
 		true,         // password_required
 		false,        // open_access_on_lock
@@ -178,6 +180,7 @@ func TestGetPoolTokenSquaresPublicEndpoint_PasswordRequired_WrongPassword(t *tes
 		100,                 // user_id
 		"Test Pool",         // name
 		"std100",            // grid_type
+		"single",            // number_set_config
 		correctPasswordHash, // password_hash
 		true,                // password_required
 		false,               // open_access_on_lock
@@ -218,6 +221,7 @@ func TestGetPoolTokenSquaresPublicEndpoint_PasswordRequired_CorrectPassword(t *t
 		100,                 // user_id
 		"Test Pool",         // name
 		"std100",            // grid_type
+		"single",            // number_set_config
 		correctPasswordHash, // password_hash
 		true,                // password_required
 		false,               // open_access_on_lock
@@ -276,6 +280,7 @@ func TestGetPoolTokenSquaresPublicEndpoint_LockedWithOpenAccess(t *testing.T) {
 		100,          // user_id
 		"Test Pool",  // name
 		"std100",     // grid_type
+		"single",     // number_set_config
 		"hash",       // password_hash
 		true,         // password_required
 		true,         // open_access_on_lock
@@ -319,6 +324,7 @@ func TestGetPoolTokenSquaresPublicEndpoint_LockedNoOpenAccess(t *testing.T) {
 		100,          // user_id
 		"Test Pool",  // name
 		"std100",     // grid_type
+		"single",     // number_set_config
 		"hash",       // password_hash
 		true,         // password_required
 		false,        // open_access_on_lock

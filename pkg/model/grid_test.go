@@ -66,7 +66,7 @@ func TestGrid(t *testing.T) {
 	user, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
-	pool, err := m.NewPool(context.Background(), user.ID, "My Pool", GridTypeStd25, "my-pass")
+	pool, err := m.NewPool(context.Background(), user.ID, "My Pool", GridTypeStd25, "my-pass", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(pool.id).Should(gomega.BeNumerically(">", 0))
 	g.Expect(pool.token).ShouldNot(gomega.BeEmpty())
@@ -242,7 +242,7 @@ func getPool(m *Model) *Pool {
 		panic(err)
 	}
 
-	pool, err := m.NewPool(context.Background(), user.ID, "Test Pool", GridTypeStd25, "my-password")
+	pool, err := m.NewPool(context.Background(), user.ID, "Test Pool", GridTypeStd25, "my-password", NumberSetConfigStandard)
 	if err != nil {
 		panic(err)
 	}

@@ -80,7 +80,7 @@ func TestPool(t *testing.T) {
 	user, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
-	pool, err := m.NewPool(context.Background(), user.ID, "My Pool", GridTypeStd100, "my-other-unique-password")
+	pool, err := m.NewPool(context.Background(), user.ID, "My Pool", GridTypeStd100, "my-other-unique-password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(pool).ShouldNot(gomega.BeNil())
 
@@ -132,7 +132,7 @@ func TestNewGridInvalidGridType(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
 	m := New(nil)
-	s, err := m.NewPool(context.Background(), 1, "my name", GridType("invalid"), "my password")
+	s, err := m.NewPool(context.Background(), 1, "my name", GridType("invalid"), "my password", NumberSetConfigStandard)
 	g.Expect(s).Should(gomega.BeNil())
 	g.Expect(err).Should(gomega.MatchError(ErrInvalidGridType))
 }
@@ -148,7 +148,7 @@ func TestGridCollections(t *testing.T) {
 	user, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
-	pool, err := m.NewPool(context.Background(), user.ID, "Test for Collection", GridTypeStd100, "my-other-unique-password")
+	pool, err := m.NewPool(context.Background(), user.ID, "Test for Collection", GridTypeStd100, "my-other-unique-password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(pool).ShouldNot(gomega.BeNil())
 
@@ -192,7 +192,7 @@ func TestGridCollectionPagination(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	for i := 0; i < 30; i++ {
-		pool, err := m.NewPool(context.Background(), user1.ID, randString(), GridTypeStd100, "my-other-unique-password")
+		pool, err := m.NewPool(context.Background(), user1.ID, randString(), GridTypeStd100, "my-other-unique-password", NumberSetConfigStandard)
 		g.Expect(err).Should(gomega.Succeed())
 
 		if i < 20 {
@@ -260,7 +260,7 @@ func TestGridSquares(t *testing.T) {
 	user, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
-	pool, err := m.NewPool(context.Background(), user.ID, "Test Pool", GridTypeStd25, "a password")
+	pool, err := m.NewPool(context.Background(), user.ID, "Test Pool", GridTypeStd25, "a password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
 	squares, err := pool.Squares()
@@ -352,7 +352,7 @@ func TestArchiving(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	for i := 0; i < 3; i++ {
-		pool, err := m.NewPool(context.Background(), user.ID, "Test", GridTypeStd25, "a-password")
+		pool, err := m.NewPool(context.Background(), user.ID, "Test", GridTypeStd25, "a-password", NumberSetConfigStandard)
 		g.Expect(err).Should(gomega.Succeed())
 		g.Expect(pool).ShouldNot(gomega.BeNil())
 	}
@@ -419,7 +419,7 @@ func TestPoolUserID(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Create a pool owned by this user
-	pool, err := m.NewPool(ctx, user.ID, "Test Pool UserID", GridTypeStd100, "password")
+	pool, err := m.NewPool(ctx, user.ID, "Test Pool UserID", GridTypeStd100, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Verify UserID() returns the owner's ID

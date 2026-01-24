@@ -44,6 +44,7 @@ type Pool struct {
 	userID           int64
 	name             string
 	gridType         GridType
+	numberSetConfig  NumberSetConfig
 	passwordHash     string
 	checkID          int
 	archived         bool
@@ -125,15 +126,16 @@ func PoolWithID(id int64) *Pool {
 
 // PoolJSON represents an object that can be exposed to an end-user
 type PoolJSON struct {
-	Token            string    `json:"token"`
-	Name             string    `json:"name"`
-	GridType         GridType  `json:"gridType"`
-	Archived         bool      `json:"archived"`
-	PasswordRequired bool      `json:"passwordRequired"`
-	OpenAccessOnLock bool      `json:"openAccessOnLock"`
-	Locks            time.Time `json:"locks"`
-	Created          time.Time `json:"created"`
-	Modified         time.Time `json:"modified"`
+	Token            string          `json:"token"`
+	Name             string          `json:"name"`
+	GridType         GridType        `json:"gridType"`
+	NumberSetConfig  NumberSetConfig `json:"numberSetConfig"`
+	Archived         bool            `json:"archived"`
+	PasswordRequired bool            `json:"passwordRequired"`
+	OpenAccessOnLock bool            `json:"openAccessOnLock"`
+	Locks            time.Time       `json:"locks"`
+	Created          time.Time       `json:"created"`
+	Modified         time.Time       `json:"modified"`
 }
 
 // ID returns the id
@@ -196,6 +198,7 @@ func (p *Pool) JSON() *PoolJSON {
 		Token:            p.token,
 		Name:             p.name,
 		GridType:         p.gridType,
+		NumberSetConfig:  p.numberSetConfig,
 		Archived:         p.Archived(),
 		PasswordRequired: p.PasswordRequired(),
 		OpenAccessOnLock: p.OpenAccessOnLock(),
@@ -205,10 +208,20 @@ func (p *Pool) JSON() *PoolJSON {
 	}
 }
 
+// NumberSetConfig returns the number set configuration
+func (p *Pool) NumberSetConfig() NumberSetConfig {
+	return p.numberSetConfig
+}
+
+// SetNumberSetConfig sets the number set configuration
+func (p *Pool) SetNumberSetConfig(config NumberSetConfig) {
+	p.numberSetConfig = config
+}
+
 func (m *Model) poolByRow(scan scanFunc) (*Pool, error) {
 	pool := Pool{model: m}
 	var locks *time.Time
-	if err := scan(&pool.id, &pool.token, &pool.userID, &pool.name, &pool.gridType, &pool.passwordHash, &pool.passwordRequired, &pool.openAccessOnLock, &locks, &pool.created, &pool.modified, &pool.checkID, &pool.archived); err != nil {
+	if err := scan(&pool.id, &pool.token, &pool.userID, &pool.name, &pool.gridType, &pool.numberSetConfig, &pool.passwordHash, &pool.passwordRequired, &pool.openAccessOnLock, &locks, &pool.created, &pool.modified, &pool.checkID, &pool.archived); err != nil {
 		return nil, fmt.Errorf("scanning pool row: %w", err)
 	}
 
@@ -323,9 +336,13 @@ func (m *Model) PoolByID(id int64) (*Pool, error) {
 }
 
 // NewPool will save new pool into the database
-func (m *Model) NewPool(ctx context.Context, userID int64, name string, gridType GridType, password string) (*Pool, error) {
+func (m *Model) NewPool(ctx context.Context, userID int64, name string, gridType GridType, password string, numberSetConfig NumberSetConfig) (*Pool, error) {
 	if err := IsValidGridType(string(gridType)); err != nil {
 		return nil, fmt.Errorf("validating grid type: %w", err)
+	}
+
+	if !IsValidNumberSetConfig(string(numberSetConfig)) {
+		return nil, fmt.Errorf("invalid number set config: %s", numberSetConfig)
 	}
 
 	token, err := m.NewToken()
@@ -340,10 +357,10 @@ func (m *Model) NewPool(ctx context.Context, userID int64, name string, gridType
 
 	const query = `
 		SELECT ` + poolColumns + `
-		FROM new_pool($1, $2, $3, $4, $5, $6) AS pools
+		FROM new_pool($1, $2, $3, $4, $5, $6, $7) AS pools
 	`
 
-	row := m.DB.QueryRowContext(ctx, query, token, userID, name, gridType, passwordHash, gridType.Squares())
+	row := m.DB.QueryRowContext(ctx, query, token, userID, name, gridType, passwordHash, gridType.Squares(), numberSetConfig)
 
 	pool, err := m.poolByRow(row.Scan)
 	if err != nil {
@@ -376,8 +393,9 @@ SET name = $1,
     archived = $6,
     password_required = $7,
     open_access_on_lock = $8,
+    number_set_config = $9,
     modified = (NOW() AT TIME ZONE 'utc')
-WHERE id = $9`
+WHERE id = $10`
 
 	var locks *time.Time
 	if !p.locks.IsZero() {
@@ -385,7 +403,7 @@ WHERE id = $9`
 		locks = &locksInUTC
 	}
 
-	_, err := p.model.DB.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.archived, p.passwordRequired, p.openAccessOnLock, p.id)
+	_, err := p.model.DB.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.archived, p.passwordRequired, p.openAccessOnLock, p.numberSetConfig, p.id)
 	if err != nil {
 		return fmt.Errorf("saving pool: %w", err)
 	}
@@ -742,6 +760,7 @@ pools.token,
 pools.user_id,
 pools.name,
 pools.grid_type,
+pools.number_set_config,
 pools.password_hash,
 pools.password_required,
 pools.open_access_on_lock,

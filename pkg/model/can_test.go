@@ -33,7 +33,7 @@ func TestCanCreatePool(t *testing.T) {
 
 	g.Expect(user.Can(context.Background(), ActionCreatePool, user)).Should(gomega.Succeed())
 	for i := 0; i < 3; i++ {
-		_, err := m.NewPool(context.Background(), user.ID, "Test", GridTypeStd25, "password")
+		_, err := m.NewPool(context.Background(), user.ID, "Test", GridTypeStd25, "password", NumberSetConfigStandard)
 		g.Expect(err).Should(gomega.Succeed())
 	}
 
@@ -47,7 +47,7 @@ func TestCanCreatePool(t *testing.T) {
 	g.Expect(user.Can(context.Background(), ActionCreatePool, user)).Should(gomega.Succeed())
 
 	for i := 0; i < 7; i++ {
-		pool, err := m.NewPool(context.Background(), user.ID, "Test", GridTypeStd25, "password")
+		pool, err := m.NewPool(context.Background(), user.ID, "Test", GridTypeStd25, "password", NumberSetConfigStandard)
 		g.Expect(err).Should(gomega.Succeed())
 
 		_, err = stmt.Exec(pool.ID())

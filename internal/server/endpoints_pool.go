@@ -353,14 +353,16 @@ func (s *Server) getPoolConfiguration() http.HandlerFunc {
 	}
 
 	resp := struct {
-		ClaimantMaxLength     int                             `json:"claimantMaxLength"`
-		NameMaxLength         int                             `json:"nameMaxLength"`
-		NotesMaxLength        int                             `json:"notesMaxLength"`
-		TeamNameMaxLength     int                             `json:"teamNameMaxLength"`
-		PoolSquareStates      []model.PoolSquareState         `json:"poolSquareStates"`
-		GridTypes             []keyDescription                `json:"gridTypes"`
-		MinJoinPasswordLength int                             `json:"minJoinPasswordLength"`
-		GridAnnotationIcons   model.GridAnnotationIconMapping `json:"gridAnnotationIcons"`
+		ClaimantMaxLength     int                                             `json:"claimantMaxLength"`
+		NameMaxLength         int                                             `json:"nameMaxLength"`
+		NotesMaxLength        int                                             `json:"notesMaxLength"`
+		TeamNameMaxLength     int                                             `json:"teamNameMaxLength"`
+		PoolSquareStates      []model.PoolSquareState                         `json:"poolSquareStates"`
+		GridTypes             []keyDescription                                `json:"gridTypes"`
+		NumberSetConfigs      []model.NumberSetConfigInfo                     `json:"numberSetConfigs"`
+		NumberSetTypeInfos    map[model.NumberSetType]model.NumberSetTypeInfo `json:"numberSetTypeInfos"`
+		MinJoinPasswordLength int                                             `json:"minJoinPasswordLength"`
+		GridAnnotationIcons   model.GridAnnotationIconMapping                 `json:"gridAnnotationIcons"`
 	}{
 		ClaimantMaxLength:     model.ClaimantMaxLength,
 		NameMaxLength:         model.NameMaxLength,
@@ -368,6 +370,8 @@ func (s *Server) getPoolConfiguration() http.HandlerFunc {
 		TeamNameMaxLength:     model.TeamNameMaxLength,
 		PoolSquareStates:      model.PoolSquareStates,
 		GridTypes:             gridTypesSlice,
+		NumberSetConfigs:      model.ValidNumberSetConfigs(),
+		NumberSetTypeInfos:    model.NumberSetTypeInfos(),
 		MinJoinPasswordLength: minJoinPasswordLength,
 		GridAnnotationIcons:   model.AnnotationIcons,
 	}
@@ -387,9 +391,10 @@ func (s *Server) getPoolConfiguration() http.HandlerFunc {
 
 func (s *Server) postPoolEndpoint() http.HandlerFunc {
 	type payload struct {
-		Name         string `json:"name"`
-		GridType     string `json:"gridType"`
-		JoinPassword string `json:"joinPassword"`
+		Name            string `json:"name"`
+		GridType        string `json:"gridType"`
+		NumberSetConfig string `json:"numberSetConfig"`
+		JoinPassword    string `json:"joinPassword"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -408,6 +413,15 @@ func (s *Server) postPoolEndpoint() http.HandlerFunc {
 		name := v.Printable("Squares Pool Name", data.Name)
 		gridType := v.GridType("Grid Configuration", data.GridType)
 		password := v.Password("Join Password", data.JoinPassword, minJoinPasswordLength)
+
+		// Default to "single" if not provided (backwards compatibility)
+		numberSetConfig := model.NumberSetConfig(data.NumberSetConfig)
+		if numberSetConfig == "" {
+			numberSetConfig = model.NumberSetConfigStandard
+		}
+		if !model.IsValidNumberSetConfig(string(numberSetConfig)) {
+			v.AddError("numberSetConfig", "Invalid number set configuration")
+		}
 
 		if err := user.Can(r.Context(), model.ActionCreatePool, user); err != nil {
 			if _, ok := err.(model.ActionError); ok {
@@ -428,7 +442,7 @@ func (s *Server) postPoolEndpoint() http.HandlerFunc {
 			return
 		}
 
-		pool, err := s.model.NewPool(r.Context(), user.ID, name, gridType, password)
+		pool, err := s.model.NewPool(r.Context(), user.ID, name, gridType, password, numberSetConfig)
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
@@ -569,6 +583,14 @@ func (s *Server) getPoolTokenGridIDEndpoint() http.HandlerFunc {
 		if err := grid.LoadAnnotations(r.Context()); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
+		}
+
+		// Load number sets for multi-set configurations
+		if pool.NumberSetConfig() != model.NumberSetConfigStandard {
+			if err := grid.LoadNumberSets(r.Context()); err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
 		}
 
 		s.writeJSONResponse(w, http.StatusOK, grid.JSON())
@@ -959,6 +981,11 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 }
 
 func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
+	type numberSetPayload struct {
+		HomeTeamNumbers []int `json:"homeTeamNumbers"`
+		AwayTeamNumbers []int `json:"awayTeamNumbers"`
+	}
+
 	type payload struct {
 		Action string `json:"action"`
 		Data   *struct {
@@ -973,8 +1000,12 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 			AwayTeamColor1 string `json:"awayTeamColor1"`
 			AwayTeamColor2 string `json:"awayTeamColor2"`
 
+			// Legacy single set (for "single" config)
 			HomeTeamNumbers []int `json:"homeTeamNumbers"`
 			AwayTeamNumbers []int `json:"awayTeamNumbers"`
+
+			// Multiple number sets (for multi-set configs)
+			NumberSets map[model.NumberSetType]numberSetPayload `json:"numberSets"`
 		} `json:"data,omitempty"`
 	}
 
@@ -1032,32 +1063,82 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 
 		switch data.Action {
 		case "drawManualNumbers":
-			if err := grid.SetManualNumbers(data.Data.HomeTeamNumbers, data.Data.AwayTeamNumbers); err != nil {
-				s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("could not set manual numbers: %w", err))
-				return
+			config := pool.NumberSetConfig()
+
+			// Handle multi-set configs
+			if config != model.NumberSetConfigStandard && data.Data.NumberSets != nil {
+				// Convert payload to model input
+				numberSets := make(map[model.NumberSetType]model.NumberSetInput)
+				for setType, ns := range data.Data.NumberSets {
+					numberSets[setType] = model.NumberSetInput{
+						HomeNumbers: ns.HomeTeamNumbers,
+						AwayNumbers: ns.AwayTeamNumbers,
+					}
+				}
+
+				if err := grid.DrawAllNumbersManual(r.Context(), config, numberSets); err != nil {
+					s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("could not set manual numbers: %w", err))
+					return
+				}
+			} else {
+				// Legacy single set behavior
+				if err := grid.SetManualNumbers(data.Data.HomeTeamNumbers, data.Data.AwayTeamNumbers); err != nil {
+					s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("could not set manual numbers: %w", err))
+					return
+				}
+
+				if err := grid.Save(r.Context()); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
 			}
 
-			if err := grid.Save(r.Context()); err != nil {
-				s.writeErrorResponse(w, http.StatusInternalServerError, err)
-				return
+			// Load number sets for response
+			if config != model.NumberSetConfigStandard {
+				if err := grid.LoadNumberSets(r.Context()); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
 			}
 
 			s.writeJSONResponse(w, http.StatusOK, grid.JSON())
 			return
 		case "drawNumbers":
-			if err := grid.SelectRandomNumbers(); err != nil {
-				if err == model.ErrNumbersAlreadyDrawn {
-					s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("the numbers have already been drawn"))
+			config := pool.NumberSetConfig()
+
+			// Handle multi-set configs
+			if config != model.NumberSetConfigStandard {
+				if err := grid.DrawAllNumbersRandom(r.Context(), config); err != nil {
+					if err == model.ErrNumbersAlreadyDrawn {
+						s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("the numbers have already been drawn"))
+						return
+					}
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+			} else {
+				// Legacy single set behavior
+				if err := grid.SelectRandomNumbers(); err != nil {
+					if err == model.ErrNumbersAlreadyDrawn {
+						s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("the numbers have already been drawn"))
+						return
+					}
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
 					return
 				}
 
-				s.writeErrorResponse(w, http.StatusInternalServerError, err)
-				return
+				if err := grid.Save(r.Context()); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
 			}
 
-			if err := grid.Save(r.Context()); err != nil {
-				s.writeErrorResponse(w, http.StatusInternalServerError, err)
-				return
+			// Load number sets for response
+			if config != model.NumberSetConfigStandard {
+				if err := grid.LoadNumberSets(r.Context()); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
 			}
 
 			s.writeJSONResponse(w, http.StatusOK, grid.JSON())

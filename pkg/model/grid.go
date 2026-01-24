@@ -22,10 +22,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/lib/pq"
 	"math/big"
 	"time"
 	"unicode/utf8"
+
+	"github.com/lib/pq"
 )
 
 // TeamNameMaxLength is the maximum length of the team names
@@ -69,30 +70,32 @@ type Grid struct {
 
 	settings    *GridSettings
 	annotations map[int]*GridAnnotation
+	numberSets  map[NumberSetType]*GridNumberSet
 }
 
 // GridJSON represents grid metadata that can be sent to the front-end
 type GridJSON struct {
-	ID           int64                   `json:"id"`
-	Name         string                  `json:"name"`
-	Label        string                  `json:"label"`
-	HomeTeamName string                  `json:"homeTeamName"`
-	HomeNumbers  []int                   `json:"homeNumbers"`
-	AwayTeamName string                  `json:"awayTeamName"`
-	AwayNumbers  []int                   `json:"awayNumbers"`
-	ManualDraw   bool                    `json:"manualDraw"`
-	EventDate    time.Time               `json:"eventDate"`
-	Rollover     bool                    `json:"rollover"`
-	State        State                   `json:"state"`
-	Created      time.Time               `json:"created"`
-	Modified     time.Time               `json:"modified"`
-	Settings     *GridSettings           `json:"settings"`
-	Annotations  map[int]*GridAnnotation `json:"annotations"`
+	ID           int64                                `json:"id"`
+	Name         string                               `json:"name"`
+	Label        string                               `json:"label"`
+	HomeTeamName string                               `json:"homeTeamName"`
+	HomeNumbers  []int                                `json:"homeNumbers"`
+	AwayTeamName string                               `json:"awayTeamName"`
+	AwayNumbers  []int                                `json:"awayNumbers"`
+	ManualDraw   bool                                 `json:"manualDraw"`
+	EventDate    time.Time                            `json:"eventDate"`
+	Rollover     bool                                 `json:"rollover"`
+	State        State                                `json:"state"`
+	Created      time.Time                            `json:"created"`
+	Modified     time.Time                            `json:"modified"`
+	Settings     *GridSettings                        `json:"settings"`
+	Annotations  map[int]*GridAnnotation              `json:"annotations"`
+	NumberSets   map[NumberSetType]*GridNumberSetJSON `json:"numberSets,omitempty"`
 }
 
 // JSON will marshal the JSON using a custom marshaller
 func (g *Grid) JSON() *GridJSON {
-	return &GridJSON{
+	json := &GridJSON{
 		ID:           g.ID(),
 		Name:         g.Name(),
 		Label:        g.Label(),
@@ -109,6 +112,15 @@ func (g *Grid) JSON() *GridJSON {
 		Settings:     g.settings,
 		Annotations:  g.annotations,
 	}
+
+	if len(g.numberSets) > 0 {
+		json.NumberSets = make(map[NumberSetType]*GridNumberSetJSON)
+		for k, v := range g.numberSets {
+			json.NumberSets[k] = v.JSON()
+		}
+	}
+
+	return json
 }
 
 // State is a getter for the state
@@ -428,6 +440,153 @@ func (g *Grid) LoadAnnotations(ctx context.Context) error {
 	}
 
 	g.annotations = annotations
+	return nil
+}
+
+// LoadNumberSets loads all number sets for the grid
+func (g *Grid) LoadNumberSets(ctx context.Context) error {
+	numberSets, err := g.model.GridNumberSetsByGridID(ctx, g.id)
+	if err != nil {
+		return err
+	}
+
+	g.numberSets = numberSets
+	return nil
+}
+
+// NumberSets returns the loaded number sets
+func (g *Grid) NumberSets() map[NumberSetType]*GridNumberSet {
+	return g.numberSets
+}
+
+// NumbersAreDrawn checks if ALL required sets have numbers for the given config
+func (g *Grid) NumbersAreDrawn(config NumberSetConfig) bool {
+	setTypes := GetSetTypes(config)
+	if setTypes == nil {
+		return false
+	}
+
+	// For "standard" config, check legacy homeNumbers/awayNumbers
+	if config == NumberSetConfigStandard {
+		return g.homeNumbers != nil && g.awayNumbers != nil
+	}
+
+	// For multi-set configs, check each required set
+	if g.numberSets == nil {
+		return false
+	}
+
+	for _, setType := range setTypes {
+		ns, ok := g.numberSets[setType]
+		if !ok || !ns.HasNumbers() {
+			return false
+		}
+	}
+
+	return true
+}
+
+// DrawAllNumbersRandom atomically draws random numbers for all required sets
+func (g *Grid) DrawAllNumbersRandom(ctx context.Context, config NumberSetConfig) error {
+	setTypes := GetSetTypes(config)
+	if setTypes == nil {
+		return fmt.Errorf("invalid number set config: %s", config)
+	}
+
+	// For "standard" config, use legacy behavior
+	if config == NumberSetConfigStandard {
+		return g.SelectRandomNumbers()
+	}
+
+	tx, err := g.model.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning transaction: %w", err)
+	}
+
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	newSets := make(map[NumberSetType]*GridNumberSet)
+	for _, setType := range setTypes {
+		ns := g.model.NewGridNumberSet(g.id, setType)
+		if err := ns.SelectRandomNumbers(); err != nil {
+			return fmt.Errorf("selecting random numbers for %s: %w", setType, err)
+		}
+		if err := ns.Save(ctx, tx); err != nil {
+			return fmt.Errorf("saving number set %s: %w", setType, err)
+		}
+		newSets[setType] = ns
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing transaction: %w", err)
+	}
+
+	g.numberSets = newSets
+	return nil
+}
+
+// NumberSetInput represents input for a single number set
+type NumberSetInput struct {
+	HomeNumbers []int `json:"homeTeamNumbers"`
+	AwayNumbers []int `json:"awayTeamNumbers"`
+}
+
+// DrawAllNumbersManual atomically sets manual numbers for all required sets
+func (g *Grid) DrawAllNumbersManual(ctx context.Context, config NumberSetConfig, numberSets map[NumberSetType]NumberSetInput) error {
+	setTypes := GetSetTypes(config)
+	if setTypes == nil {
+		return fmt.Errorf("invalid number set config: %s", config)
+	}
+
+	// For "standard" config, use legacy behavior with "all" set
+	if config == NumberSetConfigStandard {
+		input, ok := numberSets[NumberSetTypeAll]
+		if !ok {
+			return fmt.Errorf("missing 'all' number set for 'standard' config")
+		}
+		return g.SetManualNumbers(input.HomeNumbers, input.AwayNumbers)
+	}
+
+	// Validate all required sets are provided
+	for _, setType := range setTypes {
+		if _, ok := numberSets[setType]; !ok {
+			return fmt.Errorf("missing number set for %s", setType)
+		}
+	}
+
+	tx, err := g.model.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning transaction: %w", err)
+	}
+
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	newSets := make(map[NumberSetType]*GridNumberSet)
+	for _, setType := range setTypes {
+		input := numberSets[setType]
+		ns := g.model.NewGridNumberSet(g.id, setType)
+		if err := ns.SetNumbers(input.HomeNumbers, input.AwayNumbers); err != nil {
+			return fmt.Errorf("setting numbers for %s: %w", setType, err)
+		}
+		if err := ns.Save(ctx, tx); err != nil {
+			return fmt.Errorf("saving number set %s: %w", setType, err)
+		}
+		newSets[setType] = ns
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing transaction: %w", err)
+	}
+
+	g.numberSets = newSets
 	return nil
 }
 
