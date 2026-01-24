@@ -17,8 +17,8 @@ BEGIN;
 -- Enum for number set configurations
 CREATE TYPE number_set_config AS ENUM (
     'standard', -- Standard (one set for all)
-    'q1234',    -- 1st, 2nd, 3rd, 4th quarter
-    'q123f',    -- 1st, 2nd, 3rd, Final
+    '1234',     -- 1st, 2nd, 3rd, 4th quarter
+    '123f',     -- 1st, 2nd, 3rd, Final
     'hf',       -- Half, Final
     'h4'        -- Half, 4th
 );
