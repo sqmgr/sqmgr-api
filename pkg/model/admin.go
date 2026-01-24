@@ -32,17 +32,18 @@ type AdminStats struct {
 
 // AdminPool represents a pool in the admin list with additional metadata
 type AdminPool struct {
-	Token        string   `json:"token"`
-	Name         string   `json:"name"`
-	GridType     GridType `json:"gridType"`
-	Archived     bool     `json:"archived"`
-	OwnerID      int64    `json:"ownerId"`
-	OwnerEmail   *string  `json:"ownerEmail"`
-	OwnerStore   string   `json:"ownerStore"`
-	MemberCount  int64    `json:"memberCount"`
-	GridCount    int64    `json:"gridCount"`
-	ClaimedCount int64    `json:"claimedCount"`
-	Created      string   `json:"created"`
+	Token           string          `json:"token"`
+	Name            string          `json:"name"`
+	GridType        GridType        `json:"gridType"`
+	NumberSetConfig NumberSetConfig `json:"numberSetConfig"`
+	Archived        bool            `json:"archived"`
+	OwnerID         int64           `json:"ownerId"`
+	OwnerEmail      *string         `json:"ownerEmail"`
+	OwnerStore      string          `json:"ownerStore"`
+	MemberCount     int64           `json:"memberCount"`
+	GridCount       int64           `json:"gridCount"`
+	ClaimedCount    int64           `json:"claimedCount"`
+	Created         string          `json:"created"`
 }
 
 // periodToInterval converts a period string to a PostgreSQL interval
@@ -134,6 +135,7 @@ func (m *Model) GetAllPools(ctx context.Context, search string, offset int64, li
 			p.token,
 			p.name,
 			p.grid_type,
+			p.number_set_config,
 			p.archived,
 			p.user_id,
 			u.email,
@@ -182,6 +184,7 @@ func scanAdminPools(rows interface {
 			&pool.Token,
 			&pool.Name,
 			&pool.GridType,
+			&pool.NumberSetConfig,
 			&pool.Archived,
 			&pool.OwnerID,
 			&pool.OwnerEmail,
@@ -266,6 +269,7 @@ func (m *Model) GetPoolsByUserID(ctx context.Context, userID int64, includeArchi
 			p.token,
 			p.name,
 			p.grid_type,
+			p.number_set_config,
 			p.archived,
 			p.user_id,
 			u.email,

@@ -134,6 +134,7 @@ func TestGetAllPools(t *testing.T) {
 	g.Expect(pools[0].Token).ShouldNot(gomega.BeEmpty())
 	g.Expect(pools[0].Name).ShouldNot(gomega.BeEmpty())
 	g.Expect(pools[0].GridType).ShouldNot(gomega.BeEmpty())
+	g.Expect(pools[0].NumberSetConfig).ShouldNot(gomega.BeEmpty())
 	g.Expect(pools[0].OwnerID).Should(gomega.BeNumerically(">", 0))
 	g.Expect(pools[0].Created).ShouldNot(gomega.BeEmpty())
 	// ClaimedCount should be 0 for new pools with no claimed squares
