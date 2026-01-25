@@ -425,3 +425,83 @@ func TestPoolUserID(t *testing.T) {
 	// Verify UserID() returns the owner's ID
 	g.Expect(pool.UserID()).Should(gomega.Equal(user.ID))
 }
+
+func TestCanChangeNumberSetConfig_NoNumbersDrawn(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create a pool with standard config
+	pool, err := m.NewPool(ctx, user.ID, "Test CanChange", GridTypeStd100, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Without any numbers drawn, should return true
+	canChange, err := pool.CanChangeNumberSetConfig(ctx)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(canChange).Should(gomega.BeTrue())
+}
+
+func TestCanChangeNumberSetConfig_StandardWithNumbersDrawn(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create a pool with standard config
+	pool, err := m.NewPool(ctx, user.ID, "Test CanChange Standard", GridTypeStd100, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Get the default grid and draw numbers
+	grid, err := pool.DefaultGrid(ctx)
+	g.Expect(err).Should(gomega.Succeed())
+
+	err = grid.SelectRandomNumbers()
+	g.Expect(err).Should(gomega.Succeed())
+
+	err = grid.Save(ctx)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Now it should return false since numbers are drawn
+	canChange, err := pool.CanChangeNumberSetConfig(ctx)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(canChange).Should(gomega.BeFalse())
+}
+
+func TestCanChangeNumberSetConfig_MultiSetWithNumbersDrawn(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create a pool with multi-set config (123f = 1st, 2nd, 3rd, Final)
+	pool, err := m.NewPool(ctx, user.ID, "Test CanChange MultiSet", GridTypeStd100, "password", NumberSetConfig123F)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Get the default grid and draw numbers using multi-set method
+	grid, err := pool.DefaultGrid(ctx)
+	g.Expect(err).Should(gomega.Succeed())
+
+	err = grid.DrawAllNumbersRandom(ctx, NumberSetConfig123F)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Now it should return false since numbers are drawn
+	canChange, err := pool.CanChangeNumberSetConfig(ctx)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(canChange).Should(gomega.BeFalse())
+}

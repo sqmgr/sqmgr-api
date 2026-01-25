@@ -146,6 +146,7 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 		ResetMembership  bool    `json:"resetMembership"`
 		PasswordRequired bool    `json:"passwordRequired"`
 		OpenAccessOnLock bool    `json:"openAccessOnLock"`
+		NumberSetConfig  string  `json:"numberSetConfig"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -231,6 +232,32 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 
 			pool.SetName(name)
 			err = pool.Save(r.Context())
+		case "changeNumberSetConfig":
+			if !model.IsValidNumberSetConfig(resp.NumberSetConfig) {
+				s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
+					Status: statusError,
+					Error:  "Invalid number set configuration",
+				})
+				return
+			}
+
+			var canChange bool
+			canChange, err = pool.CanChangeNumberSetConfig(r.Context())
+			if err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+
+			if !canChange {
+				s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
+					Status: statusError,
+					Error:  "Cannot change number set configuration after numbers have been drawn for any game",
+				})
+				return
+			}
+
+			pool.SetNumberSetConfig(model.NumberSetConfig(resp.NumberSetConfig))
+			err = pool.Save(r.Context())
 		default:
 			s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("unsupported action %s", resp.Action))
 			return
@@ -241,9 +268,16 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 			return
 		}
 
+		canChange, canChangeErr := pool.CanChangeNumberSetConfig(r.Context())
+		if canChangeErr != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, canChangeErr)
+			return
+		}
+
 		s.writeJSONResponse(w, http.StatusOK, poolResponse{
-			PoolJSON: pool.JSON(),
-			IsAdmin:  true,
+			PoolJSON:                 pool.JSON(),
+			IsAdmin:                  true,
+			CanChangeNumberSetConfig: canChange,
 		})
 	}
 }
@@ -465,10 +499,21 @@ func (s *Server) getPoolTokenEndpoint() http.HandlerFunc {
 			return
 		}
 
-		s.writeJSONResponse(w, http.StatusOK, poolResponse{
+		resp := poolResponse{
 			PoolJSON: pool.JSON(),
 			IsAdmin:  isAdminOf,
-		})
+		}
+
+		if isAdminOf {
+			canChange, err := pool.CanChangeNumberSetConfig(r.Context())
+			if err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+			resp.CanChangeNumberSetConfig = canChange
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, resp)
 	}
 }
 
@@ -1344,5 +1389,6 @@ func (s *Server) postPoolTokenMemberEndpoint() http.HandlerFunc {
 
 type poolResponse struct {
 	*model.PoolJSON
-	IsAdmin bool `json:"isAdmin"`
+	IsAdmin                  bool `json:"isAdmin"`
+	CanChangeNumberSetConfig bool `json:"canChangeNumberSetConfig,omitempty"`
 }

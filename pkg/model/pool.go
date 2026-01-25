@@ -218,6 +218,27 @@ func (p *Pool) SetNumberSetConfig(config NumberSetConfig) {
 	p.numberSetConfig = config
 }
 
+// CanChangeNumberSetConfig returns true if the number set config can be changed.
+// This is only allowed if no grid has had its numbers drawn.
+func (p *Pool) CanChangeNumberSetConfig(ctx context.Context) (bool, error) {
+	grids, err := p.Grids(ctx, 0, MaxGridsPerPool)
+	if err != nil {
+		return false, err
+	}
+
+	for _, grid := range grids {
+		if p.numberSetConfig != NumberSetConfigStandard {
+			if err := grid.LoadNumberSets(ctx); err != nil {
+				return false, err
+			}
+		}
+		if grid.NumbersAreDrawn(p.numberSetConfig) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 func (m *Model) poolByRow(scan scanFunc) (*Pool, error) {
 	pool := Pool{model: m}
 	var locks *time.Time
