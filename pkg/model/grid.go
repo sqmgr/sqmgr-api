@@ -412,7 +412,7 @@ func (g *Grid) LoadSettings(ctx context.Context) error {
 		SELECT grid_id,
 			   home_team_color_1, home_team_color_2,
 			   away_team_color_1, away_team_color_2,
-			   notes, modified
+			   notes, branding_image_url, branding_image_alt, modified
 		FROM grid_settings
 		WHERE grid_id = $1
 	`, g.id)
@@ -428,6 +428,8 @@ func (g *Grid) LoadSettings(ctx context.Context) error {
 		&g.settings.awayTeamColor1,
 		&g.settings.awayTeamColor2,
 		&g.settings.notes,
+		&g.settings.brandingImageURL,
+		&g.settings.brandingImageAlt,
 		&g.settings.modified,
 	)
 }

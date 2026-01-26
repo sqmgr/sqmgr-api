@@ -26,6 +26,10 @@ import (
 const (
 	// NotesMaxLength is the maximum number of characters the notes can be
 	NotesMaxLength = 500
+	// BrandingImageURLMaxLength is the maximum number of characters for the branding image URL
+	BrandingImageURLMaxLength = 2048
+	// BrandingImageAltMaxLength is the maximum number of characters for the branding image alt text
+	BrandingImageAltMaxLength = 255
 )
 
 // constants for default colors
@@ -39,32 +43,38 @@ const (
 // GridSettings will contain various user-defined settings
 // This object uses getters and setters to help guard against user input.
 type GridSettings struct {
-	gridID         int64
-	homeTeamColor1 *string
-	homeTeamColor2 *string
-	awayTeamColor1 *string
-	awayTeamColor2 *string
-	notes          *string
-	modified       *time.Time
+	gridID           int64
+	homeTeamColor1   *string
+	homeTeamColor2   *string
+	awayTeamColor1   *string
+	awayTeamColor2   *string
+	notes            *string
+	brandingImageURL *string
+	brandingImageAlt *string
+	modified         *time.Time
 }
 
 // gridSettingsJSON is used for custom serialization
 type gridSettingsJSON struct {
-	HomeTeamColor1 string `json:"homeTeamColor1"`
-	HomeTeamColor2 string `json:"homeTeamColor2"`
-	AwayTeamColor1 string `json:"awayTeamColor1"`
-	AwayTeamColor2 string `json:"awayTeamColor2"`
-	Notes          string `json:"notes"`
+	HomeTeamColor1   string `json:"homeTeamColor1"`
+	HomeTeamColor2   string `json:"homeTeamColor2"`
+	AwayTeamColor1   string `json:"awayTeamColor1"`
+	AwayTeamColor2   string `json:"awayTeamColor2"`
+	Notes            string `json:"notes"`
+	BrandingImageURL string `json:"brandingImageUrl,omitempty"`
+	BrandingImageAlt string `json:"brandingImageAlt,omitempty"`
 }
 
 // MarshalJSON adds custom JSON marshalling support
 func (g GridSettings) MarshalJSON() ([]byte, error) {
 	return json.Marshal(gridSettingsJSON{
-		HomeTeamColor1: g.HomeTeamColor1(),
-		HomeTeamColor2: g.HomeTeamColor2(),
-		AwayTeamColor1: g.AwayTeamColor1(),
-		AwayTeamColor2: g.AwayTeamColor2(),
-		Notes:          g.Notes(),
+		HomeTeamColor1:   g.HomeTeamColor1(),
+		HomeTeamColor2:   g.HomeTeamColor2(),
+		AwayTeamColor1:   g.AwayTeamColor1(),
+		AwayTeamColor2:   g.AwayTeamColor2(),
+		Notes:            g.Notes(),
+		BrandingImageURL: g.BrandingImageURL(),
+		BrandingImageAlt: g.BrandingImageAlt(),
 	})
 }
 
@@ -77,14 +87,18 @@ func (g *GridSettings) Save(ctx context.Context, q Queryable) error {
 			away_team_color_1 = $3,
 			away_team_color_2 = $4,
 			notes = $5,
+			branding_image_url = $6,
+			branding_image_alt = $7,
 			modified = (NOW() AT TIME ZONE 'utc')
-		WHERE grid_id = $6
+		WHERE grid_id = $8
 	`,
 		g.homeTeamColor1,
 		g.homeTeamColor2,
 		g.awayTeamColor1,
 		g.awayTeamColor2,
 		g.notes,
+		g.brandingImageURL,
+		g.brandingImageAlt,
 		g.gridID,
 	)
 
@@ -190,4 +204,54 @@ func (g *GridSettings) AwayTeamColor2() string {
 	}
 
 	return *g.awayTeamColor2
+}
+
+// SetBrandingImageURL is a setter for the branding image URL
+func (g *GridSettings) SetBrandingImageURL(url string) {
+	if len(url) == 0 {
+		g.brandingImageURL = nil
+		return
+	}
+
+	nRunes := utf8.RuneCountInString(url)
+	if nRunes > BrandingImageURLMaxLength {
+		urlChars := []rune(url)
+		url = string(urlChars[0:BrandingImageURLMaxLength])
+	}
+
+	g.brandingImageURL = &url
+}
+
+// BrandingImageURL returns the branding image URL
+func (g *GridSettings) BrandingImageURL() string {
+	if g.brandingImageURL == nil {
+		return ""
+	}
+
+	return *g.brandingImageURL
+}
+
+// SetBrandingImageAlt is a setter for the branding image alt text
+func (g *GridSettings) SetBrandingImageAlt(alt string) {
+	if len(alt) == 0 {
+		g.brandingImageAlt = nil
+		return
+	}
+
+	nRunes := utf8.RuneCountInString(alt)
+	if nRunes > BrandingImageAltMaxLength {
+		altChars := []rune(alt)
+		alt = string(altChars[0:BrandingImageAltMaxLength])
+	}
+
+	g.brandingImageAlt = &alt
+}
+
+// BrandingImageAlt returns the branding image alt text
+func (g *GridSettings) BrandingImageAlt() string {
+	if g.brandingImageAlt == nil {
+		return ""
+	}
+
+	return *g.brandingImageAlt
 }

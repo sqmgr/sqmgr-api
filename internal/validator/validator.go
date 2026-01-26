@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"net/mail"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -118,6 +119,36 @@ func (v *Validator) Email(key, email string) string {
 	}
 
 	return email
+}
+
+// URL will ensure the URL is valid and uses http or https scheme
+func (v *Validator) URL(key, urlStr string, isOptional ...bool) string {
+	if len(isOptional) > 0 && isOptional[0] && len(urlStr) == 0 {
+		return ""
+	}
+
+	if len(urlStr) == 0 {
+		v.AddError(key, "must be a valid URL")
+		return ""
+	}
+
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		v.AddError(key, "must be a valid URL")
+		return ""
+	}
+
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		v.AddError(key, "must be an http or https URL")
+		return ""
+	}
+
+	if parsedURL.Host == "" {
+		v.AddError(key, "must be a valid URL")
+		return ""
+	}
+
+	return urlStr
 }
 
 // Color will ensure the color is a valid hex color in the form of #000000

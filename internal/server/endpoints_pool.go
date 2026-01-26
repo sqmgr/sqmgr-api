@@ -1034,16 +1034,18 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 	type payload struct {
 		Action string `json:"action"`
 		Data   *struct {
-			EventDate      string `json:"eventDate"`
-			Notes          string `json:"notes"`
-			Rollover       bool   `json:"rollover"`
-			Label          string `json:"label"`
-			HomeTeamName   string `json:"homeTeamName"`
-			HomeTeamColor1 string `json:"homeTeamColor1"`
-			HomeTeamColor2 string `json:"homeTeamColor2"`
-			AwayTeamName   string `json:"awayTeamName"`
-			AwayTeamColor1 string `json:"awayTeamColor1"`
-			AwayTeamColor2 string `json:"awayTeamColor2"`
+			EventDate        string `json:"eventDate"`
+			Notes            string `json:"notes"`
+			Rollover         bool   `json:"rollover"`
+			Label            string `json:"label"`
+			HomeTeamName     string `json:"homeTeamName"`
+			HomeTeamColor1   string `json:"homeTeamColor1"`
+			HomeTeamColor2   string `json:"homeTeamColor2"`
+			AwayTeamName     string `json:"awayTeamName"`
+			AwayTeamColor1   string `json:"awayTeamColor1"`
+			AwayTeamColor2   string `json:"awayTeamColor2"`
+			BrandingImageURL string `json:"brandingImageUrl"`
+			BrandingImageAlt string `json:"brandingImageAlt"`
 
 			// Legacy single set (for "single" config)
 			HomeTeamNumbers []int `json:"homeTeamNumbers"`
@@ -1207,6 +1209,10 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 			awayTeamColor2 := v.Color("Away Team Colors", data.Data.AwayTeamColor2, true)
 			notes := v.PrintableWithNewline("Notes", data.Data.Notes, true)
 			notes = v.MaxLength("Notes", notes, model.NotesMaxLength)
+			brandingImageURL := v.URL("Branding Image URL", data.Data.BrandingImageURL, true)
+			brandingImageURL = v.MaxLength("Branding Image URL", brandingImageURL, model.BrandingImageURLMaxLength)
+			brandingImageAlt := v.Printable("Branding Image Alt", data.Data.BrandingImageAlt, true)
+			brandingImageAlt = v.MaxLength("Branding Image Alt", brandingImageAlt, model.BrandingImageAltMaxLength)
 
 			if pool.GridType() != model.GridTypeRoll100 && data.Data.Rollover {
 				v.AddError("rollover", "Rollover is not valid for this pool type")
@@ -1236,6 +1242,8 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 			settings.SetHomeTeamColor2(homeTeamColor2)
 			settings.SetAwayTeamColor1(awayTeamColor1)
 			settings.SetAwayTeamColor2(awayTeamColor2)
+			settings.SetBrandingImageURL(brandingImageURL)
+			settings.SetBrandingImageAlt(brandingImageAlt)
 
 			if err := grid.Save(r.Context()); err != nil {
 				if err == model.ErrGridLimit {
