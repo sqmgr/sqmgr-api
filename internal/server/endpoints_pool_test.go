@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -176,6 +177,261 @@ func TestGetPoolTokenEndpoint_NonAdminDoesNotReceiveCanChangeNumberSetConfig(t *
 	// canChangeNumberSetConfig should NOT be present (omitempty in struct)
 	_, hasKey := result["canChangeNumberSetConfig"]
 	g.Expect(hasKey).Should(gomega.BeFalse(), "canChangeNumberSetConfig should not be present for non-admin")
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func setupTestServerForDrawNumbers(t *testing.T) (*Server, sqlmock.Sqlmock, *model.Model) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+
+	m := model.New(db)
+	s := &Server{
+		Router: mux.NewRouter(),
+		model:  m,
+	}
+
+	s.Router.Path("/pool/{token}/grid/{id}").Methods(http.MethodPost).Handler(s.postPoolTokenGridIDEndpoint())
+
+	return s, mock, m
+}
+
+func gridSettingsColumns() []string {
+	return []string{
+		"grid_id", "home_team_color_1", "home_team_color_2",
+		"away_team_color_1", "away_team_color_2",
+		"notes", "branding_image_url", "branding_image_alt", "modified",
+	}
+}
+
+func TestDrawNumbers_LocksPoolByDefault(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForDrawNumbers(t)
+
+	user := &model.User{
+		Model: m,
+		ID:    100,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-token-draw-1"
+	now := time.Now()
+
+	// Pool is NOT locked (locks = nil)
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Create a grid with no numbers drawn
+	gridRows := sqlmock.NewRows(gridColumns()).
+		AddRow(1, int64(1), 0, "Game 1", "Home Team", nil, "Away Team", nil, now, false, "active", now, now, false)
+
+	mock.ExpectQuery("SELECT .+ FROM grids WHERE id = \\$1 AND pool_id = \\$2").
+		WithArgs(int64(1), int64(1)).
+		WillReturnRows(gridRows)
+
+	// LoadSettings
+	settingsRows := sqlmock.NewRows(gridSettingsColumns()).
+		AddRow(int64(1), "#000000", "#FFFFFF", "#FF0000", "#00FF00", "", "", "", now)
+
+	mock.ExpectQuery("SELECT .+ FROM grid_settings WHERE grid_id = \\$1").
+		WithArgs(int64(1)).
+		WillReturnRows(settingsRows)
+
+	// LoadAnnotations
+	annotationsRows := sqlmock.NewRows([]string{"grid_id", "square_id", "annotation", "icon"})
+	mock.ExpectQuery("SELECT .+ FROM grid_annotations WHERE grid_id = \\$1").
+		WithArgs(int64(1)).
+		WillReturnRows(annotationsRows)
+
+	// Grid save (uses transaction)
+	mock.ExpectBegin()
+	mock.ExpectExec("UPDATE grid_settings SET").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE grids SET").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	// Pool save (for locking)
+	mock.ExpectExec("UPDATE pools SET").WillReturnResult(sqlmock.NewResult(0, 1))
+
+	body := `{"action": "drawNumbers"}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/grid/1", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var result map[string]interface{}
+	err = json.Unmarshal(rec.Body.Bytes(), &result)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Response should include poolLocks
+	g.Expect(result).Should(gomega.HaveKey("poolLocks"))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestDrawNumbers_DoesNotLockPoolWhenLockPoolFalse(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForDrawNumbers(t)
+
+	user := &model.User{
+		Model: m,
+		ID:    100,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-token-draw-2"
+	now := time.Now()
+
+	// Pool is NOT locked (locks = nil)
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Create a grid with no numbers drawn
+	gridRows := sqlmock.NewRows(gridColumns()).
+		AddRow(1, int64(1), 0, "Game 1", "Home Team", nil, "Away Team", nil, now, false, "active", now, now, false)
+
+	mock.ExpectQuery("SELECT .+ FROM grids WHERE id = \\$1 AND pool_id = \\$2").
+		WithArgs(int64(1), int64(1)).
+		WillReturnRows(gridRows)
+
+	// LoadSettings
+	settingsRows := sqlmock.NewRows(gridSettingsColumns()).
+		AddRow(int64(1), "#000000", "#FFFFFF", "#FF0000", "#00FF00", "", "", "", now)
+
+	mock.ExpectQuery("SELECT .+ FROM grid_settings WHERE grid_id = \\$1").
+		WithArgs(int64(1)).
+		WillReturnRows(settingsRows)
+
+	// LoadAnnotations
+	annotationsRows := sqlmock.NewRows([]string{"grid_id", "square_id", "annotation", "icon"})
+	mock.ExpectQuery("SELECT .+ FROM grid_annotations WHERE grid_id = \\$1").
+		WithArgs(int64(1)).
+		WillReturnRows(annotationsRows)
+
+	// Grid save (uses transaction)
+	mock.ExpectBegin()
+	mock.ExpectExec("UPDATE grid_settings SET").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE grids SET").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	// NO pool save expected since lockPool = false
+
+	body := `{"action": "drawNumbers", "data": {"lockPool": false}}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/grid/1", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var result map[string]interface{}
+	err = json.Unmarshal(rec.Body.Bytes(), &result)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Response should include poolLocks (with zero value since not locked)
+	g.Expect(result).Should(gomega.HaveKey("poolLocks"))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestDrawNumbers_DoesNotLockAlreadyLockedPool(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForDrawNumbers(t)
+
+	user := &model.User{
+		Model: m,
+		ID:    100,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-token-draw-3"
+	now := time.Now()
+	pastLocks := now.Add(-24 * time.Hour) // Already locked in the past
+
+	// Pool IS already locked
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, pastLocks, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Create a grid with no numbers drawn
+	gridRows := sqlmock.NewRows(gridColumns()).
+		AddRow(1, int64(1), 0, "Game 1", "Home Team", nil, "Away Team", nil, now, false, "active", now, now, false)
+
+	mock.ExpectQuery("SELECT .+ FROM grids WHERE id = \\$1 AND pool_id = \\$2").
+		WithArgs(int64(1), int64(1)).
+		WillReturnRows(gridRows)
+
+	// LoadSettings
+	settingsRows := sqlmock.NewRows(gridSettingsColumns()).
+		AddRow(int64(1), "#000000", "#FFFFFF", "#FF0000", "#00FF00", "", "", "", now)
+
+	mock.ExpectQuery("SELECT .+ FROM grid_settings WHERE grid_id = \\$1").
+		WithArgs(int64(1)).
+		WillReturnRows(settingsRows)
+
+	// LoadAnnotations
+	annotationsRows := sqlmock.NewRows([]string{"grid_id", "square_id", "annotation", "icon"})
+	mock.ExpectQuery("SELECT .+ FROM grid_annotations WHERE grid_id = \\$1").
+		WithArgs(int64(1)).
+		WillReturnRows(annotationsRows)
+
+	// Grid save (uses transaction)
+	mock.ExpectBegin()
+	mock.ExpectExec("UPDATE grid_settings SET").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE grids SET").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	// NO pool save expected since pool is already locked
+
+	body := `{"action": "drawNumbers", "data": {"lockPool": true}}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/grid/1", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var result map[string]interface{}
+	err = json.Unmarshal(rec.Body.Bytes(), &result)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Response should include poolLocks
+	g.Expect(result).Should(gomega.HaveKey("poolLocks"))
 
 	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
 }

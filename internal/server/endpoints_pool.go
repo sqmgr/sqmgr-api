@@ -1053,7 +1053,16 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 
 			// Multiple number sets (for multi-set configs)
 			NumberSets map[model.NumberSetType]numberSetPayload `json:"numberSets"`
+
+			// LockPool controls whether to lock the pool after drawing numbers
+			// nil = default (lock if not already locked), true = lock, false = don't lock
+			LockPool *bool `json:"lockPool,omitempty"`
 		} `json:"data,omitempty"`
+	}
+
+	type drawResponse struct {
+		*model.GridJSON
+		PoolLocks time.Time `json:"poolLocks"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -1148,7 +1157,23 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 				}
 			}
 
-			s.writeJSONResponse(w, http.StatusOK, grid.JSON())
+			// Lock the pool if requested (defaults to true when not already locked)
+			shouldLock := !pool.IsLocked() // Default: lock if not already locked
+			if data.Data != nil && data.Data.LockPool != nil {
+				shouldLock = *data.Data.LockPool && !pool.IsLocked()
+			}
+			if shouldLock {
+				pool.SetLocks(time.Now())
+				if err := pool.Save(r.Context()); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+			}
+
+			s.writeJSONResponse(w, http.StatusOK, drawResponse{
+				GridJSON:  grid.JSON(),
+				PoolLocks: pool.Locks(),
+			})
 			return
 		case "drawNumbers":
 			config := pool.NumberSetConfig()
@@ -1188,7 +1213,23 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 				}
 			}
 
-			s.writeJSONResponse(w, http.StatusOK, grid.JSON())
+			// Lock the pool if requested (defaults to true when not already locked)
+			shouldLock := !pool.IsLocked() // Default: lock if not already locked
+			if data.Data != nil && data.Data.LockPool != nil {
+				shouldLock = *data.Data.LockPool && !pool.IsLocked()
+			}
+			if shouldLock {
+				pool.SetLocks(time.Now())
+				if err := pool.Save(r.Context()); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+			}
+
+			s.writeJSONResponse(w, http.StatusOK, drawResponse{
+				GridJSON:  grid.JSON(),
+				PoolLocks: pool.Locks(),
+			})
 			return
 		case "save":
 			if data.Data == nil {
