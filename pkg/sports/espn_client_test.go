@@ -818,3 +818,214 @@ func TestParseESPNDate(t *testing.T) {
 		})
 	}
 }
+
+func TestGetEventSummary(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		g.Expect(r.URL.Path).Should(gomega.Equal("/basketball/mens-college-basketball/summary"))
+		g.Expect(r.URL.Query().Get("event")).Should(gomega.Equal("401809352"))
+
+		response := espnSummaryResponse{
+			Header: espnSummaryHeader{
+				ID: "401809352",
+				Season: espnSeason{
+					Year: 2026,
+					Type: 2,
+				},
+				Competitions: []espnSummaryCompetition{
+					{
+						ID:    "401809352",
+						Date:  "2026-02-02T00:00Z",
+						Venue: &espnVenue{FullName: "Jerry Richardson Indoor Stadium"},
+						Competitors: []espnSummaryCompetitor{
+							{
+								ID:       "2747",
+								HomeAway: "home",
+								Winner:   false,
+								Team: espnSummaryTeam{
+									ID:           "2747",
+									Name:         "Terriers",
+									DisplayName:  "Wofford Terriers",
+									Abbreviation: "WOF",
+									Location:     "Wofford",
+									Color:        "897048",
+								},
+								Score: "72",
+								Linescores: []espnSummaryLinescore{
+									{DisplayValue: "39"},
+									{DisplayValue: "33"},
+								},
+							},
+							{
+								ID:       "2193",
+								HomeAway: "away",
+								Winner:   true,
+								Team: espnSummaryTeam{
+									ID:           "2193",
+									Name:         "Buccaneers",
+									DisplayName:  "East Tennessee State Buccaneers",
+									Abbreviation: "ETSU",
+									Location:     "East Tennessee State",
+									Color:        "041e42",
+								},
+								Score: "86",
+								Linescores: []espnSummaryLinescore{
+									{DisplayValue: "47"},
+									{DisplayValue: "39"},
+								},
+							},
+						},
+						Status: espnStatus{
+							Period:       2,
+							DisplayClock: "0:00",
+							Type: espnStatusType{
+								Name:        "STATUS_FINAL",
+								State:       "post",
+								Completed:   true,
+								Description: "Final",
+							},
+						},
+					},
+				},
+			},
+		}
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{
+		BaseURL:   server.URL,
+		RateLimit: 100,
+	})
+
+	event, err := client.GetEventSummary(context.Background(), LeagueNCAAB, "401809352")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(event).ShouldNot(gomega.BeNil())
+
+	g.Expect(event.ID).Should(gomega.Equal("401809352"))
+	g.Expect(event.Season).Should(gomega.Equal(2026))
+	g.Expect(event.Status).Should(gomega.Equal(EventStatusFinal))
+	g.Expect(event.Period).Should(gomega.Equal(2))
+	g.Expect(event.Clock).Should(gomega.Equal("0:00"))
+	g.Expect(event.StatusDetail).Should(gomega.Equal("Final"))
+	g.Expect(event.Venue).Should(gomega.Equal("Jerry Richardson Indoor Stadium"))
+
+	// Home team
+	g.Expect(event.HomeTeam.ID).Should(gomega.Equal("2747"))
+	g.Expect(event.HomeTeam.Abbreviation).Should(gomega.Equal("WOF"))
+	g.Expect(*event.HomeTeamScore).Should(gomega.Equal(72))
+	g.Expect(*event.HomeQ1).Should(gomega.Equal(39))
+	g.Expect(*event.HomeQ2).Should(gomega.Equal(33))
+
+	// Away team
+	g.Expect(event.AwayTeam.ID).Should(gomega.Equal("2193"))
+	g.Expect(event.AwayTeam.Abbreviation).Should(gomega.Equal("ETSU"))
+	g.Expect(*event.AwayTeamScore).Should(gomega.Equal(86))
+	g.Expect(*event.AwayQ1).Should(gomega.Equal(47))
+	g.Expect(*event.AwayQ2).Should(gomega.Equal(39))
+}
+
+func TestGetEventSummaryNotFound(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{
+		BaseURL:   server.URL,
+		RateLimit: 100,
+	})
+
+	_, err := client.GetEventSummary(context.Background(), LeagueNCAAB, "999999999")
+	g.Expect(err).ShouldNot(gomega.Succeed())
+	g.Expect(err.Error()).Should(gomega.ContainSubstring("event not found"))
+}
+
+func TestGetEventSummaryInvalidLeague(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	client := NewClient(Config{})
+
+	_, err := client.GetEventSummary(context.Background(), League("invalid"), "123")
+	g.Expect(err).ShouldNot(gomega.Succeed())
+}
+
+func TestGetEventSummaryWithOT(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := espnSummaryResponse{
+			Header: espnSummaryHeader{
+				ID: "401809999",
+				Season: espnSeason{
+					Year: 2026,
+					Type: 2,
+				},
+				Competitions: []espnSummaryCompetition{
+					{
+						ID:   "401809999",
+						Date: "2026-02-02T00:00Z",
+						Competitors: []espnSummaryCompetitor{
+							{
+								ID:       "1",
+								HomeAway: "home",
+								Team:     espnSummaryTeam{ID: "1", Abbreviation: "HOME"},
+								Score:    "95",
+								Linescores: []espnSummaryLinescore{
+									{DisplayValue: "35"},
+									{DisplayValue: "40"},
+									{DisplayValue: "10"},
+									{DisplayValue: "10"},
+								},
+							},
+							{
+								ID:       "2",
+								HomeAway: "away",
+								Team:     espnSummaryTeam{ID: "2", Abbreviation: "AWAY"},
+								Score:    "90",
+								Linescores: []espnSummaryLinescore{
+									{DisplayValue: "40"},
+									{DisplayValue: "35"},
+									{DisplayValue: "5"},
+									{DisplayValue: "10"},
+								},
+							},
+						},
+						Status: espnStatus{
+							Period: 3,
+							Type: espnStatusType{
+								Name:      "STATUS_FINAL_OT",
+								Completed: true,
+							},
+						},
+					},
+				},
+			},
+		}
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{
+		BaseURL:   server.URL,
+		RateLimit: 100,
+	})
+
+	event, err := client.GetEventSummary(context.Background(), LeagueNCAAB, "401809999")
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Basketball halves + OT: Q1=H1, Q2=H2, Q3=OT1, Q4=OT2
+	g.Expect(*event.HomeQ1).Should(gomega.Equal(35))
+	g.Expect(*event.HomeQ2).Should(gomega.Equal(40))
+	g.Expect(*event.HomeQ3).Should(gomega.Equal(10))
+	g.Expect(*event.HomeQ4).Should(gomega.Equal(10))
+	g.Expect(event.HomeOT).Should(gomega.BeNil()) // Only 4 periods, no extra OT
+
+	g.Expect(*event.AwayQ1).Should(gomega.Equal(40))
+	g.Expect(*event.AwayQ2).Should(gomega.Equal(35))
+	g.Expect(*event.AwayQ3).Should(gomega.Equal(5))
+	g.Expect(*event.AwayQ4).Should(gomega.Equal(10))
+}

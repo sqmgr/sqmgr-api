@@ -124,6 +124,7 @@ type PoolSquareJSON struct {
 	Modified       time.Time           `json:"modified"`
 	Logs           []*PoolSquareLog    `json:"logs,omitempty"`
 	UserInfo       *SquareUserInfoJSON `json:"userInfo,omitempty"`
+	WinningPeriods []WinningPeriodInfo `json:"winningPeriods,omitempty"`
 }
 
 // JSON will custom JSON encode a PoolSquare

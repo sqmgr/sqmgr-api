@@ -85,15 +85,17 @@ const (
 
 // Event represents a game/event
 type Event struct {
-	ID         string      // ESPN event ID (string format)
-	Name       string      // Event name from ESPN (e.g., "Super Bowl LVIII")
-	Date       time.Time   // Event date/time
-	Status     EventStatus // Game status
-	Period     int         // Current period (0=not started, 1-4=quarters, 5+=OT)
-	Season     int         // Season year
-	SeasonType SeasonType  // Season type (preseason, regular, postseason)
-	Week       *int        // Week number (NFL only)
-	Venue      string      // Venue name
+	ID           string      // ESPN event ID (string format)
+	Name         string      // Event name from ESPN (e.g., "Super Bowl LVIII")
+	Date         time.Time   // Event date/time
+	Status       EventStatus // Game status
+	StatusDetail string      // Status description from ESPN (e.g., "Halftime", "End of 1st Quarter")
+	Period       int         // Current period (0=not started, 1-4=quarters, 5+=OT)
+	Clock        string      // Game clock display (e.g., "12:34", "5:00")
+	Season       int         // Season year
+	SeasonType   SeasonType  // Season type (preseason, regular, postseason)
+	Week         *int        // Week number (NFL only)
+	Venue        string      // Venue name
 
 	HomeTeam      Team
 	AwayTeam      Team
@@ -318,4 +320,52 @@ type espnScheduleCompetitor struct {
 type espnScore struct {
 	Value        float64 `json:"value"`
 	DisplayValue string  `json:"displayValue"`
+}
+
+// espnSummaryResponse is the ESPN API response for event summary endpoint
+type espnSummaryResponse struct {
+	Header espnSummaryHeader `json:"header"`
+}
+
+// espnSummaryHeader contains the header info from summary response
+type espnSummaryHeader struct {
+	ID           string                   `json:"id"`
+	Season       espnSeason               `json:"season"`
+	Competitions []espnSummaryCompetition `json:"competitions"`
+}
+
+// espnSummaryCompetition represents a competition in summary response
+type espnSummaryCompetition struct {
+	ID          string                  `json:"id"`
+	Date        string                  `json:"date"`
+	Venue       *espnVenue              `json:"venue,omitempty"`
+	Competitors []espnSummaryCompetitor `json:"competitors"`
+	Status      espnStatus              `json:"status"`
+	Notes       []espnNote              `json:"notes,omitempty"`
+}
+
+// espnSummaryCompetitor represents a competitor in summary response
+type espnSummaryCompetitor struct {
+	ID         string                 `json:"id"`
+	HomeAway   string                 `json:"homeAway"`
+	Winner     bool                   `json:"winner"`
+	Team       espnSummaryTeam        `json:"team"`
+	Score      string                 `json:"score"`
+	Linescores []espnSummaryLinescore `json:"linescores,omitempty"`
+}
+
+// espnSummaryTeam represents team info in summary response
+type espnSummaryTeam struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	DisplayName    string `json:"displayName"`
+	Abbreviation   string `json:"abbreviation"`
+	Location       string `json:"location"`
+	Color          string `json:"color"`
+	AlternateColor string `json:"alternateColor"`
+}
+
+// espnSummaryLinescore represents a period score in summary response
+type espnSummaryLinescore struct {
+	DisplayValue string `json:"displayValue"`
 }

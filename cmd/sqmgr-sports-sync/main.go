@@ -99,7 +99,7 @@ func main() {
 	}
 
 	if *syncScores {
-		if err := doSyncScores(ctx, m, client); err != nil {
+		if err := doSyncScores(ctx, m, client, leagues); err != nil {
 			log.WithError(err).Fatal("failed to sync scores")
 		}
 	}
@@ -406,7 +406,7 @@ func syncFootballSchedule(ctx context.Context, client *sports.Client, league mod
 	return events, nil
 }
 
-func doSyncScores(ctx context.Context, m *model.Model, client *sports.Client) error {
+func doSyncScores(ctx context.Context, m *model.Model, client *sports.Client, leagues []model.SportsLeague) error {
 	log.Info("syncing scores")
 
 	// Start sync log
@@ -428,32 +428,52 @@ func doSyncScores(ctx context.Context, m *model.Model, client *sports.Client) er
 		return fmt.Errorf("querying events needing update: %w", err)
 	}
 
-	log.WithField("count", len(events)).Info("found events needing score update")
+	// Build a set of leagues to filter by
+	leagueSet := make(map[model.SportsLeague]bool)
+	for _, l := range leagues {
+		leagueSet[l] = true
+	}
 
-	// Group events by league for efficient API calls
+	// Group events by league for efficient API calls, filtering by specified leagues
 	eventsByLeague := make(map[model.SportsLeague][]*model.SportsEvent)
 	for _, event := range events {
-		eventsByLeague[event.League] = append(eventsByLeague[event.League], event)
+		if leagueSet[event.League] {
+			eventsByLeague[event.League] = append(eventsByLeague[event.League], event)
+		}
 	}
+
+	// Count total events after filtering
+	totalEvents := 0
+	for _, leagueEvents := range eventsByLeague {
+		totalEvents += len(leagueEvents)
+	}
+
+	log.WithField("count", totalEvents).Info("found events needing score update")
 
 	updatedCount := 0
 	for league, leagueEvents := range eventsByLeague {
 		leagueLog := log.WithField("league", league)
 
-		// Fetch today's scoreboard for this league
-		today := time.Now().Format("20060102")
-		scoreboardEvents, err := client.GetScoreboard(ctx, sports.League(league), sports.ScoreboardOptions{
-			Date: today,
-		})
-		if err != nil {
-			leagueLog.WithError(err).Warn("failed to fetch scoreboard")
-			continue
+		// Fetch today's and yesterday's scoreboards for this league
+		now := time.Now()
+		dates := []string{
+			now.Format("20060102"),
+			now.AddDate(0, 0, -1).Format("20060102"),
 		}
 
-		// Build lookup map by ESPN ID
+		// Build lookup map by ESPN ID from both days
 		espnEventMap := make(map[string]sports.Event)
-		for _, e := range scoreboardEvents {
-			espnEventMap[e.ID] = e
+		for _, date := range dates {
+			scoreboardEvents, err := client.GetScoreboard(ctx, sports.League(league), sports.ScoreboardOptions{
+				Date: date,
+			})
+			if err != nil {
+				leagueLog.WithError(err).WithField("date", date).Warn("failed to fetch scoreboard")
+				continue
+			}
+			for _, e := range scoreboardEvents {
+				espnEventMap[e.ID] = e
+			}
 		}
 
 		// Update each event that needs it
@@ -466,8 +486,15 @@ func doSyncScores(ctx context.Context, m *model.Model, client *sports.Client) er
 
 			espnEvent, found := espnEventMap[dbEvent.ESPNID]
 			if !found {
-				eventLog.Debug("event not found in today's scoreboard")
-				continue
+				// Event not in scoreboard - fetch it individually via summary endpoint
+				// This handles smaller school games that ESPN doesn't feature in daily scoreboards
+				eventLog.Debug("event not found in scoreboard, fetching via summary endpoint")
+				fetchedEvent, err := client.GetEventSummary(ctx, sports.League(league), dbEvent.ESPNID)
+				if err != nil {
+					eventLog.WithError(err).Debug("failed to fetch event summary")
+					continue
+				}
+				espnEvent = *fetchedEvent
 			}
 
 			if err := processEvent(ctx, m, league, espnEvent); err != nil {
@@ -566,6 +593,12 @@ func processEvent(ctx context.Context, m *model.Model, league model.SportsLeague
 	}
 
 	sportsEvent.Period = &event.Period
+	if event.Clock != "" {
+		sportsEvent.Clock = &event.Clock
+	}
+	if event.StatusDetail != "" {
+		sportsEvent.StatusDetail = &event.StatusDetail
+	}
 	sportsEvent.HomeScore = event.HomeTeamScore
 	sportsEvent.AwayScore = event.AwayTeamScore
 	sportsEvent.HomeQ1 = event.HomeQ1

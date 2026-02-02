@@ -458,3 +458,141 @@ func TestGetWinningSquaresInProgress(t *testing.T) {
 	g.Expect(result.Squares).ShouldNot(gomega.HaveKey(NumberSetTypeQ3))
 	g.Expect(result.Squares).ShouldNot(gomega.HaveKey(NumberSetTypeFinal))
 }
+
+func TestGetWinningPeriodsForSquare(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	intPtr := func(i int) *int { return &i }
+
+	// Create a mock event with final scores
+	event := &BDLEvent{
+		Status:    BDLEventStatusFinal,
+		HomeQ1:    intPtr(7), // Q1: 7-3
+		AwayQ1:    intPtr(3),
+		HomeQ2:    intPtr(7), // Half: 14-10
+		AwayQ2:    intPtr(7),
+		HomeQ3:    intPtr(7), // Q3: 21-17
+		AwayQ3:    intPtr(7),
+		HomeScore: intPtr(28), // Final: 28-24
+		AwayScore: intPtr(24),
+	}
+
+	// Standard numbers: position i has number i
+	homeNums := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+	awayNums := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+
+	halfSet := &GridNumberSet{homeNumbers: homeNums, awayNumbers: awayNums}
+	finalSet := &GridNumberSet{homeNumbers: homeNums, awayNumbers: awayNums}
+
+	numberSets := map[NumberSetType]*GridNumberSet{
+		NumberSetTypeHalf:  halfSet,
+		NumberSetTypeFinal: finalSet,
+	}
+
+	// Get winning squares for HF config
+	winningSquares := GetWinningSquares(event, NumberSetConfigHF, GridTypeStd100, nil, nil, numberSets)
+
+	// Half: 14-10, home digit 4, away digit 0 -> Square = (0 * 10) + 4 + 1 = 5
+	// Final: 28-24, home digit 8, away digit 4 -> Square = (4 * 10) + 8 + 1 = 49
+
+	// Test square 5 (wins Half)
+	results := GetWinningPeriodsForSquare(5, winningSquares, event)
+	g.Expect(results).Should(gomega.HaveLen(1))
+	g.Expect(results[0].Period).Should(gomega.Equal(NumberSetTypeHalf))
+	g.Expect(results[0].Label).Should(gomega.Equal("Halftime"))
+	g.Expect(results[0].HomeScore).Should(gomega.Equal(14))
+	g.Expect(results[0].AwayScore).Should(gomega.Equal(10))
+
+	// Test square 49 (wins Final)
+	results = GetWinningPeriodsForSquare(49, winningSquares, event)
+	g.Expect(results).Should(gomega.HaveLen(1))
+	g.Expect(results[0].Period).Should(gomega.Equal(NumberSetTypeFinal))
+	g.Expect(results[0].Label).Should(gomega.Equal("Final"))
+	g.Expect(results[0].HomeScore).Should(gomega.Equal(28))
+	g.Expect(results[0].AwayScore).Should(gomega.Equal(24))
+
+	// Test square 1 (doesn't win anything)
+	results = GetWinningPeriodsForSquare(1, winningSquares, event)
+	g.Expect(results).Should(gomega.BeEmpty())
+}
+
+func TestGetWinningPeriodsForSquareMultipleWins(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	intPtr := func(i int) *int { return &i }
+
+	// Create an event where one square wins multiple periods
+	// Q1: 10-0 (digit 0, digit 0) -> Square 1
+	// Half: 20-0 (digit 0, digit 0) -> Square 1
+	// Final: 30-0 (digit 0, digit 0) -> Square 1
+	event := &BDLEvent{
+		Status:    BDLEventStatusFinal,
+		HomeQ1:    intPtr(10),
+		AwayQ1:    intPtr(0),
+		HomeQ2:    intPtr(10),
+		AwayQ2:    intPtr(0),
+		HomeQ3:    intPtr(10),
+		AwayQ3:    intPtr(0),
+		HomeScore: intPtr(30),
+		AwayScore: intPtr(0),
+	}
+
+	homeNums := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+	awayNums := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+
+	halfSet := &GridNumberSet{homeNumbers: homeNums, awayNumbers: awayNums}
+	finalSet := &GridNumberSet{homeNumbers: homeNums, awayNumbers: awayNums}
+
+	numberSets := map[NumberSetType]*GridNumberSet{
+		NumberSetTypeHalf:  halfSet,
+		NumberSetTypeFinal: finalSet,
+	}
+
+	winningSquares := GetWinningSquares(event, NumberSetConfigHF, GridTypeStd100, nil, nil, numberSets)
+
+	// Square 1 should win both Half and Final
+	results := GetWinningPeriodsForSquare(1, winningSquares, event)
+	g.Expect(results).Should(gomega.HaveLen(2))
+
+	// Results should be sorted: Half before Final
+	g.Expect(results[0].Period).Should(gomega.Equal(NumberSetTypeHalf))
+	g.Expect(results[0].Label).Should(gomega.Equal("Halftime"))
+	g.Expect(results[0].HomeScore).Should(gomega.Equal(20))
+	g.Expect(results[0].AwayScore).Should(gomega.Equal(0))
+
+	g.Expect(results[1].Period).Should(gomega.Equal(NumberSetTypeFinal))
+	g.Expect(results[1].Label).Should(gomega.Equal("Final"))
+	g.Expect(results[1].HomeScore).Should(gomega.Equal(30))
+	g.Expect(results[1].AwayScore).Should(gomega.Equal(0))
+}
+
+func TestGetWinningPeriodsForSquareNilInputs(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	intPtr := func(i int) *int { return &i }
+
+	event := &BDLEvent{
+		Status:    BDLEventStatusFinal,
+		HomeScore: intPtr(10),
+		AwayScore: intPtr(7),
+	}
+
+	winningSquares := &WinningSquaresResult{
+		Squares: map[NumberSetType]int{NumberSetTypeAll: 1},
+	}
+
+	// Test with invalid squareID
+	results := GetWinningPeriodsForSquare(0, winningSquares, event)
+	g.Expect(results).Should(gomega.BeNil())
+
+	results = GetWinningPeriodsForSquare(-1, winningSquares, event)
+	g.Expect(results).Should(gomega.BeNil())
+
+	// Test with nil winningSquares
+	results = GetWinningPeriodsForSquare(1, nil, event)
+	g.Expect(results).Should(gomega.BeNil())
+
+	// Test with nil event
+	results = GetWinningPeriodsForSquare(1, winningSquares, nil)
+	g.Expect(results).Should(gomega.BeNil())
+}

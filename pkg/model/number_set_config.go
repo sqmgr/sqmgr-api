@@ -66,8 +66,9 @@ type NumberSetConfigInfo struct {
 
 // NumberSetTypeInfo contains metadata for a number set type
 type NumberSetTypeInfo struct {
-	Key   NumberSetType `json:"key"`
-	Label string        `json:"label"`
+	Key       NumberSetType `json:"key"`
+	Label     string        `json:"label"`     // Short label: "1st", "Half"
+	LongLabel string        `json:"longLabel"` // Long label: "1st Quarter", "Halftime"
 }
 
 // validNumberSetConfigs contains all valid configurations
@@ -103,13 +104,13 @@ var validNumberSetConfigs = []NumberSetConfigInfo{
 
 // numberSetTypeInfos contains metadata for all number set types
 var numberSetTypeInfos = map[NumberSetType]NumberSetTypeInfo{
-	NumberSetTypeAll:   {Key: NumberSetTypeAll, Label: "All"},
-	NumberSetTypeQ1:    {Key: NumberSetTypeQ1, Label: "1st"},
-	NumberSetTypeQ2:    {Key: NumberSetTypeQ2, Label: "2nd"},
-	NumberSetTypeQ3:    {Key: NumberSetTypeQ3, Label: "3rd"},
-	NumberSetTypeQ4:    {Key: NumberSetTypeQ4, Label: "4th"},
-	NumberSetTypeHalf:  {Key: NumberSetTypeHalf, Label: "Half"},
-	NumberSetTypeFinal: {Key: NumberSetTypeFinal, Label: "Final"},
+	NumberSetTypeAll:   {Key: NumberSetTypeAll, Label: "All", LongLabel: "Final"},
+	NumberSetTypeQ1:    {Key: NumberSetTypeQ1, Label: "1st", LongLabel: "1st Quarter"},
+	NumberSetTypeQ2:    {Key: NumberSetTypeQ2, Label: "2nd", LongLabel: "2nd Quarter"},
+	NumberSetTypeQ3:    {Key: NumberSetTypeQ3, Label: "3rd", LongLabel: "3rd Quarter"},
+	NumberSetTypeQ4:    {Key: NumberSetTypeQ4, Label: "4th", LongLabel: "4th Quarter"},
+	NumberSetTypeHalf:  {Key: NumberSetTypeHalf, Label: "Half", LongLabel: "Halftime"},
+	NumberSetTypeFinal: {Key: NumberSetTypeFinal, Label: "Final", LongLabel: "Final"},
 }
 
 // ValidNumberSetConfigs returns all valid number set configurations with metadata
@@ -146,6 +147,14 @@ func IsValidNumberSetConfig(config string) bool {
 func IsValidNumberSetType(setType string) bool {
 	_, ok := numberSetTypeInfos[NumberSetType(setType)]
 	return ok
+}
+
+// LongLabel returns the long descriptive label for a number set type
+func (n NumberSetType) LongLabel() string {
+	if info, ok := numberSetTypeInfos[n]; ok {
+		return info.LongLabel
+	}
+	return string(n)
 }
 
 // Value implements driver.Valuer for database storage

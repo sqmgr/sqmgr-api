@@ -69,6 +69,14 @@ type WinningSquaresResult struct {
 	Squares map[NumberSetType]int `json:"squares"`
 }
 
+// WinningPeriodInfo contains information about a winning period for a square
+type WinningPeriodInfo struct {
+	Period    NumberSetType `json:"period"`
+	Label     string        `json:"label"`
+	HomeScore int           `json:"homeScore"`
+	AwayScore int           `json:"awayScore"`
+}
+
 // GetWinningSquares returns winning squares for each applicable period
 // based on the grid's number configuration and the event's scores
 // Only returns winning squares for periods that are complete
@@ -129,4 +137,50 @@ func GetWinningSquares(event *BDLEvent, config NumberSetConfig, gridType GridTyp
 // GetGridWinningSquares is a convenience method that calculates winning squares for a grid
 func (g *Grid) GetGridWinningSquares(event *BDLEvent, config NumberSetConfig, gridType GridType) *WinningSquaresResult {
 	return GetWinningSquares(event, config, gridType, g.HomeNumbers(), g.AwayNumbers(), g.NumberSets())
+}
+
+// GetWinningPeriodsForSquare returns the winning period information for a specific square.
+// It returns the periods that the square won along with their scores.
+func GetWinningPeriodsForSquare(squareID int, winningSquares *WinningSquaresResult, event *BDLEvent) []WinningPeriodInfo {
+	if squareID <= 0 || winningSquares == nil || event == nil {
+		return nil
+	}
+
+	// Define the order for sorting periods
+	periodOrder := map[NumberSetType]int{
+		NumberSetTypeQ1:    1,
+		NumberSetTypeHalf:  2,
+		NumberSetTypeQ2:    3,
+		NumberSetTypeQ3:    4,
+		NumberSetTypeFinal: 5,
+		NumberSetTypeAll:   6,
+		NumberSetTypeQ4:    7,
+	}
+
+	var results []WinningPeriodInfo
+
+	for period, winnerSquareID := range winningSquares.Squares {
+		if winnerSquareID == squareID {
+			homeScore, awayScore := event.ScoreForPeriod(period)
+			if homeScore != nil && awayScore != nil {
+				results = append(results, WinningPeriodInfo{
+					Period:    period,
+					Label:     period.LongLabel(),
+					HomeScore: *homeScore,
+					AwayScore: *awayScore,
+				})
+			}
+		}
+	}
+
+	// Sort results by period order
+	for i := 0; i < len(results)-1; i++ {
+		for j := i + 1; j < len(results); j++ {
+			if periodOrder[results[i].Period] > periodOrder[results[j].Period] {
+				results[i], results[j] = results[j], results[i]
+			}
+		}
+	}
+
+	return results
 }

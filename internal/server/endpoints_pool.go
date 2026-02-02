@@ -735,6 +735,29 @@ func (s *Server) getPoolTokenSquareIDEndpoint() http.HandlerFunc {
 
 		squareJSON := square.JSON()
 
+		// Handle optional gridId parameter for winning periods
+		if gridIDStr := r.FormValue("gridId"); gridIDStr != "" {
+			gridID, err := strconv.ParseInt(gridIDStr, 10, 64)
+			if err == nil {
+				grid, err := pool.GridByID(r.Context(), gridID)
+				if err == nil {
+					if err := grid.LoadBDLEvent(r.Context()); err == nil && grid.BDLEvent() != nil {
+						// Load number sets if needed
+						effectiveConfig := pool.NumberSetConfig()
+						if grid.PayoutConfig() != nil {
+							effectiveConfig = *grid.PayoutConfig()
+						}
+						if effectiveConfig != model.NumberSetConfigStandard {
+							_ = grid.LoadNumberSets(r.Context())
+						}
+
+						winningSquares := grid.GetGridWinningSquares(grid.BDLEvent(), effectiveConfig, pool.GridType())
+						squareJSON.WinningPeriods = model.GetWinningPeriodsForSquare(squareID, winningSquares, grid.BDLEvent())
+					}
+				}
+			}
+		}
+
 		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return

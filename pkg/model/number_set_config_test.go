@@ -97,6 +97,24 @@ func TestNumberSetTypeInfos(t *testing.T) {
 	q1Info := infos[NumberSetTypeQ1]
 	g.Expect(q1Info.Key).Should(gomega.Equal(NumberSetTypeQ1))
 	g.Expect(q1Info.Label).Should(gomega.Equal("1st"))
+	g.Expect(q1Info.LongLabel).Should(gomega.Equal("1st Quarter"))
+}
+
+func TestNumberSetTypeLongLabel(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	// Test all known types return correct long labels
+	g.Expect(NumberSetTypeQ1.LongLabel()).Should(gomega.Equal("1st Quarter"))
+	g.Expect(NumberSetTypeQ2.LongLabel()).Should(gomega.Equal("2nd Quarter"))
+	g.Expect(NumberSetTypeQ3.LongLabel()).Should(gomega.Equal("3rd Quarter"))
+	g.Expect(NumberSetTypeQ4.LongLabel()).Should(gomega.Equal("4th Quarter"))
+	g.Expect(NumberSetTypeHalf.LongLabel()).Should(gomega.Equal("Halftime"))
+	g.Expect(NumberSetTypeFinal.LongLabel()).Should(gomega.Equal("Final"))
+	g.Expect(NumberSetTypeAll.LongLabel()).Should(gomega.Equal("Final"))
+
+	// Unknown type returns the type string as fallback
+	unknown := NumberSetType("unknown")
+	g.Expect(unknown.LongLabel()).Should(gomega.Equal("unknown"))
 }
 
 func TestNumberSetConfigScan(t *testing.T) {

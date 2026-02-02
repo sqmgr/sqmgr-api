@@ -435,6 +435,8 @@ func (c *Client) parseScheduleEvent(e espnScheduleEvent) (Event, error) {
 		}
 	}
 	event.Period = comp.Status.Period
+	event.Clock = comp.Status.DisplayClock
+	event.StatusDetail = comp.Status.Type.Description
 
 	// Parse competitors
 	for _, competitor := range comp.Competitors {
@@ -464,6 +466,171 @@ func (c *Client) parseScheduleEvent(e espnScheduleEvent) (Event, error) {
 		} else {
 			event.AwayTeam = team
 			event.AwayTeamScore = score
+		}
+	}
+
+	return event, nil
+}
+
+// GetEventSummary fetches details for a specific event by ESPN ID
+// This is useful for events that don't appear in the daily scoreboard (e.g., smaller school games)
+func (c *Client) GetEventSummary(ctx context.Context, league League, eventID string) (*Event, error) {
+	if !league.IsValid() {
+		return nil, fmt.Errorf("invalid league: %s", league)
+	}
+
+	path := fmt.Sprintf("/%s/summary", league.ESPNPath())
+	query := url.Values{}
+	query.Set("event", eventID)
+
+	resp, err := c.doRequest(ctx, path, query)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("event not found: %s", eventID)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var summaryResp espnSummaryResponse
+	if err := json.NewDecoder(resp.Body).Decode(&summaryResp); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	if len(summaryResp.Header.Competitions) == 0 {
+		return nil, fmt.Errorf("no competitions in summary response")
+	}
+
+	event, err := c.parseSummaryEvent(summaryResp)
+	if err != nil {
+		return nil, fmt.Errorf("parsing summary event: %w", err)
+	}
+
+	return &event, nil
+}
+
+// parseSummaryEvent converts an ESPN summary response to our Event type
+func (c *Client) parseSummaryEvent(resp espnSummaryResponse) (Event, error) {
+	event := Event{
+		ID:         resp.Header.ID,
+		Season:     resp.Header.Season.Year,
+		SeasonType: SeasonType(resp.Header.Season.Type),
+	}
+
+	comp := resp.Header.Competitions[0]
+
+	// Parse date
+	eventDate, err := time.Parse(time.RFC3339, comp.Date)
+	if err != nil {
+		eventDate, err = time.Parse("2006-01-02T15:04Z", comp.Date)
+		if err != nil {
+			return event, fmt.Errorf("parsing date %s: %w", comp.Date, err)
+		}
+	}
+	event.Date = eventDate
+
+	// Event name from notes
+	for _, note := range comp.Notes {
+		if note.Headline != "" {
+			event.Name = note.Headline
+			break
+		}
+	}
+
+	// Venue
+	if comp.Venue != nil {
+		event.Venue = comp.Venue.FullName
+	}
+
+	// Parse status
+	event.Period = comp.Status.Period
+	event.Clock = comp.Status.DisplayClock
+	event.StatusDetail = comp.Status.Type.Description
+	switch comp.Status.Type.Name {
+	case "STATUS_SCHEDULED":
+		event.Status = EventStatusScheduled
+	case "STATUS_FINAL", "STATUS_FINAL_OT":
+		event.Status = EventStatusFinal
+	default:
+		if comp.Status.Type.Completed {
+			event.Status = EventStatusFinal
+		} else if comp.Status.Type.State == "pre" {
+			event.Status = EventStatusScheduled
+		} else {
+			event.Status = EventStatusInProgress
+		}
+	}
+
+	// Parse competitors
+	for _, competitor := range comp.Competitors {
+		team := Team{
+			ID:             competitor.Team.ID,
+			Name:           competitor.Team.Name,
+			DisplayName:    competitor.Team.DisplayName,
+			Abbreviation:   competitor.Team.Abbreviation,
+			Location:       competitor.Team.Location,
+			Color:          competitor.Team.Color,
+			AlternateColor: competitor.Team.AlternateColor,
+		}
+
+		// Parse score
+		var score *int
+		if competitor.Score != "" {
+			if s, err := strconv.Atoi(competitor.Score); err == nil {
+				score = &s
+			}
+		}
+
+		// Parse linescores (period scores - could be halves for basketball or quarters for football)
+		var q1, q2, q3, q4, ot *int
+		for i, ls := range competitor.Linescores {
+			if ls.DisplayValue == "" {
+				continue
+			}
+			s, err := strconv.Atoi(ls.DisplayValue)
+			if err != nil {
+				continue
+			}
+			switch i {
+			case 0:
+				q1 = &s
+			case 1:
+				q2 = &s
+			case 2:
+				q3 = &s
+			case 3:
+				q4 = &s
+			default:
+				// OT periods - sum them
+				if ot == nil {
+					ot = &s
+				} else {
+					*ot += s
+				}
+			}
+		}
+
+		if competitor.HomeAway == "home" {
+			event.HomeTeam = team
+			event.HomeTeamScore = score
+			event.HomeQ1 = q1
+			event.HomeQ2 = q2
+			event.HomeQ3 = q3
+			event.HomeQ4 = q4
+			event.HomeOT = ot
+		} else {
+			event.AwayTeam = team
+			event.AwayTeamScore = score
+			event.AwayQ1 = q1
+			event.AwayQ2 = q2
+			event.AwayQ3 = q3
+			event.AwayQ4 = q4
+			event.AwayOT = ot
 		}
 	}
 
@@ -536,6 +703,8 @@ func (c *Client) parseEvent(e espnEvent) (Event, error) {
 
 	// Parse status
 	event.Period = e.Status.Period
+	event.Clock = e.Status.DisplayClock
+	event.StatusDetail = e.Status.Type.Description
 	switch e.Status.Type.Name {
 	case "STATUS_SCHEDULED":
 		event.Status = EventStatusScheduled
