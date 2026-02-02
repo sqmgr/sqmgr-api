@@ -547,6 +547,7 @@ func processEvent(ctx context.Context, m *model.Model, league model.SportsLeague
 	sportsEvent.EventDate = event.Date
 	sportsEvent.Season = event.Season
 	sportsEvent.Week = event.Week
+	sportsEvent.Postseason = event.SeasonType == sports.SeasonTypePostseason
 	if event.Venue != "" {
 		sportsEvent.Venue = &event.Venue
 	}

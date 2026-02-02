@@ -378,8 +378,9 @@ func (c *Client) GetTeamSchedule(ctx context.Context, league League, teamID stri
 // parseScheduleEvent converts an ESPN team schedule event to our Event type
 func (c *Client) parseScheduleEvent(e espnScheduleEvent) (Event, error) {
 	event := Event{
-		ID:     e.ID,
-		Season: e.Season.Year,
+		ID:         e.ID,
+		Season:     e.Season.Year,
+		SeasonType: SeasonType(e.SeasonType.Type),
 	}
 
 	// Parse date
@@ -482,8 +483,9 @@ func parseESPNDate(dateStr string) (time.Time, error) {
 // parseEvent converts an ESPN event to our Event type
 func (c *Client) parseEvent(e espnEvent) (Event, error) {
 	event := Event{
-		ID:     e.ID,
-		Season: e.Season.Year,
+		ID:         e.ID,
+		Season:     e.Season.Year,
+		SeasonType: SeasonType(e.Season.Type),
 	}
 
 	// Parse date

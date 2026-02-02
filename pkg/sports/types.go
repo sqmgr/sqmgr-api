@@ -85,13 +85,14 @@ const (
 
 // Event represents a game/event
 type Event struct {
-	ID     string      // ESPN event ID (string format)
-	Date   time.Time   // Event date/time
-	Status EventStatus // Game status
-	Period int         // Current period (0=not started, 1-4=quarters, 5+=OT)
-	Season int         // Season year
-	Week   *int        // Week number (NFL only)
-	Venue  string      // Venue name
+	ID         string      // ESPN event ID (string format)
+	Date       time.Time   // Event date/time
+	Status     EventStatus // Game status
+	Period     int         // Current period (0=not started, 1-4=quarters, 5+=OT)
+	Season     int         // Season year
+	SeasonType SeasonType  // Season type (preseason, regular, postseason)
+	Week       *int        // Week number (NFL only)
+	Venue      string      // Venue name
 
 	HomeTeam      Team
 	AwayTeam      Team
