@@ -60,7 +60,7 @@ func gridColumns() []string {
 	return []string{
 		"id", "pool_id", "ord", "label", "home_team_name", "home_numbers",
 		"away_team_name", "away_numbers", "event_date", "rollover", "state",
-		"created", "modified", "manual_draw",
+		"created", "modified", "manual_draw", "sports_event_id", "payout_config",
 	}
 }
 
@@ -232,7 +232,7 @@ func TestDrawNumbers_LocksPoolByDefault(t *testing.T) {
 
 	// Create a grid with no numbers drawn
 	gridRows := sqlmock.NewRows(gridColumns()).
-		AddRow(1, int64(1), 0, "Game 1", "Home Team", nil, "Away Team", nil, now, false, "active", now, now, false)
+		AddRow(1, int64(1), 0, "Game 1", "Home Team", nil, "Away Team", nil, now, false, "active", now, now, false, nil, nil)
 
 	mock.ExpectQuery("SELECT .+ FROM grids WHERE id = \\$1 AND pool_id = \\$2").
 		WithArgs(int64(1), int64(1)).
@@ -309,7 +309,7 @@ func TestDrawNumbers_DoesNotLockPoolWhenLockPoolFalse(t *testing.T) {
 
 	// Create a grid with no numbers drawn
 	gridRows := sqlmock.NewRows(gridColumns()).
-		AddRow(1, int64(1), 0, "Game 1", "Home Team", nil, "Away Team", nil, now, false, "active", now, now, false)
+		AddRow(1, int64(1), 0, "Game 1", "Home Team", nil, "Away Team", nil, now, false, "active", now, now, false, nil, nil)
 
 	mock.ExpectQuery("SELECT .+ FROM grids WHERE id = \\$1 AND pool_id = \\$2").
 		WithArgs(int64(1), int64(1)).
@@ -386,7 +386,7 @@ func TestDrawNumbers_DoesNotLockAlreadyLockedPool(t *testing.T) {
 
 	// Create a grid with no numbers drawn
 	gridRows := sqlmock.NewRows(gridColumns()).
-		AddRow(1, int64(1), 0, "Game 1", "Home Team", nil, "Away Team", nil, now, false, "active", now, now, false)
+		AddRow(1, int64(1), 0, "Game 1", "Home Team", nil, "Away Team", nil, now, false, "active", now, now, false, nil, nil)
 
 	mock.ExpectQuery("SELECT .+ FROM grids WHERE id = \\$1 AND pool_id = \\$2").
 		WithArgs(int64(1), int64(1)).
@@ -432,6 +432,310 @@ func TestDrawNumbers_DoesNotLockAlreadyLockedPool(t *testing.T) {
 
 	// Response should include poolLocks
 	g.Expect(result).Should(gomega.HaveKey("poolLocks"))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func sportsEventColumns() []string {
+	return []string{
+		"id", "espn_id", "league", "home_team_id", "away_team_id", "event_date", "season", "week", "postseason", "venue",
+		"status", "period", "home_score", "away_score",
+		"home_q1", "home_q2", "home_q3", "home_q4", "home_ot",
+		"away_q1", "away_q2", "away_q3", "away_q4", "away_ot",
+		"created", "modified", "last_synced",
+	}
+}
+
+func sportsTeamColumns() []string {
+	return []string{
+		"id", "league", "name", "full_name", "abbreviation", "conference", "division", "location", "color", "alternate_color", "created", "modified",
+	}
+}
+
+func TestSaveGrid_BlocksChangingFinalLinkedEvent(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForDrawNumbers(t)
+
+	user := &model.User{
+		Model: m,
+		ID:    100,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-token-final-event"
+	now := time.Now()
+	bdlEventID := int64(12345)
+
+	// Create pool
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Create a grid linked to a BDL event
+	gridRows := sqlmock.NewRows(gridColumns()).
+		AddRow(1, int64(1), 0, "Game 1", "Home Team", nil, "Away Team", nil, now, false, "active", now, now, false, bdlEventID, nil)
+
+	mock.ExpectQuery("SELECT .+ FROM grids WHERE id = \\$1 AND pool_id = \\$2").
+		WithArgs(int64(1), int64(1)).
+		WillReturnRows(gridRows)
+
+	// LoadSettings
+	settingsRows := sqlmock.NewRows(gridSettingsColumns()).
+		AddRow(int64(1), "#000000", "#FFFFFF", "#FF0000", "#00FF00", "", "", "", now)
+
+	mock.ExpectQuery("SELECT .+ FROM grid_settings WHERE grid_id = \\$1").
+		WithArgs(int64(1)).
+		WillReturnRows(settingsRows)
+
+	// LoadAnnotations
+	annotationsRows := sqlmock.NewRows([]string{"grid_id", "square_id", "annotation", "icon"})
+	mock.ExpectQuery("SELECT .+ FROM grid_annotations WHERE grid_id = \\$1").
+		WithArgs(int64(1)).
+		WillReturnRows(annotationsRows)
+
+	// LoadSportsEvent - returns an event with status "final"
+	eventRows := sqlmock.NewRows(sportsEventColumns()).
+		AddRow(bdlEventID, "401547417", "nfl", "1", "2", now, 2025, 10, false, "Stadium",
+			"final", 4, 28, 21,
+			7, 7, 7, 7, nil,
+			7, 7, 7, 0, nil,
+			now, now, now)
+
+	mock.ExpectQuery("SELECT .+ FROM sports_events WHERE id = \\$1").
+		WithArgs(bdlEventID).
+		WillReturnRows(eventRows)
+
+	// LoadTeams for the event (home team)
+	homeTeamRows := sqlmock.NewRows(sportsTeamColumns()).
+		AddRow("1", "nfl", "Chiefs", "Kansas City Chiefs", "KC", "AFC", "West", "Kansas City", "E31837", "FFB612", now, now)
+	mock.ExpectQuery("SELECT .+ FROM sports_teams WHERE id = \\$1 AND league = \\$2").
+		WithArgs("1", model.SportsLeagueNFL).
+		WillReturnRows(homeTeamRows)
+
+	// LoadTeams for the event (away team)
+	awayTeamRows := sqlmock.NewRows(sportsTeamColumns()).
+		AddRow("2", "nfl", "Bills", "Buffalo Bills", "BUF", "AFC", "East", "Buffalo", "00338D", "C60C30", now, now)
+	mock.ExpectQuery("SELECT .+ FROM sports_teams WHERE id = \\$1 AND league = \\$2").
+		WithArgs("2", model.SportsLeagueNFL).
+		WillReturnRows(awayTeamRows)
+
+	// Try to unlink the event (set bdlEventId to null)
+	body := `{"action": "save", "data": {"eventDate": "2025-01-15", "label": "Game 1", "homeTeamName": "Home", "awayTeamName": "Away", "bdlEventId": null}}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/grid/1", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	// Should be rejected with 400 Bad Request
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusBadRequest))
+
+	var result map[string]interface{}
+	err = json.Unmarshal(rec.Body.Bytes(), &result)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	g.Expect(result["error"]).Should(gomega.Equal("Cannot change linked event after the game has ended"))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestSaveGrid_BlocksChangingToAnotherEventWhenFinal(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForDrawNumbers(t)
+
+	user := &model.User{
+		Model: m,
+		ID:    100,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-token-final-event-2"
+	now := time.Now()
+	bdlEventID := int64(12345)
+
+	// Create pool
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Create a grid linked to a BDL event
+	gridRows := sqlmock.NewRows(gridColumns()).
+		AddRow(1, int64(1), 0, "Game 1", "Home Team", nil, "Away Team", nil, now, false, "active", now, now, false, bdlEventID, nil)
+
+	mock.ExpectQuery("SELECT .+ FROM grids WHERE id = \\$1 AND pool_id = \\$2").
+		WithArgs(int64(1), int64(1)).
+		WillReturnRows(gridRows)
+
+	// LoadSettings
+	settingsRows := sqlmock.NewRows(gridSettingsColumns()).
+		AddRow(int64(1), "#000000", "#FFFFFF", "#FF0000", "#00FF00", "", "", "", now)
+
+	mock.ExpectQuery("SELECT .+ FROM grid_settings WHERE grid_id = \\$1").
+		WithArgs(int64(1)).
+		WillReturnRows(settingsRows)
+
+	// LoadAnnotations
+	annotationsRows := sqlmock.NewRows([]string{"grid_id", "square_id", "annotation", "icon"})
+	mock.ExpectQuery("SELECT .+ FROM grid_annotations WHERE grid_id = \\$1").
+		WithArgs(int64(1)).
+		WillReturnRows(annotationsRows)
+
+	// LoadSportsEvent - returns an event with status "final"
+	eventRows := sqlmock.NewRows(sportsEventColumns()).
+		AddRow(bdlEventID, "401547417", "nfl", "1", "2", now, 2025, 10, false, "Stadium",
+			"final", 4, 28, 21,
+			7, 7, 7, 7, nil,
+			7, 7, 7, 0, nil,
+			now, now, now)
+
+	mock.ExpectQuery("SELECT .+ FROM sports_events WHERE id = \\$1").
+		WithArgs(bdlEventID).
+		WillReturnRows(eventRows)
+
+	// LoadTeams for the event (home team)
+	homeTeamRows := sqlmock.NewRows(sportsTeamColumns()).
+		AddRow("1", "nfl", "Chiefs", "Kansas City Chiefs", "KC", "AFC", "West", "Kansas City", "E31837", "FFB612", now, now)
+	mock.ExpectQuery("SELECT .+ FROM sports_teams WHERE id = \\$1 AND league = \\$2").
+		WithArgs("1", model.SportsLeagueNFL).
+		WillReturnRows(homeTeamRows)
+
+	// LoadTeams for the event (away team)
+	awayTeamRows := sqlmock.NewRows(sportsTeamColumns()).
+		AddRow("2", "nfl", "Bills", "Buffalo Bills", "BUF", "AFC", "East", "Buffalo", "00338D", "C60C30", now, now)
+	mock.ExpectQuery("SELECT .+ FROM sports_teams WHERE id = \\$1 AND league = \\$2").
+		WithArgs("2", model.SportsLeagueNFL).
+		WillReturnRows(awayTeamRows)
+
+	// Try to change to a different event
+	body := `{"action": "save", "data": {"eventDate": "2025-01-15", "label": "Game 1", "homeTeamName": "Home", "awayTeamName": "Away", "bdlEventId": 99999}}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/grid/1", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	// Should be rejected with 400 Bad Request
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusBadRequest))
+
+	var result map[string]interface{}
+	err = json.Unmarshal(rec.Body.Bytes(), &result)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	g.Expect(result["error"]).Should(gomega.Equal("Cannot change linked event after the game has ended"))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestSaveGrid_AllowsKeepingSameEventWhenFinal(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForDrawNumbers(t)
+
+	user := &model.User{
+		Model: m,
+		ID:    100,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-token-final-event-3"
+	now := time.Now()
+	bdlEventID := int64(12345)
+
+	// Create pool
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Create a grid linked to a BDL event
+	gridRows := sqlmock.NewRows(gridColumns()).
+		AddRow(1, int64(1), 0, "Game 1", "Home Team", nil, "Away Team", nil, now, false, "active", now, now, false, bdlEventID, nil)
+
+	mock.ExpectQuery("SELECT .+ FROM grids WHERE id = \\$1 AND pool_id = \\$2").
+		WithArgs(int64(1), int64(1)).
+		WillReturnRows(gridRows)
+
+	// LoadSettings
+	settingsRows := sqlmock.NewRows(gridSettingsColumns()).
+		AddRow(int64(1), "#000000", "#FFFFFF", "#FF0000", "#00FF00", "", "", "", now)
+
+	mock.ExpectQuery("SELECT .+ FROM grid_settings WHERE grid_id = \\$1").
+		WithArgs(int64(1)).
+		WillReturnRows(settingsRows)
+
+	// LoadAnnotations
+	annotationsRows := sqlmock.NewRows([]string{"grid_id", "square_id", "annotation", "icon"})
+	mock.ExpectQuery("SELECT .+ FROM grid_annotations WHERE grid_id = \\$1").
+		WithArgs(int64(1)).
+		WillReturnRows(annotationsRows)
+
+	// LoadSportsEvent - returns an event with status "final"
+	eventRows := sqlmock.NewRows(sportsEventColumns()).
+		AddRow(bdlEventID, "401547417", "nfl", "1", "2", now, 2025, 10, false, "Stadium",
+			"final", 4, 28, 21,
+			7, 7, 7, 7, nil,
+			7, 7, 7, 0, nil,
+			now, now, now)
+
+	mock.ExpectQuery("SELECT .+ FROM sports_events WHERE id = \\$1").
+		WithArgs(bdlEventID).
+		WillReturnRows(eventRows)
+
+	// LoadTeams for the event (home team)
+	homeTeamRows := sqlmock.NewRows(sportsTeamColumns()).
+		AddRow("1", "nfl", "Chiefs", "Kansas City Chiefs", "KC", "AFC", "West", "Kansas City", "E31837", "FFB612", now, now)
+	mock.ExpectQuery("SELECT .+ FROM sports_teams WHERE id = \\$1 AND league = \\$2").
+		WithArgs("1", model.SportsLeagueNFL).
+		WillReturnRows(homeTeamRows)
+
+	// LoadTeams for the event (away team)
+	awayTeamRows := sqlmock.NewRows(sportsTeamColumns()).
+		AddRow("2", "nfl", "Bills", "Buffalo Bills", "BUF", "AFC", "East", "Buffalo", "00338D", "C60C30", now, now)
+	mock.ExpectQuery("SELECT .+ FROM sports_teams WHERE id = \\$1 AND league = \\$2").
+		WithArgs("2", model.SportsLeagueNFL).
+		WillReturnRows(awayTeamRows)
+
+	// Grid save (should be allowed since keeping same event)
+	mock.ExpectBegin()
+	mock.ExpectExec("UPDATE grid_settings SET").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE grids SET").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	// Save with the same bdlEventId (should be allowed)
+	body := `{"action": "save", "data": {"eventDate": "2025-01-15", "label": "Game 1", "homeTeamName": "Home", "awayTeamName": "Away", "bdlEventId": 12345}}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/grid/1", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	// Should succeed
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusAccepted))
 
 	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
 }

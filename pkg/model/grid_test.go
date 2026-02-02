@@ -249,3 +249,79 @@ func getPool(m *Model) *Pool {
 
 	return pool
 }
+
+func TestGridPayoutConfig(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	grid := &Grid{}
+
+	// Initially nil
+	g.Expect(grid.PayoutConfig()).Should(gomega.BeNil())
+
+	// Set a config
+	config := NumberSetConfigHF
+	grid.SetPayoutConfig(&config)
+	g.Expect(grid.PayoutConfig()).ShouldNot(gomega.BeNil())
+	g.Expect(*grid.PayoutConfig()).Should(gomega.Equal(NumberSetConfigHF))
+
+	// Clear the config
+	grid.SetPayoutConfig(nil)
+	g.Expect(grid.PayoutConfig()).Should(gomega.BeNil())
+}
+
+func TestGridPayoutConfigJSON(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	grid := &Grid{}
+
+	// JSON without payout config should have nil PayoutConfig
+	json := grid.JSON()
+	g.Expect(json.PayoutConfig).Should(gomega.BeNil())
+
+	// JSON with payout config should include it
+	config := NumberSetConfig123F
+	grid.SetPayoutConfig(&config)
+	json = grid.JSON()
+	g.Expect(json.PayoutConfig).ShouldNot(gomega.BeNil())
+	g.Expect(*json.PayoutConfig).Should(gomega.Equal(NumberSetConfig123F))
+}
+
+func TestGridPayoutConfigIntegration(t *testing.T) {
+	if len(os.Getenv("INTEGRATION")) == 0 {
+		t.Skip("skipping. to run, use -integration flag")
+	}
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+
+	pool := getPool(m)
+
+	grids, err := pool.Grids(context.Background(), 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(grids)).Should(gomega.BeNumerically(">=", 1))
+
+	grid := grids[0]
+
+	// Initially should be nil
+	g.Expect(grid.PayoutConfig()).Should(gomega.BeNil())
+
+	// Set payout config and save
+	config := NumberSetConfigHF
+	grid.SetPayoutConfig(&config)
+	g.Expect(grid.Save(context.Background())).Should(gomega.Succeed())
+
+	// Reload and verify
+	grid, err = pool.GridByID(context.Background(), grid.id)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(grid.PayoutConfig()).ShouldNot(gomega.BeNil())
+	g.Expect(*grid.PayoutConfig()).Should(gomega.Equal(NumberSetConfigHF))
+
+	// Clear payout config and save
+	grid.SetPayoutConfig(nil)
+	g.Expect(grid.Save(context.Background())).Should(gomega.Succeed())
+
+	// Reload and verify
+	grid, err = pool.GridByID(context.Background(), grid.id)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(grid.PayoutConfig()).Should(gomega.BeNil())
+}

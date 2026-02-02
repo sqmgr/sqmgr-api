@@ -74,7 +74,7 @@ type NumberSetTypeInfo struct {
 var validNumberSetConfigs = []NumberSetConfigInfo{
 	{
 		Key:      NumberSetConfigStandard,
-		Label:    "Standard",
+		Label:    "Same",
 		SetTypes: []NumberSetType{NumberSetTypeAll},
 	},
 	{

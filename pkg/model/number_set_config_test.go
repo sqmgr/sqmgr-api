@@ -83,7 +83,7 @@ func TestValidNumberSetConfigs(t *testing.T) {
 
 	// Check first config is "standard"
 	g.Expect(configs[0].Key).Should(gomega.Equal(NumberSetConfigStandard))
-	g.Expect(configs[0].Label).Should(gomega.Equal("Standard"))
+	g.Expect(configs[0].Label).Should(gomega.Equal("Same"))
 	g.Expect(configs[0].SetTypes).Should(gomega.Equal([]NumberSetType{NumberSetTypeAll}))
 }
 

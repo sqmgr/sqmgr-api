@@ -631,14 +631,25 @@ func (s *Server) getPoolTokenGridIDEndpoint() http.HandlerFunc {
 		}
 
 		// Load number sets for multi-set configurations
-		if pool.NumberSetConfig() != model.NumberSetConfigStandard {
+		// Need to load if pool config OR grid's payout config is non-standard
+		effectiveConfig := pool.NumberSetConfig()
+		if grid.PayoutConfig() != nil {
+			effectiveConfig = *grid.PayoutConfig()
+		}
+		if effectiveConfig != model.NumberSetConfigStandard {
 			if err := grid.LoadNumberSets(r.Context()); err != nil {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
 			}
 		}
 
-		s.writeJSONResponse(w, http.StatusOK, grid.JSON())
+		// Load BDL event if linked
+		if err := grid.LoadBDLEvent(r.Context()); err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, grid.JSONWithWinningSquares(pool.NumberSetConfig(), pool.GridType()))
 	}
 }
 
@@ -1047,6 +1058,12 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 			BrandingImageURL string `json:"brandingImageUrl"`
 			BrandingImageAlt string `json:"brandingImageAlt"`
 
+			// BDL Event linking (optional)
+			BDLEventID *int64 `json:"bdlEventId,omitempty"`
+
+			// Payout configuration (optional, overrides pool's numberSetConfig for payout periods)
+			PayoutConfig *string `json:"payoutConfig,omitempty"`
+
 			// Legacy single set (for "single" config)
 			HomeTeamNumbers []int `json:"homeTeamNumbers"`
 			AwayTeamNumbers []int `json:"awayTeamNumbers"`
@@ -1272,11 +1289,78 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 				grid = pool.NewGrid()
 			}
 
+			// Prevent changing linked event if current event is final
+			if grid.BDLEventID() != nil {
+				if err := grid.LoadBDLEvent(r.Context()); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+				if grid.BDLEvent() != nil && grid.BDLEvent().Status == model.BDLEventStatusFinal {
+					// Check if trying to change to a different event (or unlink)
+					currentID := *grid.BDLEventID()
+					newID := data.Data.BDLEventID
+					if newID == nil || *newID != currentID {
+						s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
+							Status: statusError,
+							Error:  "Cannot change linked event after the game has ended",
+						})
+						return
+					}
+				}
+			}
+
+			grid.SetBDLEventID(data.Data.BDLEventID)
+
+			// Auto-populate team names and colors when event is linked (only if empty)
+			if data.Data.BDLEventID != nil {
+				event, err := s.model.SportsEventByIDWithTeams(r.Context(), *data.Data.BDLEventID)
+				if err == nil && event != nil {
+					// Set full team names only if not provided
+					if homeTeamName == "" && event.HomeTeam() != nil {
+						homeTeamName = event.HomeTeam().FullName
+					}
+					if awayTeamName == "" && event.AwayTeam() != nil {
+						awayTeamName = event.AwayTeam().FullName
+					}
+
+					// Set colors only if not provided and team has them
+					if homeTeamColor1 == "" && event.HomeTeam() != nil && event.HomeTeam().Color != nil {
+						homeTeamColor1 = "#" + *event.HomeTeam().Color
+					}
+					if homeTeamColor2 == "" && event.HomeTeam() != nil && event.HomeTeam().AlternateColor != nil {
+						homeTeamColor2 = "#" + *event.HomeTeam().AlternateColor
+					}
+					if awayTeamColor1 == "" && event.AwayTeam() != nil && event.AwayTeam().Color != nil {
+						awayTeamColor1 = "#" + *event.AwayTeam().Color
+					}
+					if awayTeamColor2 == "" && event.AwayTeam() != nil && event.AwayTeam().AlternateColor != nil {
+						awayTeamColor2 = "#" + *event.AwayTeam().AlternateColor
+					}
+				}
+			}
+
 			grid.SetEventDate(eventDate)
 			grid.SetLabel(label)
 			grid.SetHomeTeamName(homeTeamName)
 			grid.SetAwayTeamName(awayTeamName)
 			grid.SetRollover(data.Data.Rollover)
+
+			// Handle payout config - validate and set if provided
+			if data.Data.PayoutConfig != nil {
+				if *data.Data.PayoutConfig == "" {
+					// Empty string means clear the payout config (use pool default)
+					grid.SetPayoutConfig(nil)
+				} else if !model.IsValidNumberSetConfig(*data.Data.PayoutConfig) {
+					s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
+						Status: statusError,
+						Error:  "Invalid payout configuration",
+					})
+					return
+				} else {
+					config := model.NumberSetConfig(*data.Data.PayoutConfig)
+					grid.SetPayoutConfig(&config)
+				}
+			}
 			settings := grid.Settings()
 			settings.SetNotes(notes)
 			settings.SetHomeTeamColor1(homeTeamColor1)

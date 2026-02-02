@@ -35,6 +35,18 @@ func (s *Server) setupRoutes() {
 	s.Router.Path("/pool/{token:[A-Za-z0-9_-]+}/squares/public").Methods(http.MethodGet).Handler(s.getPoolTokenSquaresPublicEndpoint())
 	s.Router.Path("/user/guest").Methods(http.MethodPost).Handler(s.postUserGuestEndpoint())
 
+	// Sports API routes (public, no auth required)
+	s.Router.Path("/sports/leagues").Methods(http.MethodGet).Handler(s.getSportsLeaguesEndpoint())
+	s.Router.Path("/sports/events").Methods(http.MethodGet).Handler(s.getSportsEventsEndpoint())
+	s.Router.Path("/sports/events/{id:[0-9]+}").Methods(http.MethodGet).Handler(s.getSportsEventEndpoint())
+	s.Router.Path("/sports/teams").Methods(http.MethodGet).Handler(s.getSportsTeamsEndpoint())
+
+	// Deprecated BDL routes - alias to sports routes for backwards compatibility
+	s.Router.Path("/bdl/leagues").Methods(http.MethodGet).Handler(s.getSportsLeaguesEndpoint())
+	s.Router.Path("/bdl/events").Methods(http.MethodGet).Handler(s.getSportsEventsEndpoint())
+	s.Router.Path("/bdl/events/{id:[0-9]+}").Methods(http.MethodGet).Handler(s.getSportsEventEndpoint())
+	s.Router.Path("/bdl/teams").Methods(http.MethodGet).Handler(s.getSportsTeamsEndpoint())
+
 	// these routes REQUIRE AUTH
 	authRouter := s.NewRoute().Subrouter()
 	authRouter.Use(s.authHandler)

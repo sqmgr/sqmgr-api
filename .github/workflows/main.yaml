@@ -124,4 +124,10 @@ jobs:
         run: |
           kubectl set image deployment/sqmgr-api \
             sqmgr=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          kubectl set image cronjob/sqmgr-sports-sync-teams \
+            sqmgr-sports-sync-teams=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          kubectl set image cronjob/sqmgr-sports-sync-schedule \
+            sqmgr-sports-sync-schedule=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          kubectl set image cronjob/sqmgr-sports-sync-scores \
+            sqmgr-sports-sync-scores=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
           kubectl rollout status deployment/sqmgr-api --timeout=300s
