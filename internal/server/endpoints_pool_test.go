@@ -439,7 +439,7 @@ func TestDrawNumbers_DoesNotLockAlreadyLockedPool(t *testing.T) {
 func sportsEventColumns() []string {
 	return []string{
 		"id", "espn_id", "league", "name", "home_team_id", "away_team_id", "event_date", "season", "week", "postseason", "venue",
-		"status", "period", "clock", "home_score", "away_score",
+		"status", "status_detail", "period", "clock", "home_score", "away_score",
 		"home_q1", "home_q2", "home_q3", "home_q4", "home_ot",
 		"away_q1", "away_q2", "away_q3", "away_q4", "away_ot",
 		"created", "modified", "last_synced",
@@ -502,7 +502,7 @@ func TestSaveGrid_BlocksChangingFinalLinkedEvent(t *testing.T) {
 	// LoadSportsEvent - returns an event with status "final"
 	eventRows := sqlmock.NewRows(sportsEventColumns()).
 		AddRow(bdlEventID, "401547417", "nfl", "Chiefs vs 49ers", "1", "2", now, 2025, 10, false, "Stadium",
-			"final", 4, "0:00", 28, 21,
+			"final", "Final", 4, "0:00", 28, 21,
 			7, 7, 7, 7, nil,
 			7, 7, 7, 0, nil,
 			now, now, now)
@@ -598,7 +598,7 @@ func TestSaveGrid_BlocksChangingToAnotherEventWhenFinal(t *testing.T) {
 	// LoadSportsEvent - returns an event with status "final"
 	eventRows := sqlmock.NewRows(sportsEventColumns()).
 		AddRow(bdlEventID, "401547417", "nfl", "Chiefs vs 49ers", "1", "2", now, 2025, 10, false, "Stadium",
-			"final", 4, "0:00", 28, 21,
+			"final", "Final", 4, "0:00", 28, 21,
 			7, 7, 7, 7, nil,
 			7, 7, 7, 0, nil,
 			now, now, now)
@@ -694,7 +694,7 @@ func TestSaveGrid_AllowsKeepingSameEventWhenFinal(t *testing.T) {
 	// LoadSportsEvent - returns an event with status "final"
 	eventRows := sqlmock.NewRows(sportsEventColumns()).
 		AddRow(bdlEventID, "401547417", "nfl", "Chiefs vs 49ers", "1", "2", now, 2025, 10, false, "Stadium",
-			"final", 4, "0:00", 28, 21,
+			"final", "Final", 4, "0:00", 28, 21,
 			7, 7, 7, 7, nil,
 			7, 7, 7, 0, nil,
 			now, now, now)
