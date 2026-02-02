@@ -84,7 +84,7 @@ metadata:
     app: sqmgr-sports-sync
     tier: cron
 spec:
-  schedule: '*/5 1-2,9-23 * * *'  # Every 5 minutes, skips 3am–8am
+  schedule: '*/5 * * * *'  # Every 5 minutes
   concurrencyPolicy: Forbid
   jobTemplate:
     metadata:
