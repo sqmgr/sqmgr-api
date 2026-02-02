@@ -41,6 +41,7 @@ type SportsEvent struct {
 	ID         int64  // Internal database ID
 	ESPNID     string // ESPN's string-based event ID
 	League     SportsLeague
+	Name       *string // Event name from ESPN (e.g., "Super Bowl LVIII")
 	HomeTeamID string
 	AwayTeamID string
 	EventDate  time.Time
@@ -82,6 +83,7 @@ type SportsEventJSON struct {
 	ID         int64             `json:"id"`
 	ESPNID     string            `json:"espnId,omitempty"`
 	League     SportsLeague      `json:"league"`
+	Name       string            `json:"name,omitempty"`
 	HomeTeamID string            `json:"homeTeamId"`
 	AwayTeamID string            `json:"awayTeamId"`
 	EventDate  time.Time         `json:"eventDate"`
@@ -135,6 +137,9 @@ func (e *SportsEvent) JSON() *SportsEventJSON {
 		AwayQ4:     e.AwayQ4,
 		AwayOT:     e.AwayOT,
 		LastSynced: e.LastSynced,
+	}
+	if e.Name != nil {
+		json.Name = *e.Name
 	}
 	if e.Venue != nil {
 		json.Venue = *e.Venue
@@ -241,7 +246,7 @@ func (e *SportsEvent) ScoreForPeriod(setType NumberSetType) (*int, *int) {
 }
 
 const sportsEventColumns = `
-	id, espn_id, league, home_team_id, away_team_id, event_date, season, week, postseason, venue,
+	id, espn_id, league, name, home_team_id, away_team_id, event_date, season, week, postseason, venue,
 	status, period, home_score, away_score,
 	home_q1, home_q2, home_q3, home_q4, home_ot,
 	away_q1, away_q2, away_q3, away_q4, away_ot,
@@ -249,7 +254,7 @@ const sportsEventColumns = `
 
 // sportsEventColumnsWithPrefix is for use in JOIN queries where table alias is needed
 const sportsEventColumnsWithPrefix = `
-	e.id, e.espn_id, e.league, e.home_team_id, e.away_team_id, e.event_date, e.season, e.week, e.postseason, e.venue,
+	e.id, e.espn_id, e.league, e.name, e.home_team_id, e.away_team_id, e.event_date, e.season, e.week, e.postseason, e.venue,
 	e.status, e.period, e.home_score, e.away_score,
 	e.home_q1, e.home_q2, e.home_q3, e.home_q4, e.home_ot,
 	e.away_q1, e.away_q2, e.away_q3, e.away_q4, e.away_ot,
@@ -261,6 +266,7 @@ func (m *Model) sportsEventByRow(scan scanFunc) (*SportsEvent, error) {
 		&event.ID,
 		&event.ESPNID,
 		&event.League,
+		&event.Name,
 		&event.HomeTeamID,
 		&event.AwayTeamID,
 		&event.EventDate,
@@ -524,20 +530,21 @@ func (m *Model) UpsertSportsEvent(ctx context.Context, q Queryable, event *Sport
 
 	const query = `
 		INSERT INTO sports_events (
-			espn_id, league, home_team_id, away_team_id, event_date, season, week, postseason, venue,
+			espn_id, league, name, home_team_id, away_team_id, event_date, season, week, postseason, venue,
 			status, period, home_score, away_score,
 			home_q1, home_q2, home_q3, home_q4, home_ot,
 			away_q1, away_q2, away_q3, away_q4, away_ot,
 			created, modified, last_synced
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9,
-			$10, $11, $12, $13,
-			$14, $15, $16, $17, $18,
-			$19, $20, $21, $22, $23,
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+			$11, $12, $13, $14,
+			$15, $16, $17, $18, $19,
+			$20, $21, $22, $23, $24,
 			(NOW() AT TIME ZONE 'utc'), (NOW() AT TIME ZONE 'utc'), (NOW() AT TIME ZONE 'utc')
 		)
 		ON CONFLICT (espn_id) WHERE espn_id IS NOT NULL DO UPDATE SET
 			league = EXCLUDED.league,
+			name = EXCLUDED.name,
 			home_team_id = EXCLUDED.home_team_id,
 			away_team_id = EXCLUDED.away_team_id,
 			event_date = EXCLUDED.event_date,
@@ -567,6 +574,7 @@ func (m *Model) UpsertSportsEvent(ctx context.Context, q Queryable, event *Sport
 	err := q.QueryRowContext(ctx, query,
 		event.ESPNID,
 		event.League,
+		event.Name,
 		event.HomeTeamID,
 		event.AwayTeamID,
 		event.EventDate,

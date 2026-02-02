@@ -1,0 +1,1 @@
+ALTER TABLE sports_events ADD COLUMN name VARCHAR(200);

@@ -405,6 +405,15 @@ func (c *Client) parseScheduleEvent(e espnScheduleEvent) (Event, error) {
 	}
 	comp := e.Competitions[0]
 
+	// Only set Name for special events (e.g., "Super Bowl LVIII", "Wild Card")
+	// Regular season games will have no name (null)
+	for _, note := range comp.Notes {
+		if note.Headline != "" {
+			event.Name = note.Headline
+			break
+		}
+	}
+
 	// Venue
 	if comp.Venue != nil {
 		event.Venue = comp.Venue.FullName
@@ -510,6 +519,15 @@ func (c *Client) parseEvent(e espnEvent) (Event, error) {
 		return event, fmt.Errorf("no competitions found")
 	}
 	comp := e.Competitions[0]
+
+	// Only set Name for special events (e.g., "Super Bowl LVIII", "Wild Card")
+	// Regular season games will have no name (null)
+	for _, note := range comp.Notes {
+		if note.Headline != "" {
+			event.Name = note.Headline
+			break
+		}
+	}
 
 	// Venue
 	if comp.Venue != nil {

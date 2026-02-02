@@ -542,6 +542,9 @@ func processEvent(ctx context.Context, m *model.Model, league model.SportsLeague
 	sportsEvent := m.NewSportsEvent()
 	sportsEvent.ESPNID = event.ID
 	sportsEvent.League = league
+	if event.Name != "" {
+		sportsEvent.Name = &event.Name
+	}
 	sportsEvent.HomeTeamID = event.HomeTeam.ID
 	sportsEvent.AwayTeamID = event.AwayTeam.ID
 	sportsEvent.EventDate = event.Date

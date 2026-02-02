@@ -86,6 +86,7 @@ const (
 // Event represents a game/event
 type Event struct {
 	ID         string      // ESPN event ID (string format)
+	Name       string      // Event name from ESPN (e.g., "Super Bowl LVIII")
 	Date       time.Time   // Event date/time
 	Status     EventStatus // Game status
 	Period     int         // Current period (0=not started, 1-4=quarters, 5+=OT)
@@ -203,10 +204,17 @@ type espnCompetition struct {
 	Venue       *espnVenue       `json:"venue,omitempty"`
 	Competitors []espnCompetitor `json:"competitors"`
 	Status      espnStatus       `json:"status"`
+	Notes       []espnNote       `json:"notes,omitempty"`
 }
 
 type espnVenue struct {
 	FullName string `json:"fullName"`
+}
+
+// espnNote represents a note/headline for special events (e.g., "Super Bowl LVIII")
+type espnNote struct {
+	Type     string `json:"type"`
+	Headline string `json:"headline"`
 }
 
 // espnCompetitor represents a team in a competition
@@ -295,6 +303,7 @@ type espnScheduleCompetition struct {
 	Venue       *espnVenue               `json:"venue,omitempty"`
 	Competitors []espnScheduleCompetitor `json:"competitors"`
 	Status      espnStatus               `json:"status"`
+	Notes       []espnNote               `json:"notes,omitempty"`
 }
 
 // espnScheduleCompetitor represents a competitor in team schedule

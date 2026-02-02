@@ -151,6 +151,7 @@ func TestGetScoreboard(t *testing.T) {
 				{
 					ID:     "401547417",
 					Date:   "2024-02-11T23:30:00Z",
+					Name:   "Kansas City Chiefs at San Francisco 49ers",
 					Season: espnSeason{Year: 2024, Type: 2},
 					Week:   &espnWeek{Number: 22},
 					Status: espnStatus{
@@ -166,6 +167,7 @@ func TestGetScoreboard(t *testing.T) {
 							ID:    "401547417",
 							Date:  "2024-02-11T23:30:00Z",
 							Venue: &espnVenue{FullName: "Allegiant Stadium"},
+							Notes: []espnNote{{Type: "event", Headline: "Super Bowl LVIII"}},
 							Competitors: []espnCompetitor{
 								{
 									ID:       "12",
@@ -220,6 +222,7 @@ func TestGetScoreboard(t *testing.T) {
 
 	event := events[0]
 	g.Expect(event.ID).Should(gomega.Equal("401547417"))
+	g.Expect(event.Name).Should(gomega.Equal("Super Bowl LVIII"))
 	g.Expect(event.Status).Should(gomega.Equal(EventStatusFinal))
 	g.Expect(event.HomeTeam.Abbreviation).Should(gomega.Equal("KC"))
 	g.Expect(event.AwayTeam.Abbreviation).Should(gomega.Equal("SF"))
@@ -248,6 +251,7 @@ func TestGetScoreboardScheduledGame(t *testing.T) {
 				{
 					ID:     "401547500",
 					Date:   "2024-09-05T20:20:00Z",
+					Name:   "Baltimore Ravens at Kansas City Chiefs",
 					Season: espnSeason{Year: 2024, Type: 2},
 					Week:   &espnWeek{Number: 1},
 					Status: espnStatus{
@@ -262,6 +266,7 @@ func TestGetScoreboardScheduledGame(t *testing.T) {
 						{
 							ID:   "401547500",
 							Date: "2024-09-05T20:20:00Z",
+							// No Notes - regular season game uses event.Name
 							Competitors: []espnCompetitor{
 								{
 									HomeAway: "home",
@@ -300,6 +305,8 @@ func TestGetScoreboardScheduledGame(t *testing.T) {
 	g.Expect(len(events)).Should(gomega.Equal(1))
 
 	event := events[0]
+	// Regular season game without notes has no name (empty)
+	g.Expect(event.Name).Should(gomega.Equal(""))
 	g.Expect(event.Status).Should(gomega.Equal(EventStatusScheduled))
 	g.Expect(event.HomeTeamScore).Should(gomega.BeNil())
 	g.Expect(event.AwayTeamScore).Should(gomega.BeNil())
@@ -733,9 +740,10 @@ func TestGetTeamSchedule(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(events)).Should(gomega.Equal(2))
 
-	// First event - completed game
+	// First event - completed game (no notes, so no name)
 	event1 := events[0]
 	g.Expect(event1.ID).Should(gomega.Equal("401823425"))
+	g.Expect(event1.Name).Should(gomega.Equal(""))
 	g.Expect(event1.Status).Should(gomega.Equal(EventStatusFinal))
 	g.Expect(event1.HomeTeam.Abbreviation).Should(gomega.Equal("BUF"))
 	g.Expect(event1.AwayTeam.Abbreviation).Should(gomega.Equal("USM"))
@@ -744,9 +752,10 @@ func TestGetTeamSchedule(t *testing.T) {
 	g.Expect(event1.Venue).Should(gomega.Equal("Alumni Arena"))
 	g.Expect(*event1.Week).Should(gomega.Equal(1))
 
-	// Second event - scheduled game
+	// Second event - scheduled game (no notes, so no name)
 	event2 := events[1]
 	g.Expect(event2.ID).Should(gomega.Equal("401823500"))
+	g.Expect(event2.Name).Should(gomega.Equal(""))
 	g.Expect(event2.Status).Should(gomega.Equal(EventStatusScheduled))
 	g.Expect(event2.HomeTeam.Abbreviation).Should(gomega.Equal("OHIO"))
 	g.Expect(event2.AwayTeam.Abbreviation).Should(gomega.Equal("BUF"))

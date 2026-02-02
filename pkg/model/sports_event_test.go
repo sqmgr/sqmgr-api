@@ -68,6 +68,45 @@ func TestSportsEventJSONWithVenue(t *testing.T) {
 	g.Expect(json.Venue).Should(gomega.Equal("Madison Square Garden"))
 }
 
+func TestSportsEventJSONWithName(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	name := "Super Bowl LVIII"
+	event := &SportsEvent{
+		ID:         1,
+		ESPNID:     "12345",
+		League:     SportsLeagueNFL,
+		HomeTeamID: "home-1",
+		AwayTeamID: "away-1",
+		EventDate:  time.Now(),
+		Season:     2024,
+		Status:     SportsEventStatusScheduled,
+		Name:       &name,
+	}
+
+	json := event.JSON()
+	g.Expect(json.Name).Should(gomega.Equal("Super Bowl LVIII"))
+}
+
+func TestSportsEventJSONWithNilName(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	event := &SportsEvent{
+		ID:         1,
+		ESPNID:     "12345",
+		League:     SportsLeagueNFL,
+		HomeTeamID: "home-1",
+		AwayTeamID: "away-1",
+		EventDate:  time.Now(),
+		Season:     2024,
+		Status:     SportsEventStatusScheduled,
+		Name:       nil,
+	}
+
+	json := event.JSON()
+	g.Expect(json.Name).Should(gomega.Equal(""))
+}
+
 func TestSportsEventJSONWithTeams(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
