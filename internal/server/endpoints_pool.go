@@ -752,7 +752,17 @@ func (s *Server) getPoolTokenSquareIDEndpoint() http.HandlerFunc {
 						}
 
 						winningSquares := grid.GetGridWinningSquares(grid.BDLEvent(), effectiveConfig, pool.GridType())
-						squareJSON.WinningPeriods = model.GetWinningPeriodsForSquare(squareID, winningSquares, grid.BDLEvent())
+
+						// Use team abbreviations from live event
+						var homeTeamName, awayTeamName string
+						if grid.BDLEvent().HomeTeam() != nil {
+							homeTeamName = grid.BDLEvent().HomeTeam().Abbreviation
+						}
+						if grid.BDLEvent().AwayTeam() != nil {
+							awayTeamName = grid.BDLEvent().AwayTeam().Abbreviation
+						}
+
+						squareJSON.WinningPeriods = model.GetWinningPeriodsForSquare(squareID, winningSquares, grid.BDLEvent(), homeTeamName, awayTeamName)
 					}
 				}
 			}

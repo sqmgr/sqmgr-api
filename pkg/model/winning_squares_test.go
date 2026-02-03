@@ -496,15 +496,17 @@ func TestGetWinningPeriodsForSquare(t *testing.T) {
 	// Final: 28-24, home digit 8, away digit 4 -> Square = (4 * 10) + 8 + 1 = 49
 
 	// Test square 5 (wins Half)
-	results := GetWinningPeriodsForSquare(5, winningSquares, event)
+	results := GetWinningPeriodsForSquare(5, winningSquares, event, "Chiefs", "Eagles")
 	g.Expect(results).Should(gomega.HaveLen(1))
 	g.Expect(results[0].Period).Should(gomega.Equal(NumberSetTypeHalf))
 	g.Expect(results[0].Label).Should(gomega.Equal("Halftime"))
 	g.Expect(results[0].HomeScore).Should(gomega.Equal(14))
 	g.Expect(results[0].AwayScore).Should(gomega.Equal(10))
+	g.Expect(results[0].HomeTeamName).Should(gomega.Equal("Chiefs"))
+	g.Expect(results[0].AwayTeamName).Should(gomega.Equal("Eagles"))
 
 	// Test square 49 (wins Final)
-	results = GetWinningPeriodsForSquare(49, winningSquares, event)
+	results = GetWinningPeriodsForSquare(49, winningSquares, event, "Chiefs", "Eagles")
 	g.Expect(results).Should(gomega.HaveLen(1))
 	g.Expect(results[0].Period).Should(gomega.Equal(NumberSetTypeFinal))
 	g.Expect(results[0].Label).Should(gomega.Equal("Final"))
@@ -512,7 +514,7 @@ func TestGetWinningPeriodsForSquare(t *testing.T) {
 	g.Expect(results[0].AwayScore).Should(gomega.Equal(24))
 
 	// Test square 1 (doesn't win anything)
-	results = GetWinningPeriodsForSquare(1, winningSquares, event)
+	results = GetWinningPeriodsForSquare(1, winningSquares, event, "Chiefs", "Eagles")
 	g.Expect(results).Should(gomega.BeEmpty())
 }
 
@@ -551,7 +553,7 @@ func TestGetWinningPeriodsForSquareMultipleWins(t *testing.T) {
 	winningSquares := GetWinningSquares(event, NumberSetConfigHF, GridTypeStd100, nil, nil, numberSets)
 
 	// Square 1 should win both Half and Final
-	results := GetWinningPeriodsForSquare(1, winningSquares, event)
+	results := GetWinningPeriodsForSquare(1, winningSquares, event, "HOU", "IND")
 	g.Expect(results).Should(gomega.HaveLen(2))
 
 	// Results should be sorted: Half before Final
@@ -559,6 +561,8 @@ func TestGetWinningPeriodsForSquareMultipleWins(t *testing.T) {
 	g.Expect(results[0].Label).Should(gomega.Equal("Halftime"))
 	g.Expect(results[0].HomeScore).Should(gomega.Equal(20))
 	g.Expect(results[0].AwayScore).Should(gomega.Equal(0))
+	g.Expect(results[0].HomeTeamName).Should(gomega.Equal("HOU"))
+	g.Expect(results[0].AwayTeamName).Should(gomega.Equal("IND"))
 
 	g.Expect(results[1].Period).Should(gomega.Equal(NumberSetTypeFinal))
 	g.Expect(results[1].Label).Should(gomega.Equal("Final"))
@@ -582,17 +586,17 @@ func TestGetWinningPeriodsForSquareNilInputs(t *testing.T) {
 	}
 
 	// Test with invalid squareID
-	results := GetWinningPeriodsForSquare(0, winningSquares, event)
+	results := GetWinningPeriodsForSquare(0, winningSquares, event, "HOU", "IND")
 	g.Expect(results).Should(gomega.BeNil())
 
-	results = GetWinningPeriodsForSquare(-1, winningSquares, event)
+	results = GetWinningPeriodsForSquare(-1, winningSquares, event, "HOU", "IND")
 	g.Expect(results).Should(gomega.BeNil())
 
 	// Test with nil winningSquares
-	results = GetWinningPeriodsForSquare(1, nil, event)
+	results = GetWinningPeriodsForSquare(1, nil, event, "HOU", "IND")
 	g.Expect(results).Should(gomega.BeNil())
 
 	// Test with nil event
-	results = GetWinningPeriodsForSquare(1, winningSquares, nil)
+	results = GetWinningPeriodsForSquare(1, winningSquares, nil, "HOU", "IND")
 	g.Expect(results).Should(gomega.BeNil())
 }

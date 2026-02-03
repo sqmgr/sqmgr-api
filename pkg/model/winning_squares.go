@@ -71,10 +71,12 @@ type WinningSquaresResult struct {
 
 // WinningPeriodInfo contains information about a winning period for a square
 type WinningPeriodInfo struct {
-	Period    NumberSetType `json:"period"`
-	Label     string        `json:"label"`
-	HomeScore int           `json:"homeScore"`
-	AwayScore int           `json:"awayScore"`
+	Period       NumberSetType `json:"period"`
+	Label        string        `json:"label"`
+	HomeScore    int           `json:"homeScore"`
+	AwayScore    int           `json:"awayScore"`
+	HomeTeamName string        `json:"homeTeamName"`
+	AwayTeamName string        `json:"awayTeamName"`
 }
 
 // GetWinningSquares returns winning squares for each applicable period
@@ -141,7 +143,7 @@ func (g *Grid) GetGridWinningSquares(event *BDLEvent, config NumberSetConfig, gr
 
 // GetWinningPeriodsForSquare returns the winning period information for a specific square.
 // It returns the periods that the square won along with their scores.
-func GetWinningPeriodsForSquare(squareID int, winningSquares *WinningSquaresResult, event *BDLEvent) []WinningPeriodInfo {
+func GetWinningPeriodsForSquare(squareID int, winningSquares *WinningSquaresResult, event *BDLEvent, homeTeamName, awayTeamName string) []WinningPeriodInfo {
 	if squareID <= 0 || winningSquares == nil || event == nil {
 		return nil
 	}
@@ -164,10 +166,12 @@ func GetWinningPeriodsForSquare(squareID int, winningSquares *WinningSquaresResu
 			homeScore, awayScore := event.ScoreForPeriod(period)
 			if homeScore != nil && awayScore != nil {
 				results = append(results, WinningPeriodInfo{
-					Period:    period,
-					Label:     period.LongLabel(),
-					HomeScore: *homeScore,
-					AwayScore: *awayScore,
+					Period:       period,
+					Label:        period.LongLabel(),
+					HomeScore:    *homeScore,
+					AwayScore:    *awayScore,
+					HomeTeamName: homeTeamName,
+					AwayTeamName: awayTeamName,
 				})
 			}
 		}
