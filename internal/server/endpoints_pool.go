@@ -1210,6 +1210,11 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 				}
 			}
 
+			// Load the BDL event so it's included in the response
+			if err := grid.LoadBDLEvent(r.Context()); err != nil {
+				logrus.WithError(err).Warn("could not load BDL event after draw")
+			}
+
 			s.writeJSONResponse(w, http.StatusOK, drawResponse{
 				GridJSON:  grid.JSON(),
 				PoolLocks: pool.Locks(),
@@ -1264,6 +1269,11 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 					s.writeErrorResponse(w, http.StatusInternalServerError, err)
 					return
 				}
+			}
+
+			// Load the BDL event so it's included in the response
+			if err := grid.LoadBDLEvent(r.Context()); err != nil {
+				logrus.WithError(err).Warn("could not load BDL event after draw")
 			}
 
 			s.writeJSONResponse(w, http.StatusOK, drawResponse{
@@ -1401,6 +1411,11 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
+			}
+
+			// Load the BDL event so it's included in the response
+			if err := grid.LoadBDLEvent(r.Context()); err != nil {
+				logrus.WithError(err).Warn("could not load BDL event after save")
 			}
 
 			s.writeJSONResponse(w, http.StatusAccepted, grid.JSON())
