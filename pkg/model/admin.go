@@ -453,6 +453,7 @@ type AdminEventGrid struct {
 	GridState    string    `json:"gridState"`
 	PoolToken    string    `json:"poolToken"`
 	PoolName     string    `json:"poolName"`
+	CreatorID    int64     `json:"creatorId"`
 	CreatorEmail *string   `json:"creatorEmail"`
 	Created      time.Time `json:"created"`
 }
@@ -559,7 +560,7 @@ func (m *Model) GetAdminEventGrids(ctx context.Context, eventID int64, offset in
 	const query = `
 		SELECT
 			g.id, g.label, g.home_team_name, g.away_team_name, g.state,
-			p.token, p.name, u.email, g.created
+			p.token, p.name, p.user_id, u.email, g.created
 		FROM grids g
 		INNER JOIN pools p ON p.id = g.pool_id
 		LEFT JOIN users u ON u.id = p.user_id
@@ -580,7 +581,7 @@ func (m *Model) GetAdminEventGrids(ctx context.Context, eventID int64, offset in
 		var label, homeTeamName, awayTeamName *string
 		if err := rows.Scan(
 			&grid.GridID, &label, &homeTeamName, &awayTeamName, &grid.GridState,
-			&grid.PoolToken, &grid.PoolName, &grid.CreatorEmail, &grid.Created,
+			&grid.PoolToken, &grid.PoolName, &grid.CreatorID, &grid.CreatorEmail, &grid.Created,
 		); err != nil {
 			return nil, fmt.Errorf("scanning event grid row: %w", err)
 		}

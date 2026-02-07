@@ -1023,6 +1023,7 @@ func TestGetAdminEventGrids(t *testing.T) {
 		g.Expect(eg.GridName).ShouldNot(gomega.BeEmpty())
 		g.Expect(eg.PoolToken).ShouldNot(gomega.BeEmpty())
 		g.Expect(eg.PoolName).ShouldNot(gomega.BeEmpty())
+		g.Expect(eg.CreatorID).Should(gomega.BeNumerically(">", 0))
 		g.Expect(eg.GridState).Should(gomega.Equal("active"))
 		poolTokens[eg.PoolToken] = true
 	}
