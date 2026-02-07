@@ -58,25 +58,27 @@ func (s *Server) poolHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		if (pool.IsLocked() && pool.OpenAccessOnLock()) || !pool.PasswordRequired() {
-			// Auto-join user to pool since no password is required
-			user := r.Context().Value(ctxUserKey).(*model.User)
-			if err := user.JoinPool(r.Context(), pool); err != nil {
-				s.writeErrorResponse(w, http.StatusInternalServerError, err)
-				return
-			}
-		} else {
-			user := r.Context().Value(ctxUserKey).(*model.User)
+		user := r.Context().Value(ctxUserKey).(*model.User)
 
-			isMemberOf, err := user.IsMemberOf(r.Context(), pool)
-			if err != nil {
-				s.writeErrorResponse(w, http.StatusInternalServerError, err)
-				return
-			}
+		// Site admins can access any pool without joining
+		if !user.IsAdmin {
+			if (pool.IsLocked() && pool.OpenAccessOnLock()) || !pool.PasswordRequired() {
+				// Auto-join user to pool since no password is required
+				if err := user.JoinPool(r.Context(), pool); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+			} else {
+				isMemberOf, err := user.IsMemberOf(r.Context(), pool)
+				if err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
 
-			if !isMemberOf {
-				s.writeErrorResponse(w, http.StatusForbidden, nil)
-				return
+				if !isMemberOf {
+					s.writeErrorResponse(w, http.StatusForbidden, nil)
+					return
+				}
 			}
 		}
 

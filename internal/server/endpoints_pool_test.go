@@ -452,6 +452,143 @@ func sportsTeamColumns() []string {
 	}
 }
 
+func setupTestServerForPoolHandler(t *testing.T) (*Server, sqlmock.Sqlmock, *model.Model, *bool) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+
+	m := model.New(db)
+	s := &Server{
+		Router: mux.NewRouter(),
+		model:  m,
+	}
+
+	nextCalled := false
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nextCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	s.Router.Path("/pool/{token}").Methods(http.MethodGet).Handler(s.poolHandler(nextHandler))
+
+	return s, mock, m, &nextCalled
+}
+
+func TestPoolHandler_SiteAdminBypassesPasswordProtectedPool(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m, nextCalled := setupTestServerForPoolHandler(t)
+
+	// Site admin user (different ID from pool owner)
+	user := &model.User{
+		Model:   m,
+		ID:      999,
+		Store:   model.UserStoreAuth0,
+		IsAdmin: true,
+	}
+
+	poolToken := "test-admin-bypass"
+	now := time.Now()
+
+	// Password-protected pool owned by user 100
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Protected Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	// No membership or join queries should be issued for site admin
+
+	req := httptest.NewRequest(http.MethodGet, "/pool/"+poolToken, nil)
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+	g.Expect(*nextCalled).Should(gomega.BeTrue(), "next handler should have been called")
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPoolHandler_SiteAdminNotAutoJoined(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m, nextCalled := setupTestServerForPoolHandler(t)
+
+	// Site admin user
+	user := &model.User{
+		Model:   m,
+		ID:      999,
+		Store:   model.UserStoreAuth0,
+		IsAdmin: true,
+	}
+
+	poolToken := "test-admin-no-join"
+	now := time.Now()
+
+	// Open pool (password_required = false), so non-admins would be auto-joined
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Open Pool", "std100", "standard", "hash", false, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	// No JoinPool query should be issued for site admin
+
+	req := httptest.NewRequest(http.MethodGet, "/pool/"+poolToken, nil)
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+	g.Expect(*nextCalled).Should(gomega.BeTrue(), "next handler should have been called")
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPoolHandler_NonAdminNonMemberDenied(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m, nextCalled := setupTestServerForPoolHandler(t)
+
+	// Regular user (not site admin, not pool owner)
+	user := &model.User{
+		Model:   m,
+		ID:      200,
+		Store:   model.UserStoreAuth0,
+		IsAdmin: false,
+	}
+
+	poolToken := "test-non-member-denied"
+	now := time.Now()
+
+	// Password-protected pool owned by user 100
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Protected Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	// IsMemberOf: user 200 != pool owner 100, so it queries pools_users
+	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2").
+		WithArgs(int64(1), int64(200)).
+		WillReturnRows(sqlmock.NewRows([]string{"bool"})) // empty = not a member
+
+	req := httptest.NewRequest(http.MethodGet, "/pool/"+poolToken, nil)
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusForbidden))
+	g.Expect(*nextCalled).Should(gomega.BeFalse(), "next handler should NOT have been called")
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
 func TestSaveGrid_BlocksChangingFinalLinkedEvent(t *testing.T) {
 	g := gomega.NewWithT(t)
 	s, mock, m := setupTestServerForDrawNumbers(t)
