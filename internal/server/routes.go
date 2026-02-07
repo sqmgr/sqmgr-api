@@ -93,6 +93,8 @@ func (s *Server) setupRoutes() {
 	adminRouter.Path("/admin/pool/{token:[A-Za-z0-9_-]+}/join").Methods(http.MethodPost).Handler(s.postAdminPoolJoinEndpoint())
 	adminRouter.Path("/admin/user/{id:[0-9]+}").Methods(http.MethodGet).Handler(s.getAdminUserEndpoint())
 	adminRouter.Path("/admin/user/{id:[0-9]+}/pools").Methods(http.MethodGet).Handler(s.getAdminUserPoolsEndpoint())
+	adminRouter.Path("/admin/events").Methods(http.MethodGet).Handler(s.getAdminEventsEndpoint())
+	adminRouter.Path("/admin/events/{id:[0-9]+}/grids").Methods(http.MethodGet).Handler(s.getAdminEventGridsEndpoint())
 
 	pathTemplates := make(map[string]bool)
 

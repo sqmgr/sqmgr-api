@@ -19,6 +19,7 @@ package model
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // AdminStats holds site-wide statistics for admin dashboard
@@ -424,5 +425,198 @@ func (m *Model) GetAllUsersCount(ctx context.Context, search string) (int64, err
 		return 0, fmt.Errorf("counting users: %w", err)
 	}
 
+	return count, nil
+}
+
+// AdminLinkedEvent represents a sports event that has at least one grid linked to it
+type AdminLinkedEvent struct {
+	ID           int64             `json:"id"`
+	ESPNID       string            `json:"espnId,omitempty"`
+	League       SportsLeague      `json:"league"`
+	Name         string            `json:"name,omitempty"`
+	HomeTeamID   string            `json:"homeTeamId"`
+	AwayTeamID   string            `json:"awayTeamId"`
+	EventDate    time.Time         `json:"eventDate"`
+	Status       SportsEventStatus `json:"status"`
+	StatusDetail string            `json:"statusDetail,omitempty"`
+	HomeScore    *int              `json:"homeScore,omitempty"`
+	AwayScore    *int              `json:"awayScore,omitempty"`
+	HomeTeam     *SportsTeamJSON   `json:"homeTeam,omitempty"`
+	AwayTeam     *SportsTeamJSON   `json:"awayTeam,omitempty"`
+	GridCount    int64             `json:"gridCount"`
+}
+
+// AdminEventGrid represents a grid linked to a sports event
+type AdminEventGrid struct {
+	GridID       int64     `json:"gridId"`
+	GridName     string    `json:"gridName"`
+	GridState    string    `json:"gridState"`
+	PoolToken    string    `json:"poolToken"`
+	PoolName     string    `json:"poolName"`
+	CreatorEmail *string   `json:"creatorEmail"`
+	Created      time.Time `json:"created"`
+}
+
+// GetAdminLinkedEvents returns sports events that have at least one active grid linked,
+// with the count of linked grids, sorted and paginated
+func (m *Model) GetAdminLinkedEvents(ctx context.Context, offset int64, limit int, sortBy string, sortDir string) ([]*AdminLinkedEvent, error) {
+	// Validate sort column
+	validSortColumns := map[string]string{
+		"eventDate": "e.event_date",
+		"gridCount": "grid_count",
+	}
+	orderColumn := "e.event_date"
+	if col, ok := validSortColumns[sortBy]; ok {
+		orderColumn = col
+	}
+
+	orderDir := "DESC"
+	if sortDir == "asc" {
+		orderDir = "ASC"
+	}
+
+	query := `
+		SELECT
+			e.id, e.espn_id, e.league, e.name, e.home_team_id, e.away_team_id,
+			e.event_date, e.status, e.status_detail, e.home_score, e.away_score,
+			COUNT(g.id) AS grid_count
+		FROM sports_events e
+		INNER JOIN grids g ON g.sports_event_id = e.id AND g.state = 'active'
+		GROUP BY e.id
+		ORDER BY ` + orderColumn + ` ` + orderDir + `
+		OFFSET $1
+		LIMIT $2`
+
+	rows, err := m.DB.QueryContext(ctx, query, offset, limit)
+	if err != nil {
+		return nil, fmt.Errorf("querying linked events: %w", err)
+	}
+	defer rows.Close()
+
+	// Scan rows and build SportsEvent objects for team loading
+	var events []*AdminLinkedEvent
+	var sportsEvents []*SportsEvent
+	for rows.Next() {
+		ale := &AdminLinkedEvent{}
+		se := &SportsEvent{model: m}
+		var name, statusDetail *string
+		if err := rows.Scan(
+			&ale.ID, &ale.ESPNID, &ale.League, &name, &ale.HomeTeamID, &ale.AwayTeamID,
+			&ale.EventDate, &ale.Status, &statusDetail, &ale.HomeScore, &ale.AwayScore,
+			&ale.GridCount,
+		); err != nil {
+			return nil, fmt.Errorf("scanning linked event row: %w", err)
+		}
+		if name != nil {
+			ale.Name = *name
+		}
+		if statusDetail != nil {
+			ale.StatusDetail = *statusDetail
+		}
+		// Build a SportsEvent for team loading
+		se.ID = ale.ID
+		se.League = ale.League
+		se.HomeTeamID = ale.HomeTeamID
+		se.AwayTeamID = ale.AwayTeamID
+		sportsEvents = append(sportsEvents, se)
+		events = append(events, ale)
+	}
+
+	// Batch load teams
+	if err := m.LoadTeamsForSportsEvents(ctx, sportsEvents); err != nil {
+		return nil, fmt.Errorf("loading teams for linked events: %w", err)
+	}
+
+	// Assign team JSON to results
+	for i, se := range sportsEvents {
+		if se.homeTeam != nil {
+			events[i].HomeTeam = se.homeTeam.JSON()
+		}
+		if se.awayTeam != nil {
+			events[i].AwayTeam = se.awayTeam.JSON()
+		}
+	}
+
+	return events, nil
+}
+
+// GetAdminLinkedEventsCount returns the count of sports events with at least one active linked grid
+func (m *Model) GetAdminLinkedEventsCount(ctx context.Context) (int64, error) {
+	var count int64
+	row := m.DB.QueryRowContext(ctx, `
+		SELECT COUNT(DISTINCT e.id)
+		FROM sports_events e
+		INNER JOIN grids g ON g.sports_event_id = e.id AND g.state = 'active'
+	`)
+	if err := row.Scan(&count); err != nil {
+		return 0, fmt.Errorf("counting linked events: %w", err)
+	}
+	return count, nil
+}
+
+// GetAdminEventGrids returns the grids linked to a specific sports event with pagination
+func (m *Model) GetAdminEventGrids(ctx context.Context, eventID int64, offset int64, limit int) ([]*AdminEventGrid, error) {
+	const query = `
+		SELECT
+			g.id, g.label, g.home_team_name, g.away_team_name, g.state,
+			p.token, p.name, u.email, g.created
+		FROM grids g
+		INNER JOIN pools p ON p.id = g.pool_id
+		LEFT JOIN users u ON u.id = p.user_id
+		WHERE g.sports_event_id = $1 AND g.state = 'active'
+		ORDER BY g.created DESC
+		OFFSET $2
+		LIMIT $3`
+
+	rows, err := m.DB.QueryContext(ctx, query, eventID, offset, limit)
+	if err != nil {
+		return nil, fmt.Errorf("querying event grids: %w", err)
+	}
+	defer rows.Close()
+
+	grids := make([]*AdminEventGrid, 0)
+	for rows.Next() {
+		grid := &AdminEventGrid{}
+		var label, homeTeamName, awayTeamName *string
+		if err := rows.Scan(
+			&grid.GridID, &label, &homeTeamName, &awayTeamName, &grid.GridState,
+			&grid.PoolToken, &grid.PoolName, &grid.CreatorEmail, &grid.Created,
+		); err != nil {
+			return nil, fmt.Errorf("scanning event grid row: %w", err)
+		}
+
+		// Build grid name using same logic as Grid.Name()
+		away := ""
+		if awayTeamName != nil {
+			away = *awayTeamName
+		}
+		home := ""
+		if homeTeamName != nil {
+			home = *homeTeamName
+		}
+		vs := fmt.Sprintf("%s vs. %s", away, home)
+		if label != nil {
+			grid.GridName = fmt.Sprintf("%s: %s", *label, vs)
+		} else {
+			grid.GridName = vs
+		}
+
+		grids = append(grids, grid)
+	}
+
+	return grids, nil
+}
+
+// GetAdminEventGridsCount returns the count of active grids linked to a specific sports event
+func (m *Model) GetAdminEventGridsCount(ctx context.Context, eventID int64) (int64, error) {
+	var count int64
+	row := m.DB.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM grids
+		WHERE sports_event_id = $1 AND state = 'active'
+	`, eventID)
+	if err := row.Scan(&count); err != nil {
+		return 0, fmt.Errorf("counting event grids: %w", err)
+	}
 	return count, nil
 }

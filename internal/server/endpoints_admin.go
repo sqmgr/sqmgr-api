@@ -31,6 +31,8 @@ const defaultAdminPoolsLimit = 25
 const maxAdminPoolsLimit = 100
 const defaultAdminUsersLimit = 25
 const maxAdminUsersLimit = 100
+const defaultAdminEventsLimit = 25
+const maxAdminEventsLimit = 100
 
 // validStatsPeriods defines the valid period values for stats filtering
 var validStatsPeriods = map[string]bool{
@@ -297,6 +299,96 @@ func (s *Server) getAdminUsersEndpoint() http.HandlerFunc {
 
 		s.writeJSONResponse(w, http.StatusOK, response{
 			Users: users,
+			Total: total,
+		})
+	}
+}
+
+// getAdminEventsEndpoint returns paginated list of sports events with linked grids
+func (s *Server) getAdminEventsEndpoint() http.HandlerFunc {
+	type response struct {
+		Events []*model.AdminLinkedEvent `json:"events"`
+		Total  int64                     `json:"total"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		offset, _ := strconv.ParseInt(r.FormValue("offset"), 10, 64)
+		if offset < 0 {
+			offset = 0
+		}
+
+		limit, _ := strconv.Atoi(r.FormValue("limit"))
+		if limit <= 0 {
+			limit = defaultAdminEventsLimit
+		}
+		if limit > maxAdminEventsLimit {
+			limit = maxAdminEventsLimit
+		}
+
+		sortBy := r.FormValue("sortBy")
+		sortDir := r.FormValue("sortDir")
+
+		events, err := s.model.GetAdminLinkedEvents(r.Context(), offset, limit, sortBy, sortDir)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		total, err := s.model.GetAdminLinkedEventsCount(r.Context())
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, response{
+			Events: events,
+			Total:  total,
+		})
+	}
+}
+
+// getAdminEventGridsEndpoint returns grids linked to a specific sports event
+func (s *Server) getAdminEventGridsEndpoint() http.HandlerFunc {
+	type response struct {
+		Grids []*model.AdminEventGrid `json:"grids"`
+		Total int64                   `json:"total"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := mux.Vars(r)["id"]
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, nil)
+			return
+		}
+
+		offset, _ := strconv.ParseInt(r.FormValue("offset"), 10, 64)
+		if offset < 0 {
+			offset = 0
+		}
+
+		limit, _ := strconv.Atoi(r.FormValue("limit"))
+		if limit <= 0 {
+			limit = defaultAdminEventsLimit
+		}
+		if limit > maxAdminEventsLimit {
+			limit = maxAdminEventsLimit
+		}
+
+		grids, err := s.model.GetAdminEventGrids(r.Context(), id, offset, limit)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		total, err := s.model.GetAdminEventGridsCount(r.Context(), id)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, response{
+			Grids: grids,
 			Total: total,
 		})
 	}

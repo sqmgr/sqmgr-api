@@ -19,6 +19,7 @@ package model
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/onsi/gomega"
 )
@@ -759,4 +760,287 @@ func TestGetAllUsersExcludesGuestUsers(t *testing.T) {
 	newCount, err := m.GetAllUsersCount(ctx, "")
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(newCount).Should(gomega.Equal(initialCount + 1))
+}
+
+// createTestEventWithGrid is a helper that creates a sports event linked to a grid
+func createTestEventWithGrid(t *testing.T, m *Model, ctx context.Context, league SportsLeague, eventDate time.Time, homeScore, awayScore *int) (*SportsEvent, *Pool, *Grid) {
+	t.Helper()
+	g := gomega.NewWithT(t)
+
+	// Create teams
+	homeTeam := &SportsTeam{
+		ID:           "test-home-" + randString(),
+		League:       league,
+		Name:         "Home " + randString()[:4],
+		FullName:     "Test Home Team",
+		Abbreviation: "HOM",
+	}
+	awayTeam := &SportsTeam{
+		ID:           "test-away-" + randString(),
+		League:       league,
+		Name:         "Away " + randString()[:4],
+		FullName:     "Test Away Team",
+		Abbreviation: "AWY",
+	}
+	err := m.UpsertSportsTeam(ctx, nil, homeTeam)
+	g.Expect(err).Should(gomega.Succeed())
+	err = m.UpsertSportsTeam(ctx, nil, awayTeam)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create event
+	event := m.NewSportsEvent()
+	event.ESPNID = "test-event-" + randString()
+	event.League = league
+	event.HomeTeamID = homeTeam.ID
+	event.AwayTeamID = awayTeam.ID
+	event.EventDate = eventDate
+	event.Season = 2024
+	event.Status = SportsEventStatusScheduled
+	event.HomeScore = homeScore
+	event.AwayScore = awayScore
+	if homeScore != nil {
+		event.Status = SportsEventStatusFinal
+	}
+	err = m.UpsertSportsEvent(ctx, nil, event)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create user, pool, grid
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	pool, err := m.NewPool(ctx, user.ID, "Event Test Pool "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Get the default grid created with the pool
+	grids, err := pool.Grids(ctx, 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(grids)).Should(gomega.BeNumerically(">=", 1))
+
+	grid := grids[0]
+	grid.SetBDLEvent(event)
+	err = grid.Save(ctx)
+	g.Expect(err).Should(gomega.Succeed())
+
+	return event, pool, grid
+}
+
+func TestGetAdminLinkedEvents(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Get initial count
+	initialCount, err := m.GetAdminLinkedEventsCount(ctx)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create an event with a linked grid
+	event, _, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNFL, time.Now().Add(24*time.Hour), nil, nil)
+
+	// Verify it appears in results
+	events, err := m.GetAdminLinkedEvents(ctx, 0, 100, "", "")
+	g.Expect(err).Should(gomega.Succeed())
+
+	var found *AdminLinkedEvent
+	for _, e := range events {
+		if e.ID == event.ID {
+			found = e
+			break
+		}
+	}
+	g.Expect(found).ShouldNot(gomega.BeNil())
+	g.Expect(found.GridCount).Should(gomega.Equal(int64(1)))
+	g.Expect(found.League).Should(gomega.Equal(SportsLeagueNFL))
+	g.Expect(found.HomeTeam).ShouldNot(gomega.BeNil())
+	g.Expect(found.AwayTeam).ShouldNot(gomega.BeNil())
+
+	// Verify count increased
+	newCount, err := m.GetAdminLinkedEventsCount(ctx)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(newCount).Should(gomega.Equal(initialCount + 1))
+}
+
+func TestGetAdminLinkedEventsWithScores(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	homeScore := 24
+	awayScore := 17
+	event, _, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNFL, time.Now(), &homeScore, &awayScore)
+
+	events, err := m.GetAdminLinkedEvents(ctx, 0, 100, "", "")
+	g.Expect(err).Should(gomega.Succeed())
+
+	var found *AdminLinkedEvent
+	for _, e := range events {
+		if e.ID == event.ID {
+			found = e
+			break
+		}
+	}
+	g.Expect(found).ShouldNot(gomega.BeNil())
+	g.Expect(found.HomeScore).ShouldNot(gomega.BeNil())
+	g.Expect(*found.HomeScore).Should(gomega.Equal(24))
+	g.Expect(found.AwayScore).ShouldNot(gomega.BeNil())
+	g.Expect(*found.AwayScore).Should(gomega.Equal(17))
+}
+
+func TestGetAdminLinkedEventsSorting(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create event 1: earlier date, 1 grid
+	event1, _, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNBA, time.Now().Add(-48*time.Hour), nil, nil)
+
+	// Create event 2: later date, 2 grids (add extra grid)
+	event2, pool2, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNBA, time.Now().Add(48*time.Hour), nil, nil)
+
+	// Add a second grid linked to event2
+	extraGrid := pool2.NewGrid()
+	extraGrid.SetBDLEventID(&event2.ID)
+	err := extraGrid.Save(ctx)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Sort by eventDate ascending - event1 (earlier) should come first
+	events, err := m.GetAdminLinkedEvents(ctx, 0, 100, "eventDate", "asc")
+	g.Expect(err).Should(gomega.Succeed())
+
+	var idx1, idx2 int
+	for i, e := range events {
+		if e.ID == event1.ID {
+			idx1 = i
+		}
+		if e.ID == event2.ID {
+			idx2 = i
+		}
+	}
+	g.Expect(idx1).Should(gomega.BeNumerically("<", idx2))
+
+	// Sort by gridCount descending - event2 (2 grids) should come first
+	events, err = m.GetAdminLinkedEvents(ctx, 0, 100, "gridCount", "desc")
+	g.Expect(err).Should(gomega.Succeed())
+
+	for i, e := range events {
+		if e.ID == event1.ID {
+			idx1 = i
+		}
+		if e.ID == event2.ID {
+			idx2 = i
+		}
+	}
+	g.Expect(idx2).Should(gomega.BeNumerically("<", idx1))
+}
+
+func TestGetAdminLinkedEventsExcludesUnlinked(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create an event with NO grids linked
+	homeTeam := &SportsTeam{
+		ID:           "test-home-" + randString(),
+		League:       SportsLeagueNFL,
+		Name:         "Unlinked Home",
+		FullName:     "Unlinked Home Team",
+		Abbreviation: "UNH",
+	}
+	awayTeam := &SportsTeam{
+		ID:           "test-away-" + randString(),
+		League:       SportsLeagueNFL,
+		Name:         "Unlinked Away",
+		FullName:     "Unlinked Away Team",
+		Abbreviation: "UNA",
+	}
+	err := m.UpsertSportsTeam(ctx, nil, homeTeam)
+	g.Expect(err).Should(gomega.Succeed())
+	err = m.UpsertSportsTeam(ctx, nil, awayTeam)
+	g.Expect(err).Should(gomega.Succeed())
+
+	event := m.NewSportsEvent()
+	event.ESPNID = "test-unlinked-" + randString()
+	event.League = SportsLeagueNFL
+	event.HomeTeamID = homeTeam.ID
+	event.AwayTeamID = awayTeam.ID
+	event.EventDate = time.Now()
+	event.Season = 2024
+	event.Status = SportsEventStatusScheduled
+	err = m.UpsertSportsEvent(ctx, nil, event)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Verify it does NOT appear in linked events
+	events, err := m.GetAdminLinkedEvents(ctx, 0, 1000, "", "")
+	g.Expect(err).Should(gomega.Succeed())
+
+	for _, e := range events {
+		g.Expect(e.ID).ShouldNot(gomega.Equal(event.ID))
+	}
+}
+
+func TestGetAdminEventGrids(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create event with one grid via helper
+	event, pool1, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNFL, time.Now(), nil, nil)
+
+	// Create a second pool with a grid linked to the same event
+	user2, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	pool2, err := m.NewPool(ctx, user2.ID, "Second Pool "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+
+	grids2, err := pool2.Grids(ctx, 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(grids2)).Should(gomega.BeNumerically(">=", 1))
+
+	grid2 := grids2[0]
+	grid2.SetBDLEvent(event)
+	err = grid2.Save(ctx)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Get grids for this event
+	eventGrids, err := m.GetAdminEventGrids(ctx, event.ID, 0, 100)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(eventGrids)).Should(gomega.Equal(2))
+
+	// Verify grid details
+	poolTokens := map[string]bool{}
+	for _, eg := range eventGrids {
+		g.Expect(eg.GridID).Should(gomega.BeNumerically(">", 0))
+		g.Expect(eg.GridName).ShouldNot(gomega.BeEmpty())
+		g.Expect(eg.PoolToken).ShouldNot(gomega.BeEmpty())
+		g.Expect(eg.PoolName).ShouldNot(gomega.BeEmpty())
+		g.Expect(eg.GridState).Should(gomega.Equal("active"))
+		poolTokens[eg.PoolToken] = true
+	}
+
+	// Verify grids come from both pools
+	g.Expect(poolTokens[pool1.Token()]).Should(gomega.BeTrue())
+	g.Expect(poolTokens[pool2.Token()]).Should(gomega.BeTrue())
+}
+
+func TestGetAdminEventGridsEmpty(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Query grids for a non-existent event ID
+	grids, err := m.GetAdminEventGrids(ctx, 999999999, 0, 100)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(grids).Should(gomega.HaveLen(0))
 }
