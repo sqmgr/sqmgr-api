@@ -25,11 +25,11 @@ import (
 
 // AdminStats holds site-wide statistics for admin dashboard
 type AdminStats struct {
-	TotalPools    int64 `json:"totalPools"`
-	TotalUsers    int64 `json:"totalUsers"`
-	GuestUsers    int64 `json:"guestUsers"`
-	ActivePools   int64 `json:"activePools"`
-	ArchivedPools int64 `json:"archivedPools"`
+	TotalPools     int64 `json:"totalPools"`
+	TotalUsers     int64 `json:"totalUsers"`
+	GuestUsers     int64 `json:"guestUsers"`
+	ActivePools    int64 `json:"activePools"`
+	ClaimedSquares int64 `json:"claimedSquares"`
 }
 
 // AdminPool represents a pool in the admin list with additional metadata
@@ -117,14 +117,14 @@ func (m *Model) GetAdminStats(ctx context.Context, period string) (*AdminStats, 
 		return nil, fmt.Errorf("counting active pools: %w", err)
 	}
 
-	// Archived pools
-	query = "SELECT COUNT(*) FROM pools WHERE archived = true"
+	// Claimed squares (state != 'unclaimed')
+	query = "SELECT COUNT(*) FROM pool_squares WHERE state != 'unclaimed'"
 	if interval != "" {
-		query += fmt.Sprintf(" AND created > NOW() - INTERVAL '%s'", interval)
+		query += fmt.Sprintf(" AND modified > NOW() - INTERVAL '%s'", interval)
 	}
 	row = m.DB.QueryRowContext(ctx, query)
-	if err := row.Scan(&stats.ArchivedPools); err != nil {
-		return nil, fmt.Errorf("counting archived pools: %w", err)
+	if err := row.Scan(&stats.ClaimedSquares); err != nil {
+		return nil, fmt.Errorf("counting claimed squares: %w", err)
 	}
 
 	return stats, nil

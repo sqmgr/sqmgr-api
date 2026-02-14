@@ -47,15 +47,32 @@ func TestGetAdminStats(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Create an active pool
-	activePool, err := m.NewPool(ctx, auth0User.ID, "Active Test Pool", GridTypeStd100, "password", NumberSetConfigStandard)
+	activePool, err := m.NewPool(ctx, auth0User.ID, "Active Test Pool", GridTypeStd25, "password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(activePool).ShouldNot(gomega.BeNil())
 
-	// Create an archived pool
-	archivedPool, err := m.NewPool(ctx, auth0User.ID, "Archived Test Pool", GridTypeStd25, "password", NumberSetConfigStandard)
+	// Claim a square in the active pool
+	squares, err := activePool.Squares()
 	g.Expect(err).Should(gomega.Succeed())
-	archivedPool.SetArchived(true)
-	g.Expect(archivedPool.Save(ctx)).Should(gomega.Succeed())
+	var square *PoolSquare
+	for _, sq := range squares {
+		square = sq
+		break
+	}
+	g.Expect(square).ShouldNot(gomega.BeNil())
+	square.claimant = "Test Claimant"
+	square.State = PoolSquareStateClaimed
+	square.SetUserID(auth0User.ID)
+	err = square.Save(ctx, m.DB, true, PoolSquareLog{
+		Note:       "Test claim",
+		RemoteAddr: "127.0.0.1",
+	})
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Create a second pool
+	pool2, err := m.NewPool(ctx, auth0User.ID, "Second Test Pool", GridTypeStd25, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(pool2).ShouldNot(gomega.BeNil())
 
 	// Get updated stats
 	stats, err := m.GetAdminStats(ctx, "all")
@@ -63,8 +80,8 @@ func TestGetAdminStats(t *testing.T) {
 
 	// Verify counts increased correctly
 	g.Expect(stats.TotalPools).Should(gomega.Equal(initialStats.TotalPools + 2))
-	g.Expect(stats.ActivePools).Should(gomega.Equal(initialStats.ActivePools + 1))
-	g.Expect(stats.ArchivedPools).Should(gomega.Equal(initialStats.ArchivedPools + 1))
+	g.Expect(stats.ActivePools).Should(gomega.Equal(initialStats.ActivePools + 2))
+	g.Expect(stats.ClaimedSquares).Should(gomega.Equal(initialStats.ClaimedSquares + 1))
 }
 
 func TestGetAdminStatsWithPeriod(t *testing.T) {
