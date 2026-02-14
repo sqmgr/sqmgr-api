@@ -1,17 +1,18 @@
 /*
-Copyright 2019 Tom Peters
+Copyright (C) 2019 Tom Peters
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-   http://www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 package model
@@ -38,7 +39,7 @@ func TestJoinGrid(t *testing.T) {
 	u2, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
-	pool, err := m.NewPool(context.Background(), u.ID, "test", GridTypeStd100, "join-password")
+	pool, err := m.NewPool(context.Background(), u.ID, "test", GridTypeStd100, "join-password", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 
 	g.Expect(u.JoinPool(context.Background(), pool)).Should(gomega.Succeed())
@@ -108,4 +109,80 @@ func ensureIntegration(t *testing.T) {
 	if len(os.Getenv("INTEGRATION")) == 0 {
 		t.Skip("skipping. to run, use -integration flag")
 	}
+}
+
+func TestUserIsAdmin(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(user.IsAdmin).Should(gomega.BeFalse())
+
+	// Set user as admin directly in database
+	_, err = m.DB.ExecContext(ctx, "UPDATE users SET is_admin = true WHERE id = $1", user.ID)
+	g.Expect(err).Should(gomega.Succeed())
+
+	// Reload user via GetUserByID
+	reloadedUser, err := m.GetUserByID(ctx, user.ID)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(reloadedUser.IsAdmin).Should(gomega.BeTrue())
+
+	// Clean up - reset admin status
+	_, err = m.DB.ExecContext(ctx, "UPDATE users SET is_admin = false WHERE id = $1", user.ID)
+	g.Expect(err).Should(gomega.Succeed())
+}
+
+func TestUserEmail(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(user.Email).Should(gomega.BeNil())
+
+	// Set email
+	testEmail := "test@example.com"
+	err = user.SetEmail(ctx, testEmail)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(user.Email).ShouldNot(gomega.BeNil())
+	g.Expect(*user.Email).Should(gomega.Equal(testEmail))
+
+	// Reload user and verify email persisted
+	reloadedUser, err := m.GetUserByID(ctx, user.ID)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(reloadedUser.Email).ShouldNot(gomega.BeNil())
+	g.Expect(*reloadedUser.Email).Should(gomega.Equal(testEmail))
+
+	// Update email
+	newEmail := "new@example.com"
+	err = reloadedUser.SetEmail(ctx, newEmail)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(*reloadedUser.Email).Should(gomega.Equal(newEmail))
+}
+
+func TestUserEmailNullable(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Create a user without email
+	user, err := m.GetUser(ctx, IssuerSqMGR, randString())
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(user.Email).Should(gomega.BeNil())
+
+	// Reload and verify email is still nil
+	reloadedUser, err := m.GetUserByID(ctx, user.ID)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(reloadedUser.Email).Should(gomega.BeNil())
 }

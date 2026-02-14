@@ -1,17 +1,18 @@
 /*
-Copyright 2019 Tom Peters
+Copyright (C) 2019 Tom Peters
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-   http://www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 package model
@@ -21,8 +22,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // ErrUserExists is an error when the user already exists (when trying to create a new account)
@@ -36,8 +38,9 @@ type UserStore string
 
 // constants for the JWT "iss" (issuer) claim
 const (
-	IssuerAuth0 = "https://sqmgr.auth0.com/"
-	IssuerSqMGR = "https://api.sqmgr.com/"
+	IssuerAuth0    = "https://sqmgr.auth0.com/"
+	IssuerSqMGR    = "https://api.sqmgr.com/"
+	ClaimNamespace = "https://sqmgr.com"
 )
 
 // constants for UserStore
@@ -57,6 +60,8 @@ type User struct {
 	ID      int64
 	Store   UserStore
 	StoreID string
+	IsAdmin bool
+	Email   *string
 	Created time.Time
 
 	// not stored in the database
@@ -84,8 +89,8 @@ func (u *User) HasPermission(action Permission) bool {
 func (m *Model) userByRow(row *sql.Row) (*User, error) {
 	var u User
 	u.Model = m
-	if err := row.Scan(&u.ID, &u.Store, &u.StoreID, &u.Created); err != nil {
-		return nil, err
+	if err := row.Scan(&u.ID, &u.Store, &u.StoreID, &u.IsAdmin, &u.Email, &u.Created); err != nil {
+		return nil, fmt.Errorf("scanning user row: %w", err)
 	}
 
 	return &u, nil
@@ -93,7 +98,7 @@ func (m *Model) userByRow(row *sql.Row) (*User, error) {
 
 // GetUserByID will return a user by its ID.
 func (m *Model) GetUserByID(ctx context.Context, id int64) (*User, error) {
-	row := m.DB.QueryRowContext(ctx, "SELECT id, store, store_id, created FROM users WHERE id = $1", id)
+	row := m.DB.QueryRowContext(ctx, "SELECT id, store, store_id, is_admin, email, created FROM users WHERE id = $1", id)
 	return m.userByRow(row)
 }
 
@@ -104,7 +109,7 @@ func (m *Model) GetUser(ctx context.Context, issuer, storeID string) (*User, err
 		return nil, fmt.Errorf("invalid issuer: %s", issuer)
 	}
 
-	row := m.DB.QueryRowContext(ctx, "SELECT id, store, store_id, created FROM get_user($1, $2)", store, storeID)
+	row := m.DB.QueryRowContext(ctx, "SELECT id, store, store_id, is_admin, email, created FROM get_user($1, $2)", store, storeID)
 	return m.userByRow(row)
 }
 
@@ -112,20 +117,22 @@ func (m *Model) GetUser(ctx context.Context, issuer, storeID string) (*User, err
 func (u *User) JoinPool(ctx context.Context, p *Pool) error {
 	// no-op
 	if isAdmin, err := u.IsAdminOf(ctx, p); err != nil {
-		return err
+		return fmt.Errorf("checking admin status: %w", err)
 	} else if isAdmin {
 		return nil
 	}
 
-	_, err := u.DB.ExecContext(ctx, "INSERT INTO pools_users (pool_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", p.id, u.ID)
-	return err
+	if _, err := u.DB.ExecContext(ctx, "INSERT INTO pools_users (pool_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", p.id, u.ID); err != nil {
+		return fmt.Errorf("inserting pool user: %w", err)
+	}
+	return nil
 }
 
 // LeavePool will unlink a user from a pool
 func (u *User) LeavePool(ctx context.Context, p *Pool) error {
 	_, err := u.DB.ExecContext(ctx, "DELETE FROM pools_users WHERE pool_id = $1 AND user_id = $2", p.ID(), u.ID)
 	if err != nil {
-		return fmt.Errorf("could not delete pools_users: %v", err)
+		return fmt.Errorf("deleting pool user: %w", err)
 	}
 
 	return nil
@@ -144,11 +151,11 @@ func (u *User) IsMemberOf(ctx context.Context, p *Pool) (bool, error) {
 
 	var ok bool
 	if err := row.Scan(&ok); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
 
-		return false, err
+		return false, fmt.Errorf("checking pool membership: %w", err)
 	}
 
 	return ok, nil
@@ -166,8 +173,11 @@ SET
 WHERE
 	pool_id = $2 AND
   	user_id = $3`, isAdmin, p.ID(), u.ID)
+	if err != nil {
+		return fmt.Errorf("updating admin status: %w", err)
+	}
 
-	return err
+	return nil
 }
 
 // IsAdminOf will return true if the user is the admin of the grid
@@ -182,11 +192,11 @@ func (u *User) IsAdminOf(ctx context.Context, p *Pool) (bool, error) {
 
 	var ok bool
 	if err := row.Scan(&ok); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
 
-		return false, err
+		return false, fmt.Errorf("checking admin status: %w", err)
 	}
 
 	return ok, nil
@@ -198,8 +208,18 @@ func (u *User) PoolsCreatedWithin(ctx context.Context, within time.Duration) (in
 	row := u.DB.QueryRowContext(ctx, query, u.ID, within/time.Microsecond)
 	var count int
 	if err := row.Scan(&count); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("counting pools created within duration: %w", err)
 	}
 
 	return count, nil
+}
+
+// SetEmail updates the user's email in the database
+func (u *User) SetEmail(ctx context.Context, email string) error {
+	_, err := u.DB.ExecContext(ctx, "UPDATE users SET email = $1 WHERE id = $2", email, u.ID)
+	if err != nil {
+		return fmt.Errorf("updating user email: %w", err)
+	}
+	u.Email = &email
+	return nil
 }

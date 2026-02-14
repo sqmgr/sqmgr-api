@@ -1,0 +1,116 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sqmgr-sports-sync-teams
+  labels:
+    app: sqmgr-sports-sync
+    tier: cron
+spec:
+  schedule: '0 6 * * 0'  # Weekly on Sunday at 6am UTC
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    metadata:
+      labels:
+        app: sqmgr-sports-sync
+        tier: cron
+    spec:
+      parallelism: 1
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: sqmgr-sports-sync-teams
+              image: ghcr.io/sqmgr/sqmgr-api:latest
+              command:
+                - '/bin/sqmgr-sports-sync'
+                - '--sync-teams'
+              envFrom:
+                - secretRef:
+                    name: sqmgr-config
+              env:
+                - name: SQMGR_CONF_DSN
+                  value: 'dbname=$(PG_DBNAME) host=$(PG_HOST) port=$(PG_PORT) user=$(PG_USER) sslmode=$(PG_SSLMODE) password=$(PG_PASSWORD)'
+                - name: SQMGR_CONF_JWT_PRIVATE_KEY
+                  value: '-'
+                - name: SQMGR_CONF_JWT_PUBLIC_KEY
+                  value: '-'
+          imagePullSecrets:
+            - name: github
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sqmgr-sports-sync-schedule
+  labels:
+    app: sqmgr-sports-sync
+    tier: cron
+spec:
+  schedule: '0 1/8 * * *'  # 1am, 9am, 5pm
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    metadata:
+      labels:
+        app: sqmgr-sports-sync
+        tier: cron
+    spec:
+      parallelism: 1
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: sqmgr-sports-sync-schedule
+              image: ghcr.io/sqmgr/sqmgr-api:latest
+              command:
+                - '/bin/sqmgr-sports-sync'
+                - '--sync-schedule'
+              envFrom:
+                - secretRef:
+                    name: sqmgr-config
+              env:
+                - name: SQMGR_CONF_DSN
+                  value: 'dbname=$(PG_DBNAME) host=$(PG_HOST) port=$(PG_PORT) user=$(PG_USER) sslmode=$(PG_SSLMODE) password=$(PG_PASSWORD)'
+                - name: SQMGR_CONF_JWT_PRIVATE_KEY
+                  value: '-'
+                - name: SQMGR_CONF_JWT_PUBLIC_KEY
+                  value: '-'
+          imagePullSecrets:
+            - name: github
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sqmgr-sports-sync-scores
+  labels:
+    app: sqmgr-sports-sync
+    tier: cron
+spec:
+  schedule: '*/5 * * * *'  # Every 5 minutes
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    metadata:
+      labels:
+        app: sqmgr-sports-sync
+        tier: cron
+    spec:
+      parallelism: 1
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: sqmgr-sports-sync-scores
+              image: ghcr.io/sqmgr/sqmgr-api:latest
+              command:
+                - '/bin/sqmgr-sports-sync'
+                - '--sync-scores'
+              envFrom:
+                - secretRef:
+                    name: sqmgr-config
+              env:
+                - name: SQMGR_CONF_DSN
+                  value: 'dbname=$(PG_DBNAME) host=$(PG_HOST) port=$(PG_PORT) user=$(PG_USER) sslmode=$(PG_SSLMODE) password=$(PG_PASSWORD)'
+                - name: SQMGR_CONF_JWT_PRIVATE_KEY
+                  value: '-'
+                - name: SQMGR_CONF_JWT_PUBLIC_KEY
+                  value: '-'
+          imagePullSecrets:
+            - name: github

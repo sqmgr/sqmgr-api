@@ -1,27 +1,31 @@
 /*
-Copyright 2019 Tom Peters
+Copyright (C) 2019 Tom Peters
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-   http://www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 package server
 
 import (
+	"context"
 	"database/sql"
+
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"github.com/sqmgr/sqmgr-api/internal/config"
 	"github.com/sqmgr/sqmgr-api/internal/keylocker"
+	"github.com/sqmgr/sqmgr-api/pkg/auth0"
 	"github.com/sqmgr/sqmgr-api/pkg/model"
 	"github.com/sqmgr/sqmgr-api/pkg/smjwt"
 )
@@ -29,10 +33,15 @@ import (
 // Server represents the SqMGR server
 type Server struct {
 	*mux.Router
-	model     *model.Model
-	version   string
-	keyLocker *keylocker.KeyLocker
-	smjwt     *smjwt.SMJWT
+	model           *model.Model
+	version         string
+	keyLocker       *keylocker.KeyLocker
+	smjwt           *smjwt.SMJWT
+	rateLimiter     *RateLimiter
+	authRateLimiter *RateLimiter
+	auth0Client     *auth0.Client
+	broker          *PoolBroker
+	pgListener      *PGListener
 }
 
 // New returns a new server object
@@ -45,20 +54,51 @@ func New(version string, db *sql.DB) *Server {
 		logrus.WithError(err).Fatal("could not load private key")
 	}
 
+	// Rate limit: 10 requests per second with burst of 20
+	rl := NewRateLimiter(10, 20)
+
+	// Auth rate limit: 5 failed attempts per minute per IP
+	authRL := NewRateLimiter(5.0/60.0, 5)
+
+	// Initialize Auth0 Management API client
+	auth0Client := auth0.NewClient(auth0.Config{
+		Domain:       config.Auth0MgmtDomain(),
+		ClientID:     config.Auth0MgmtClientID(),
+		ClientSecret: config.Auth0MgmtClientSecret(),
+	})
+
 	s := &Server{
-		Router:    mux.NewRouter(),
-		model:     model.New(db),
-		keyLocker: keylocker.New("https://sqmgr.auth0.com/.well-known/jwks.json"),
-		smjwt:     sj,
-		version:   version,
+		Router:          mux.NewRouter(),
+		model:           model.New(db),
+		keyLocker:       keylocker.New(config.Auth0JWKSURL()),
+		smjwt:           sj,
+		version:         version,
+		rateLimiter:     rl,
+		authRateLimiter: authRL,
+		auth0Client:     auth0Client,
+		broker:          NewPoolBroker(),
 	}
 
 	s.setupRoutes()
+
+	// Start PostgreSQL listener for real-time score update notifications
+	pgListener, err := NewPGListener(config.DSN(), s.model, s.broker)
+	if err != nil {
+		logrus.WithError(err).Error("could not start pg listener for score updates (SSE notifications will not work)")
+	} else {
+		pgListener.Start(context.Background())
+		s.pgListener = pgListener
+	}
 
 	return s
 }
 
 // Shutdown will handle any cleanup
 func (s *Server) Shutdown() error {
+	if s.pgListener != nil {
+		if err := s.pgListener.Close(); err != nil {
+			logrus.WithError(err).Error("could not close pg listener")
+		}
+	}
 	return nil
 }

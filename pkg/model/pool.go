@@ -1,17 +1,18 @@
 /*
-Copyright 2019 Tom Peters
+Copyright (C) 2019 Tom Peters
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-   http://www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 package model
@@ -44,6 +45,7 @@ type Pool struct {
 	userID           int64
 	name             string
 	gridType         GridType
+	numberSetConfig  NumberSetConfig
 	passwordHash     string
 	checkID          int
 	archived         bool
@@ -125,20 +127,26 @@ func PoolWithID(id int64) *Pool {
 
 // PoolJSON represents an object that can be exposed to an end-user
 type PoolJSON struct {
-	Token            string    `json:"token"`
-	Name             string    `json:"name"`
-	GridType         GridType  `json:"gridType"`
-	Archived         bool      `json:"archived"`
-	PasswordRequired bool      `json:"passwordRequired"`
-	OpenAccessOnLock bool      `json:"openAccessOnLock"`
-	Locks            time.Time `json:"locks"`
-	Created          time.Time `json:"created"`
-	Modified         time.Time `json:"modified"`
+	Token            string          `json:"token"`
+	Name             string          `json:"name"`
+	GridType         GridType        `json:"gridType"`
+	NumberSetConfig  NumberSetConfig `json:"numberSetConfig"`
+	Archived         bool            `json:"archived"`
+	PasswordRequired bool            `json:"passwordRequired"`
+	OpenAccessOnLock bool            `json:"openAccessOnLock"`
+	Locks            time.Time       `json:"locks"`
+	Created          time.Time       `json:"created"`
+	Modified         time.Time       `json:"modified"`
 }
 
 // ID returns the id
 func (p *Pool) ID() int64 {
 	return p.id
+}
+
+// UserID returns the owner's user ID
+func (p *Pool) UserID() int64 {
+	return p.userID
 }
 
 // Token is a getter for the token
@@ -191,6 +199,7 @@ func (p *Pool) JSON() *PoolJSON {
 		Token:            p.token,
 		Name:             p.name,
 		GridType:         p.gridType,
+		NumberSetConfig:  p.numberSetConfig,
 		Archived:         p.Archived(),
 		PasswordRequired: p.PasswordRequired(),
 		OpenAccessOnLock: p.OpenAccessOnLock(),
@@ -200,11 +209,42 @@ func (p *Pool) JSON() *PoolJSON {
 	}
 }
 
+// NumberSetConfig returns the number set configuration
+func (p *Pool) NumberSetConfig() NumberSetConfig {
+	return p.numberSetConfig
+}
+
+// SetNumberSetConfig sets the number set configuration
+func (p *Pool) SetNumberSetConfig(config NumberSetConfig) {
+	p.numberSetConfig = config
+}
+
+// CanChangeNumberSetConfig returns true if the number set config can be changed.
+// This is only allowed if no grid has had its numbers drawn.
+func (p *Pool) CanChangeNumberSetConfig(ctx context.Context) (bool, error) {
+	grids, err := p.Grids(ctx, 0, MaxGridsPerPool)
+	if err != nil {
+		return false, err
+	}
+
+	for _, grid := range grids {
+		if p.numberSetConfig != NumberSetConfigStandard {
+			if err := grid.LoadNumberSets(ctx); err != nil {
+				return false, err
+			}
+		}
+		if grid.NumbersAreDrawn(p.numberSetConfig) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 func (m *Model) poolByRow(scan scanFunc) (*Pool, error) {
 	pool := Pool{model: m}
 	var locks *time.Time
-	if err := scan(&pool.id, &pool.token, &pool.userID, &pool.name, &pool.gridType, &pool.passwordHash, &pool.passwordRequired, &pool.openAccessOnLock, &locks, &pool.created, &pool.modified, &pool.checkID, &pool.archived); err != nil {
-		return nil, err
+	if err := scan(&pool.id, &pool.token, &pool.userID, &pool.name, &pool.gridType, &pool.numberSetConfig, &pool.passwordHash, &pool.passwordRequired, &pool.openAccessOnLock, &locks, &pool.created, &pool.modified, &pool.checkID, &pool.archived); err != nil {
+		return nil, fmt.Errorf("scanning pool row: %w", err)
 	}
 
 	if locks != nil {
@@ -279,7 +319,7 @@ func (m *Model) PoolsOwnedByUserIDCount(ctx context.Context, userID int64, inclu
 
 func (m *Model) poolsByRows(rows *sql.Rows, err error) ([]*Pool, error) {
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("querying pools: %w", err)
 	}
 	defer rows.Close()
 
@@ -299,7 +339,7 @@ func (m *Model) poolsByRows(rows *sql.Rows, err error) ([]*Pool, error) {
 func (m *Model) poolsCount(row *sql.Row) (int64, error) {
 	var count int64
 	if err := row.Scan(&count); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("counting pools: %w", err)
 	}
 
 	return count, nil
@@ -318,31 +358,35 @@ func (m *Model) PoolByID(id int64) (*Pool, error) {
 }
 
 // NewPool will save new pool into the database
-func (m *Model) NewPool(ctx context.Context, userID int64, name string, gridType GridType, password string) (*Pool, error) {
+func (m *Model) NewPool(ctx context.Context, userID int64, name string, gridType GridType, password string, numberSetConfig NumberSetConfig) (*Pool, error) {
 	if err := IsValidGridType(string(gridType)); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("validating grid type: %w", err)
+	}
+
+	if !IsValidNumberSetConfig(string(numberSetConfig)) {
+		return nil, fmt.Errorf("invalid number set config: %s", numberSetConfig)
 	}
 
 	token, err := m.NewToken()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("generating token: %w", err)
 	}
 
 	passwordHash, err := argon2id.DefaultHashPassword(password)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hashing password: %w", err)
 	}
 
 	const query = `
 		SELECT ` + poolColumns + `
-		FROM new_pool($1, $2, $3, $4, $5, $6) AS pools
+		FROM new_pool($1, $2, $3, $4, $5, $6, $7) AS pools
 	`
 
-	row := m.DB.QueryRowContext(ctx, query, token, userID, name, gridType, passwordHash, gridType.Squares())
+	row := m.DB.QueryRowContext(ctx, query, token, userID, name, gridType, passwordHash, gridType.Squares(), numberSetConfig)
 
 	pool, err := m.poolByRow(row.Scan)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating pool: %w", err)
 	}
 
 	return pool, nil
@@ -352,7 +396,7 @@ func (m *Model) NewPool(ctx context.Context, userID int64, name string, gridType
 func (p *Pool) SetPassword(password string) error {
 	passwordHash, err := argon2id.DefaultHashPassword(password)
 	if err != nil {
-		return err
+		return fmt.Errorf("hashing password: %w", err)
 	}
 
 	p.passwordHash = passwordHash
@@ -371,8 +415,9 @@ SET name = $1,
     archived = $6,
     password_required = $7,
     open_access_on_lock = $8,
+    number_set_config = $9,
     modified = (NOW() AT TIME ZONE 'utc')
-WHERE id = $9`
+WHERE id = $10`
 
 	var locks *time.Time
 	if !p.locks.IsZero() {
@@ -380,8 +425,11 @@ WHERE id = $9`
 		locks = &locksInUTC
 	}
 
-	_, err := p.model.DB.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.archived, p.passwordRequired, p.openAccessOnLock, p.id)
-	return err
+	_, err := p.model.DB.ExecContext(ctx, query, p.name, p.gridType, p.passwordHash, locks, p.checkID, p.archived, p.passwordRequired, p.openAccessOnLock, p.numberSetConfig, p.id)
+	if err != nil {
+		return fmt.Errorf("saving pool: %w", err)
+	}
+	return nil
 }
 
 // PasswordIsValid is will return true if the password matches
@@ -669,8 +717,10 @@ func (p *Pool) SetGridsOrder(ctx context.Context, gridIDs []int64) error {
 	// pool_id is present to ensure user has access (prevents us from having to check the owner of every grid)
 	stmt, err := tx.PrepareContext(ctx, "UPDATE grids SET ord = $1, modified = (NOW() at time zone 'UTC') WHERE id = $2 AND pool_id = $3")
 	if err != nil {
+		rollback()
 		return err
 	}
+	defer stmt.Close()
 
 	for ord, id := range gridIDs {
 		l := logrus.WithFields(logrus.Fields{"pool_id": p.id, "grid_id": id})
@@ -734,6 +784,7 @@ pools.token,
 pools.user_id,
 pools.name,
 pools.grid_type,
+pools.number_set_config,
 pools.password_hash,
 pools.password_required,
 pools.open_access_on_lock,

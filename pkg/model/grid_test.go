@@ -1,17 +1,18 @@
 /*
-Copyright 2019 Tom Peters
+Copyright (C) 2019 Tom Peters
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-   http://www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 package model
@@ -48,11 +49,11 @@ func TestGridName(t *testing.T) {
 	grid.SetLabel("")
 	g.Expect(grid.Name()).Should(gomega.Equal("Away Team vs. Home Team"))
 
-	grid.SetHomeTeamName(strings.Repeat("á", 50) + "é")
-	g.Expect(grid.HomeTeamName()).Should(gomega.Equal(strings.Repeat("á", 50)))
+	grid.SetHomeTeamName(strings.Repeat("á", 75) + "é")
+	g.Expect(grid.HomeTeamName()).Should(gomega.Equal(strings.Repeat("á", 75)))
 
-	grid.SetAwayTeamName(strings.Repeat("í", 50) + "é")
-	g.Expect(grid.AwayTeamName()).Should(gomega.Equal(strings.Repeat("í", 50)))
+	grid.SetAwayTeamName(strings.Repeat("í", 75) + "é")
+	g.Expect(grid.AwayTeamName()).Should(gomega.Equal(strings.Repeat("í", 75)))
 }
 
 func TestGrid(t *testing.T) {
@@ -66,7 +67,7 @@ func TestGrid(t *testing.T) {
 	user, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
-	pool, err := m.NewPool(context.Background(), user.ID, "My Pool", GridTypeStd25, "my-pass")
+	pool, err := m.NewPool(context.Background(), user.ID, "My Pool", GridTypeStd25, "my-pass", NumberSetConfigStandard)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(pool.id).Should(gomega.BeNumerically(">", 0))
 	g.Expect(pool.token).ShouldNot(gomega.BeEmpty())
@@ -242,10 +243,86 @@ func getPool(m *Model) *Pool {
 		panic(err)
 	}
 
-	pool, err := m.NewPool(context.Background(), user.ID, "Test Pool", GridTypeStd25, "my-password")
+	pool, err := m.NewPool(context.Background(), user.ID, "Test Pool", GridTypeStd25, "my-password", NumberSetConfigStandard)
 	if err != nil {
 		panic(err)
 	}
 
 	return pool
+}
+
+func TestGridPayoutConfig(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	grid := &Grid{}
+
+	// Initially nil
+	g.Expect(grid.PayoutConfig()).Should(gomega.BeNil())
+
+	// Set a config
+	config := NumberSetConfigHF
+	grid.SetPayoutConfig(&config)
+	g.Expect(grid.PayoutConfig()).ShouldNot(gomega.BeNil())
+	g.Expect(*grid.PayoutConfig()).Should(gomega.Equal(NumberSetConfigHF))
+
+	// Clear the config
+	grid.SetPayoutConfig(nil)
+	g.Expect(grid.PayoutConfig()).Should(gomega.BeNil())
+}
+
+func TestGridPayoutConfigJSON(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	grid := &Grid{}
+
+	// JSON without payout config should have nil PayoutConfig
+	json := grid.JSON()
+	g.Expect(json.PayoutConfig).Should(gomega.BeNil())
+
+	// JSON with payout config should include it
+	config := NumberSetConfig123F
+	grid.SetPayoutConfig(&config)
+	json = grid.JSON()
+	g.Expect(json.PayoutConfig).ShouldNot(gomega.BeNil())
+	g.Expect(*json.PayoutConfig).Should(gomega.Equal(NumberSetConfig123F))
+}
+
+func TestGridPayoutConfigIntegration(t *testing.T) {
+	if len(os.Getenv("INTEGRATION")) == 0 {
+		t.Skip("skipping. to run, use -integration flag")
+	}
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+
+	pool := getPool(m)
+
+	grids, err := pool.Grids(context.Background(), 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(grids)).Should(gomega.BeNumerically(">=", 1))
+
+	grid := grids[0]
+
+	// Initially should be nil
+	g.Expect(grid.PayoutConfig()).Should(gomega.BeNil())
+
+	// Set payout config and save
+	config := NumberSetConfigHF
+	grid.SetPayoutConfig(&config)
+	g.Expect(grid.Save(context.Background())).Should(gomega.Succeed())
+
+	// Reload and verify
+	grid, err = pool.GridByID(context.Background(), grid.id)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(grid.PayoutConfig()).ShouldNot(gomega.BeNil())
+	g.Expect(*grid.PayoutConfig()).Should(gomega.Equal(NumberSetConfigHF))
+
+	// Clear payout config and save
+	grid.SetPayoutConfig(nil)
+	g.Expect(grid.Save(context.Background())).Should(gomega.Succeed())
+
+	// Reload and verify
+	grid, err = pool.GridByID(context.Background(), grid.id)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(grid.PayoutConfig()).Should(gomega.BeNil())
 }

@@ -1,17 +1,18 @@
 /*
-Copyright 2019 Tom Peters
+Copyright (C) 2019 Tom Peters
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-   http://www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 package smjwt
@@ -19,8 +20,9 @@ package smjwt
 import (
 	"crypto/rsa"
 	"errors"
-	"github.com/dgrijalva/jwt-go"
-	"io/ioutil"
+	"os"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // ErrNoPrivateKeySpecified is an error when a private key hasn't been specified
@@ -51,7 +53,7 @@ func New() *SMJWT {
 
 // LoadPublicKey will load the public key from the specified filename.
 func (s *SMJWT) LoadPublicKey(filename string) error {
-	file, err := ioutil.ReadFile(filename)
+	file, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
@@ -67,7 +69,7 @@ func (s *SMJWT) LoadPublicKey(filename string) error {
 
 // LoadPrivateKey will load the private key from the specified filename.
 func (s *SMJWT) LoadPrivateKey(filename string) error {
-	file, err := ioutil.ReadFile(filename)
+	file, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
@@ -94,7 +96,7 @@ func (s *SMJWT) Sign(claims jwt.Claims) (string, error) {
 
 // Validate will return the token if there were no errors and everything is fully valid. This method takes
 // an optional second argument of a jwt.Claims object that can be used to specify the claims type. If this is left out,
-// it will default to jwt.StandardClaims.
+// it will default to jwt.RegisteredClaims.
 // You MUST call LoadPublicKey before you can use this method.
 func (s *SMJWT) Validate(tokenStr string, customClaims ...jwt.Claims) (*jwt.Token, error) {
 	if s.publicKey == nil {
@@ -105,10 +107,10 @@ func (s *SMJWT) Validate(tokenStr string, customClaims ...jwt.Claims) (*jwt.Toke
 	if len(customClaims) > 0 {
 		claimsType = customClaims[0]
 	} else {
-		claimsType = &jwt.StandardClaims{}
+		claimsType = &jwt.RegisteredClaims{}
 	}
 
-	token, err := jwt.ParseWithClaims(tokenStr, claimsType, func(token *jwt.Token) (i interface{}, e error) {
+	token, err := jwt.ParseWithClaims(tokenStr, claimsType, func(token *jwt.Token) (interface{}, error) {
 		return s.publicKey, nil
 	})
 
@@ -117,7 +119,7 @@ func (s *SMJWT) Validate(tokenStr string, customClaims ...jwt.Claims) (*jwt.Toke
 		return token, nil
 	}
 
-	if ve, ok := err.(*jwt.ValidationError); ok && ve.Errors&jwt.ValidationErrorExpired > 0 {
+	if errors.Is(err, jwt.ErrTokenExpired) {
 		return nil, ErrExpired
 	}
 

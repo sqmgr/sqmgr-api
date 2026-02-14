@@ -1,31 +1,37 @@
 /*
-Copyright 2019 Tom Peters
+Copyright (C) 2019 Tom Peters
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-   http://www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 package config
 
 import (
 	"fmt"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 type config struct {
-	dsn           string
-	jwtPrivateKey string
-	jwtPublicKey  string
+	dsn                string
+	jwtPrivateKey      string
+	jwtPublicKey       string
+	auth0JWKSURL       string
+	auth0MgmtDomain    string
+	auth0MgmtClientID  string
+	auth0MgmtClientSec string
 }
 
 var instance *config
@@ -48,6 +54,30 @@ func JWTPrivateKey() string {
 	return instance.jwtPrivateKey
 }
 
+// Auth0JWKSURL returns the URL to the Auth0 JWKS endpoint
+func Auth0JWKSURL() string {
+	mustHaveInstance()
+	return instance.auth0JWKSURL
+}
+
+// Auth0MgmtDomain returns the Auth0 Management API domain
+func Auth0MgmtDomain() string {
+	mustHaveInstance()
+	return instance.auth0MgmtDomain
+}
+
+// Auth0MgmtClientID returns the Auth0 Management API client ID
+func Auth0MgmtClientID() string {
+	mustHaveInstance()
+	return instance.auth0MgmtClientID
+}
+
+// Auth0MgmtClientSecret returns the Auth0 Management API client secret
+func Auth0MgmtClientSecret() string {
+	mustHaveInstance()
+	return instance.auth0MgmtClientSec
+}
+
 func mustHaveInstance() {
 	if instance == nil {
 		panic("config: must call Load() first")
@@ -63,8 +93,13 @@ func Load() error {
 	_ = viper.BindEnv("dsn")
 	_ = viper.BindEnv("jwt_private_key")
 	_ = viper.BindEnv("jwt_public_key")
+	_ = viper.BindEnv("auth0_jwks_url")
+	_ = viper.BindEnv("auth0_mgmt_domain")
+	_ = viper.BindEnv("auth0_mgmt_client_id")
+	_ = viper.BindEnv("auth0_mgmt_client_secret")
 
 	viper.SetDefault("dsn", "host=localhost port=5432 user=postgres sslmode=disable")
+	viper.SetDefault("auth0_jwks_url", "https://sqmgr.auth0.com/.well-known/jwks.json")
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, isNotFoundError := err.(viper.ConfigFileNotFoundError); !isNotFoundError {
@@ -75,21 +110,16 @@ func Load() error {
 	}
 
 	instance = &config{
-		dsn:           viper.GetString("dsn"),
-		jwtPrivateKey: viperGetStringOrFatal("jwt_private_key"),
-		jwtPublicKey:  viperGetStringOrFatal("jwt_public_key"),
+		dsn:                viper.GetString("dsn"),
+		jwtPrivateKey:      viperGetStringOrFatal("jwt_private_key"),
+		jwtPublicKey:       viperGetStringOrFatal("jwt_public_key"),
+		auth0JWKSURL:       viper.GetString("auth0_jwks_url"),
+		auth0MgmtDomain:    viper.GetString("auth0_mgmt_domain"),
+		auth0MgmtClientID:  viper.GetString("auth0_mgmt_client_id"),
+		auth0MgmtClientSec: viper.GetString("auth0_mgmt_client_secret"),
 	}
 
 	return nil
-}
-
-func viperGetStringOrWarn(key string) string {
-	val := viper.GetString(key)
-	if val == "" {
-		logrus.WithField("key", key).Warn("configuration key not specified")
-	}
-
-	return val
 }
 
 func viperGetStringOrFatal(key string) string {

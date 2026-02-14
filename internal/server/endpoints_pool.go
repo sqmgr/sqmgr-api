@@ -1,17 +1,18 @@
 /*
-Copyright 2019 Tom Peters
+Copyright (C) 2019 Tom Peters
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-   http://www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 package server
@@ -22,14 +23,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"github.com/sqmgr/sqmgr-api/internal/validator"
 	"github.com/sqmgr/sqmgr-api/pkg/model"
-	"net/http"
-	"strconv"
-	"time"
 )
 
 const minJoinPasswordLength = 6
@@ -39,7 +41,7 @@ const sqmgrInviteAudience = "com.sqmgr.invite"
 var inviteTokenTTL = time.Hour * 24 * 365 // 1 year
 
 type inviteClaims struct {
-	*jwt.StandardClaims
+	jwt.RegisteredClaims
 	CheckID int `json:"chid"`
 }
 
@@ -48,7 +50,7 @@ func (s *Server) poolHandler(next http.Handler) http.Handler {
 		token := mux.Vars(r)["token"]
 		pool, err := s.model.PoolByToken(r.Context(), token)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				s.writeErrorResponse(w, http.StatusNotFound, nil)
 				return
 			}
@@ -57,20 +59,31 @@ func (s *Server) poolHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		if (pool.IsLocked() && pool.OpenAccessOnLock()) || !pool.PasswordRequired() {
-			// no auth required
-		} else {
-			user := r.Context().Value(ctxUserKey).(*model.User)
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 
-			isMemberOf, err := user.IsMemberOf(r.Context(), pool)
-			if err != nil {
-				s.writeErrorResponse(w, http.StatusInternalServerError, err)
-				return
-			}
+		// Site admins can access any pool without joining
+		if !user.IsAdmin {
+			if (pool.IsLocked() && pool.OpenAccessOnLock()) || !pool.PasswordRequired() {
+				// Auto-join user to pool since no password is required
+				if err := user.JoinPool(r.Context(), pool); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+			} else {
+				isMemberOf, err := user.IsMemberOf(r.Context(), pool)
+				if err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
 
-			if !isMemberOf {
-				s.writeErrorResponse(w, http.StatusForbidden, nil)
-				return
+				if !isMemberOf {
+					s.writeErrorResponse(w, http.StatusForbidden, nil)
+					return
+				}
 			}
 		}
 
@@ -80,7 +93,11 @@ func (s *Server) poolHandler(next http.Handler) http.Handler {
 
 func (s *Server) poolGridHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 
 		gridID, err := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
 		if err != nil {
@@ -90,7 +107,7 @@ func (s *Server) poolGridHandler(next http.Handler) http.Handler {
 
 		grid, err := pool.GridByID(r.Context(), gridID)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				s.writeErrorResponse(w, http.StatusNotFound, nil)
 				return
 			}
@@ -105,8 +122,16 @@ func (s *Server) poolGridHandler(next http.Handler) http.Handler {
 
 func (s *Server) poolGridSquareAdminHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
-		user := r.Context().Value(ctxUserKey).(*model.User)
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 
 		squareID, err := strconv.Atoi(mux.Vars(r)["square_id"])
 		if err != nil {
@@ -140,11 +165,20 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 		ResetMembership  bool    `json:"resetMembership"`
 		PasswordRequired bool    `json:"passwordRequired"`
 		OpenAccessOnLock bool    `json:"openAccessOnLock"`
+		NumberSetConfig  string  `json:"numberSetConfig"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
-		user := r.Context().Value(ctxUserKey).(*model.User)
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 
 		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
@@ -225,6 +259,32 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 
 			pool.SetName(name)
 			err = pool.Save(r.Context())
+		case "changeNumberSetConfig":
+			if !model.IsValidNumberSetConfig(resp.NumberSetConfig) {
+				s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
+					Status: statusError,
+					Error:  "Invalid number set configuration",
+				})
+				return
+			}
+
+			var canChange bool
+			canChange, err = pool.CanChangeNumberSetConfig(r.Context())
+			if err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+
+			if !canChange {
+				s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
+					Status: statusError,
+					Error:  "Cannot change number set configuration after numbers have been drawn for any game",
+				})
+				return
+			}
+
+			pool.SetNumberSetConfig(model.NumberSetConfig(resp.NumberSetConfig))
+			err = pool.Save(r.Context())
 		default:
 			s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("unsupported action %s", resp.Action))
 			return
@@ -235,9 +295,18 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 			return
 		}
 
+		canChange, canChangeErr := pool.CanChangeNumberSetConfig(r.Context())
+		if canChangeErr != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, canChangeErr)
+			return
+		}
+
+		s.broker.Publish(pool.Token(), PoolEvent{Type: EventPoolUpdated})
+
 		s.writeJSONResponse(w, http.StatusOK, poolResponse{
-			PoolJSON: pool.JSON(),
-			IsAdmin:  true,
+			PoolJSON:                 pool.JSON(),
+			IsAdmin:                  true,
+			CanChangeNumberSetConfig: canChange,
 		})
 	}
 }
@@ -252,8 +321,16 @@ func (s *Server) getPoolTokenLogEndpoint() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
-		user := r.Context().Value(ctxUserKey).(*model.User)
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 
 		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
@@ -303,12 +380,16 @@ func (s *Server) getPoolTokenLogEndpoint() http.HandlerFunc {
 
 func (s *Server) deletePoolTokenGridIDEndpoint() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 		id, _ := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
 
 		grid, err := pool.GridByID(r.Context(), id)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				s.writeErrorResponse(w, http.StatusNotFound, nil)
 				return
 			}
@@ -327,6 +408,7 @@ func (s *Server) deletePoolTokenGridIDEndpoint() http.HandlerFunc {
 			return
 		}
 
+		s.broker.Publish(pool.Token(), PoolEvent{Type: EventGridUpdated})
 		s.writeJSONResponse(w, http.StatusNoContent, nil)
 	}
 }
@@ -347,14 +429,16 @@ func (s *Server) getPoolConfiguration() http.HandlerFunc {
 	}
 
 	resp := struct {
-		ClaimantMaxLength     int                             `json:"claimantMaxLength"`
-		NameMaxLength         int                             `json:"nameMaxLength"`
-		NotesMaxLength        int                             `json:"notesMaxLength"`
-		TeamNameMaxLength     int                             `json:"teamNameMaxLength"`
-		PoolSquareStates      []model.PoolSquareState         `json:"poolSquareStates"`
-		GridTypes             []keyDescription                `json:"gridTypes"`
-		MinJoinPasswordLength int                             `json:"minJoinPasswordLength"`
-		GridAnnotationIcons   model.GridAnnotationIconMapping `json:"gridAnnotationIcons"`
+		ClaimantMaxLength     int                                             `json:"claimantMaxLength"`
+		NameMaxLength         int                                             `json:"nameMaxLength"`
+		NotesMaxLength        int                                             `json:"notesMaxLength"`
+		TeamNameMaxLength     int                                             `json:"teamNameMaxLength"`
+		PoolSquareStates      []model.PoolSquareState                         `json:"poolSquareStates"`
+		GridTypes             []keyDescription                                `json:"gridTypes"`
+		NumberSetConfigs      []model.NumberSetConfigInfo                     `json:"numberSetConfigs"`
+		NumberSetTypeInfos    map[model.NumberSetType]model.NumberSetTypeInfo `json:"numberSetTypeInfos"`
+		MinJoinPasswordLength int                                             `json:"minJoinPasswordLength"`
+		GridAnnotationIcons   model.GridAnnotationIconMapping                 `json:"gridAnnotationIcons"`
 	}{
 		ClaimantMaxLength:     model.ClaimantMaxLength,
 		NameMaxLength:         model.NameMaxLength,
@@ -362,6 +446,8 @@ func (s *Server) getPoolConfiguration() http.HandlerFunc {
 		TeamNameMaxLength:     model.TeamNameMaxLength,
 		PoolSquareStates:      model.PoolSquareStates,
 		GridTypes:             gridTypesSlice,
+		NumberSetConfigs:      model.ValidNumberSetConfigs(),
+		NumberSetTypeInfos:    model.NumberSetTypeInfos(),
 		MinJoinPasswordLength: minJoinPasswordLength,
 		GridAnnotationIcons:   model.AnnotationIcons,
 	}
@@ -381,13 +467,18 @@ func (s *Server) getPoolConfiguration() http.HandlerFunc {
 
 func (s *Server) postPoolEndpoint() http.HandlerFunc {
 	type payload struct {
-		Name         string `json:"name"`
-		GridType     string `json:"gridType"`
-		JoinPassword string `json:"joinPassword"`
+		Name            string `json:"name"`
+		GridType        string `json:"gridType"`
+		NumberSetConfig string `json:"numberSetConfig"`
+		JoinPassword    string `json:"joinPassword"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := r.Context().Value(ctxUserKey).(*model.User)
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 		if !user.HasPermission(model.PermissionCreatePool) {
 			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
@@ -402,6 +493,15 @@ func (s *Server) postPoolEndpoint() http.HandlerFunc {
 		name := v.Printable("Squares Pool Name", data.Name)
 		gridType := v.GridType("Grid Configuration", data.GridType)
 		password := v.Password("Join Password", data.JoinPassword, minJoinPasswordLength)
+
+		// Default to "single" if not provided (backwards compatibility)
+		numberSetConfig := model.NumberSetConfig(data.NumberSetConfig)
+		if numberSetConfig == "" {
+			numberSetConfig = model.NumberSetConfigStandard
+		}
+		if !model.IsValidNumberSetConfig(string(numberSetConfig)) {
+			v.AddError("numberSetConfig", "Invalid number set configuration")
+		}
 
 		if err := user.Can(r.Context(), model.ActionCreatePool, user); err != nil {
 			if _, ok := err.(model.ActionError); ok {
@@ -422,7 +522,7 @@ func (s *Server) postPoolEndpoint() http.HandlerFunc {
 			return
 		}
 
-		pool, err := s.model.NewPool(r.Context(), user.ID, name, gridType, password)
+		pool, err := s.model.NewPool(r.Context(), user.ID, name, gridType, password, numberSetConfig)
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
@@ -437,29 +537,56 @@ func (s *Server) postPoolEndpoint() http.HandlerFunc {
 
 func (s *Server) getPoolTokenEndpoint() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := r.Context().Value(ctxUserKey).(*model.User)
-		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 		isAdminOf, err := user.IsAdminOf(r.Context(), pool)
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
 
-		s.writeJSONResponse(w, http.StatusOK, poolResponse{
+		resp := poolResponse{
 			PoolJSON: pool.JSON(),
 			IsAdmin:  isAdminOf,
-		})
+		}
+
+		if isAdminOf {
+			canChange, err := pool.CanChangeNumberSetConfig(r.Context())
+			if err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+			resp.CanChangeNumberSetConfig = canChange
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, resp)
 	}
 }
 
 func (s *Server) getPoolTokenInviteTokenEndpoint() http.HandlerFunc {
 	type response struct {
-		JWT string `json:"jwt"`
+		Token string `json:"token"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := r.Context().Value(ctxUserKey).(*model.User)
-		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
@@ -468,24 +595,21 @@ func (s *Server) getPoolTokenInviteTokenEndpoint() http.HandlerFunc {
 			return
 		}
 
-		claim := &inviteClaims{
-			StandardClaims: &jwt.StandardClaims{
-				Audience:  sqmgrInviteAudience,
-				ExpiresAt: time.Now().Add(inviteTokenTTL).Unix(),
-				Issuer:    model.IssuerSqMGR,
-				NotBefore: 0,
-				Subject:   pool.Token(),
-			},
-			CheckID: pool.CheckID(),
-		}
-
-		sign, err := s.smjwt.Sign(claim)
+		invite, err := pool.ActiveInvite(r.Context())
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
 
-		s.writeJSONResponse(w, http.StatusOK, response{JWT: sign})
+		if invite == nil {
+			invite, err = s.model.NewPoolInvite(r.Context(), pool.ID(), pool.CheckID(), inviteTokenTTL)
+			if err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, response{Token: invite.Token})
 	}
 }
 
@@ -500,7 +624,11 @@ func (s *Server) getPoolTokenGridEndpoint() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 
 		offset, _ := strconv.ParseInt(r.FormValue("offset"), 10, 64)
 		if offset < 0 {
@@ -542,12 +670,16 @@ func (s *Server) getPoolTokenGridEndpoint() http.HandlerFunc {
 
 func (s *Server) getPoolTokenGridIDEndpoint() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 		id, _ := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
 
 		grid, err := pool.GridByID(r.Context(), id)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				s.writeErrorResponse(w, http.StatusNotFound, nil)
 				return
 			}
@@ -566,13 +698,36 @@ func (s *Server) getPoolTokenGridIDEndpoint() http.HandlerFunc {
 			return
 		}
 
-		s.writeJSONResponse(w, http.StatusOK, grid.JSON())
+		// Load number sets for multi-set configurations
+		// Need to load if pool config OR grid's payout config is non-standard
+		effectiveConfig := pool.NumberSetConfig()
+		if grid.PayoutConfig() != nil {
+			effectiveConfig = *grid.PayoutConfig()
+		}
+		if effectiveConfig != model.NumberSetConfigStandard {
+			if err := grid.LoadNumberSets(r.Context()); err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+		}
+
+		// Load BDL event if linked
+		if err := grid.LoadBDLEvent(r.Context()); err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, grid.JSONWithWinningSquares(pool.NumberSetConfig(), pool.GridType()))
 	}
 }
 
 func (s *Server) getPoolTokenSquareEndpoint() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 
 		squares, err := pool.Squares()
 		if err != nil {
@@ -589,21 +744,108 @@ func (s *Server) getPoolTokenSquareEndpoint() http.HandlerFunc {
 	}
 }
 
+func (s *Server) getPoolTokenSquaresPublicEndpoint() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := mux.Vars(r)["token"]
+
+		// Load pool from database
+		pool, err := s.model.PoolByToken(r.Context(), token)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				s.writeErrorResponse(w, http.StatusNotFound, nil)
+				return
+			}
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		// Auth required when password is required AND pool is not in open-access state
+		// Open access: !PasswordRequired() OR (IsLocked() AND OpenAccessOnLock())
+		authRequired := pool.PasswordRequired() && (!pool.IsLocked() || !pool.OpenAccessOnLock())
+		if authRequired {
+			_, password, ok := r.BasicAuth()
+			if !ok || !pool.PasswordIsValid(password) {
+				w.Header().Set("WWW-Authenticate", `Basic realm="Pool Access"`)
+				s.writeErrorResponse(w, http.StatusUnauthorized, errors.New("authentication required"))
+				return
+			}
+		}
+
+		// Retrieve squares
+		squares, err := pool.Squares()
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		// Convert to JSON (no admin fields populated by default)
+		squaresJSON := make(map[int]*model.PoolSquareJSON)
+		for key, square := range squares {
+			squaresJSON[key] = square.JSON()
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, squaresJSON)
+	}
+}
+
 func (s *Server) getPoolTokenSquareIDEndpoint() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
-		user := r.Context().Value(ctxUserKey).(*model.User)
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 
 		squareID, _ := strconv.Atoi(mux.Vars(r)["id"])
 		square, err := pool.SquareBySquareID(squareID)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				s.writeErrorResponse(w, http.StatusNotFound, nil)
 				return
 			}
 
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
+		}
+
+		squareJSON := square.JSON()
+
+		// Handle optional gridId parameter for winning periods
+		if gridIDStr := r.FormValue("gridId"); gridIDStr != "" {
+			gridID, err := strconv.ParseInt(gridIDStr, 10, 64)
+			if err == nil {
+				grid, err := pool.GridByID(r.Context(), gridID)
+				if err == nil {
+					if err := grid.LoadBDLEvent(r.Context()); err == nil && grid.BDLEvent() != nil {
+						// Load number sets if needed
+						effectiveConfig := pool.NumberSetConfig()
+						if grid.PayoutConfig() != nil {
+							effectiveConfig = *grid.PayoutConfig()
+						}
+						if effectiveConfig != model.NumberSetConfigStandard {
+							_ = grid.LoadNumberSets(r.Context())
+						}
+
+						winningSquares := grid.GetGridWinningSquares(grid.BDLEvent(), effectiveConfig, pool.GridType())
+
+						// Use team abbreviations from live event
+						var homeTeamName, awayTeamName string
+						if grid.BDLEvent().HomeTeam() != nil {
+							homeTeamName = grid.BDLEvent().HomeTeam().Abbreviation
+						}
+						if grid.BDLEvent().AwayTeam() != nil {
+							awayTeamName = grid.BDLEvent().AwayTeam().Abbreviation
+						}
+
+						squareJSON.WinningPeriods = model.GetWinningPeriodsForSquare(squareID, winningSquares, grid.BDLEvent(), homeTeamName, awayTeamName)
+					}
+				}
+			}
 		}
 
 		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
@@ -614,9 +856,44 @@ func (s *Server) getPoolTokenSquareIDEndpoint() http.HandlerFunc {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
 			}
+			squareJSON.Logs = square.Logs
+
+			// Add user info for admins
+			if square.UserID() > 0 {
+				squareUser, err := s.model.GetUserByID(r.Context(), square.UserID())
+				if err != nil {
+					logrus.WithError(err).WithField("userId", square.UserID()).Warn("could not get square user")
+				} else {
+					userInfo := &model.SquareUserInfoJSON{}
+
+					if squareUser.Store == model.UserStoreAuth0 {
+						userInfo.UserType = "registered"
+
+						// Get email: first try local, then fallback to Auth0 API
+						if squareUser.Email != nil && *squareUser.Email != "" {
+							userInfo.Email = *squareUser.Email
+						} else if s.auth0Client.IsConfigured() {
+							email, err := s.auth0Client.GetUserEmail(r.Context(), squareUser.StoreID)
+							if err != nil {
+								logrus.WithError(err).WithField("storeId", squareUser.StoreID).Warn("could not get email from Auth0")
+							} else if email != "" {
+								userInfo.Email = email
+								// Cache the email for next time
+								if err := squareUser.SetEmail(r.Context(), email); err != nil {
+									logrus.WithError(err).Warn("could not cache user email")
+								}
+							}
+						}
+					} else {
+						userInfo.UserType = "guest"
+					}
+
+					squareJSON.UserInfo = userInfo
+				}
+			}
 		}
 
-		s.writeJSONResponse(w, http.StatusOK, square.JSON())
+		s.writeJSONResponse(w, http.StatusOK, squareJSON)
 	}
 }
 
@@ -631,12 +908,20 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
-		user := r.Context().Value(ctxUserKey).(*model.User)
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 		squareID, _ := strconv.Atoi(mux.Vars(r)["id"])
 		square, err := pool.SquareBySquareID(squareID)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				logrus.WithFields(logrus.Fields{
 					"pool":   pool.ID(),
 					"square": squareID,
@@ -679,7 +964,7 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 		if payload.SecondarySquareID > 0 {
 			secondSquare, err = pool.SquareBySquareID(payload.SecondarySquareID)
 			if err != nil {
-				if err == sql.ErrNoRows {
+				if errors.Is(err, sql.ErrNoRows) {
 					logrus.WithFields(logrus.Fields{
 						"pool":   pool.ID(),
 						"square": squareID,
@@ -696,6 +981,11 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 		if payload.Rename {
 			if !isAdmin {
 				s.writeErrorResponse(w, http.StatusForbidden, errors.New("only an admin can rename a square"))
+				return
+			}
+
+			if square.ParentID > 0 {
+				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("cannot rename a secondary square directly; rename the primary square instead"))
 				return
 			}
 
@@ -723,10 +1013,42 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 				"claimant":    claimant,
 			}).Info("renaming square")
 
-			if err := square.Save(r.Context(), s.model.DB, true, model.PoolSquareLog{
+			tx, err := s.model.DB.BeginTx(r.Context(), nil)
+			if err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+
+			if err := square.Save(r.Context(), tx, true, model.PoolSquareLog{
 				RemoteAddr: r.RemoteAddr,
 				Note:       fmt.Sprintf("admin: changed claimant from %s", oldClaimant),
 			}); err != nil {
+				_ = tx.Rollback()
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+
+			// also rename any secondary squares linked to this primary
+			childSquares, err := square.ChildSquares(r.Context(), tx)
+			if err != nil {
+				_ = tx.Rollback()
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+
+			for _, child := range childSquares {
+				child.SetClaimant(claimant)
+				if err := child.Save(r.Context(), tx, true, model.PoolSquareLog{
+					RemoteAddr: r.RemoteAddr,
+					Note:       fmt.Sprintf("admin: changed claimant from %s (via primary square %d)", oldClaimant, square.SquareID),
+				}); err != nil {
+					_ = tx.Rollback()
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+			}
+
+			if err := tx.Commit(); err != nil {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
 			}
@@ -848,10 +1170,44 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 				square.State = payload.State
 			}
 
-			if err := square.Save(r.Context(), s.model.DB, true, model.PoolSquareLog{
+			tx, err := s.model.DB.BeginTx(r.Context(), nil)
+			if err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+
+			if err := square.Save(r.Context(), tx, true, model.PoolSquareLog{
 				RemoteAddr: r.RemoteAddr,
 				Note:       payload.Note,
 			}); err != nil {
+				_ = tx.Rollback()
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+
+			// when unclaiming a primary square, also unclaim its secondary squares
+			if square.State == model.PoolSquareStateUnclaimed {
+				childSquares, err := square.ChildSquares(r.Context(), tx)
+				if err != nil {
+					_ = tx.Rollback()
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+
+				for _, child := range childSquares {
+					child.State = model.PoolSquareStateUnclaimed
+					if err := child.Save(r.Context(), tx, true, model.PoolSquareLog{
+						RemoteAddr: r.RemoteAddr,
+						Note:       fmt.Sprintf("admin: unclaimed (secondary of square %d)", square.SquareID),
+					}); err != nil {
+						_ = tx.Rollback()
+						s.writeErrorResponse(w, http.StatusInternalServerError, err)
+						return
+					}
+				}
+			}
+
+			if err := tx.Commit(); err != nil {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
 			}
@@ -860,6 +1216,8 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
 		}
+
+		s.broker.Publish(pool.Token(), PoolEvent{Type: EventSquareUpdated})
 
 		if isAdmin {
 			if err := square.LoadLogs(r.Context()); err != nil {
@@ -873,28 +1231,62 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 }
 
 func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
+	type numberSetPayload struct {
+		HomeTeamNumbers []int `json:"homeTeamNumbers"`
+		AwayTeamNumbers []int `json:"awayTeamNumbers"`
+	}
+
 	type payload struct {
 		Action string `json:"action"`
 		Data   *struct {
-			EventDate      string `json:"eventDate"`
-			Notes          string `json:"notes"`
-			Rollover       bool   `json:"rollover"`
-			Label          string `json:"label"`
-			HomeTeamName   string `json:"homeTeamName"`
-			HomeTeamColor1 string `json:"homeTeamColor1"`
-			HomeTeamColor2 string `json:"homeTeamColor2"`
-			AwayTeamName   string `json:"awayTeamName"`
-			AwayTeamColor1 string `json:"awayTeamColor1"`
-			AwayTeamColor2 string `json:"awayTeamColor2"`
+			EventDate        string `json:"eventDate"`
+			Notes            string `json:"notes"`
+			Rollover         bool   `json:"rollover"`
+			Label            string `json:"label"`
+			HomeTeamName     string `json:"homeTeamName"`
+			HomeTeamColor1   string `json:"homeTeamColor1"`
+			HomeTeamColor2   string `json:"homeTeamColor2"`
+			AwayTeamName     string `json:"awayTeamName"`
+			AwayTeamColor1   string `json:"awayTeamColor1"`
+			AwayTeamColor2   string `json:"awayTeamColor2"`
+			BrandingImageURL string `json:"brandingImageUrl"`
+			BrandingImageAlt string `json:"brandingImageAlt"`
 
+			// BDL Event linking (optional)
+			BDLEventID *int64 `json:"bdlEventId,omitempty"`
+
+			// Payout configuration (optional, overrides pool's numberSetConfig for payout periods)
+			PayoutConfig *string `json:"payoutConfig,omitempty"`
+
+			// Legacy single set (for "single" config)
 			HomeTeamNumbers []int `json:"homeTeamNumbers"`
 			AwayTeamNumbers []int `json:"awayTeamNumbers"`
+
+			// Multiple number sets (for multi-set configs)
+			NumberSets map[model.NumberSetType]numberSetPayload `json:"numberSets"`
+
+			// LockPool controls whether to lock the pool after drawing numbers
+			// nil = default (lock if not already locked), true = lock, false = don't lock
+			LockPool *bool `json:"lockPool,omitempty"`
 		} `json:"data,omitempty"`
 	}
 
+	type drawResponse struct {
+		*model.GridJSON
+		PoolLocks time.Time `json:"poolLocks"`
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
-		pool := r.Context().Value(ctxPoolKey).(*model.Pool)
-		user := r.Context().Value(ctxUserKey).(*model.User)
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 
 		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
@@ -913,7 +1305,8 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 
 		gridID, err := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
 		if err != nil {
-			panic(err)
+			s.writeErrorResponse(w, http.StatusBadRequest, err)
+			return
 		}
 
 		var grid *model.Grid
@@ -921,7 +1314,7 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 			var err error
 			grid, err = pool.GridByID(r.Context(), gridID)
 			if err != nil {
-				if err == sql.ErrNoRows {
+				if errors.Is(err, sql.ErrNoRows) {
 					s.writeErrorResponse(w, http.StatusNotFound, nil)
 					return
 				}
@@ -946,34 +1339,131 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 
 		switch data.Action {
 		case "drawManualNumbers":
-			if err := grid.SetManualNumbers(data.Data.HomeTeamNumbers, data.Data.AwayTeamNumbers); err != nil {
-				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("the numbers supplied are not valid"))
-			}
+			config := pool.NumberSetConfig()
 
-			if err := grid.Save(r.Context()); err != nil {
-				s.writeErrorResponse(w, http.StatusInternalServerError, err)
-				return
-			}
+			// Handle multi-set configs
+			if config != model.NumberSetConfigStandard && data.Data.NumberSets != nil {
+				// Convert payload to model input
+				numberSets := make(map[model.NumberSetType]model.NumberSetInput)
+				for setType, ns := range data.Data.NumberSets {
+					numberSets[setType] = model.NumberSetInput{
+						HomeNumbers: ns.HomeTeamNumbers,
+						AwayNumbers: ns.AwayTeamNumbers,
+					}
+				}
 
-			s.writeJSONResponse(w, http.StatusOK, grid.JSON())
-			return
-		case "drawNumbers":
-			if err := grid.SelectRandomNumbers(); err != nil {
-				if err == model.ErrNumbersAlreadyDrawn {
-					s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("the numbers have already been drawn"))
+				if err := grid.DrawAllNumbersManual(r.Context(), config, numberSets); err != nil {
+					s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("could not set manual numbers: %w", err))
+					return
+				}
+			} else {
+				// Legacy single set behavior
+				if err := grid.SetManualNumbers(data.Data.HomeTeamNumbers, data.Data.AwayTeamNumbers); err != nil {
+					s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("could not set manual numbers: %w", err))
 					return
 				}
 
-				s.writeErrorResponse(w, http.StatusInternalServerError, err)
-				return
+				if err := grid.Save(r.Context()); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
 			}
 
-			if err := grid.Save(r.Context()); err != nil {
-				s.writeErrorResponse(w, http.StatusInternalServerError, err)
-				return
+			// Load number sets for response
+			if config != model.NumberSetConfigStandard {
+				if err := grid.LoadNumberSets(r.Context()); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
 			}
 
-			s.writeJSONResponse(w, http.StatusOK, grid.JSON())
+			// Lock the pool if requested (defaults to true when not already locked)
+			shouldLock := !pool.IsLocked() // Default: lock if not already locked
+			if data.Data != nil && data.Data.LockPool != nil {
+				shouldLock = *data.Data.LockPool && !pool.IsLocked()
+			}
+			if shouldLock {
+				pool.SetLocks(time.Now())
+				if err := pool.Save(r.Context()); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+			}
+
+			// Load the BDL event so it's included in the response
+			if err := grid.LoadBDLEvent(r.Context()); err != nil {
+				logrus.WithError(err).Warn("could not load BDL event after draw")
+			}
+
+			s.broker.Publish(pool.Token(), PoolEvent{Type: EventGridUpdated})
+
+			s.writeJSONResponse(w, http.StatusOK, drawResponse{
+				GridJSON:  grid.JSON(),
+				PoolLocks: pool.Locks(),
+			})
+			return
+		case "drawNumbers":
+			config := pool.NumberSetConfig()
+
+			// Handle multi-set configs
+			if config != model.NumberSetConfigStandard {
+				if err := grid.DrawAllNumbersRandom(r.Context(), config); err != nil {
+					if err == model.ErrNumbersAlreadyDrawn {
+						s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("the numbers have already been drawn"))
+						return
+					}
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+			} else {
+				// Legacy single set behavior
+				if err := grid.SelectRandomNumbers(); err != nil {
+					if err == model.ErrNumbersAlreadyDrawn {
+						s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("the numbers have already been drawn"))
+						return
+					}
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+
+				if err := grid.Save(r.Context()); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+			}
+
+			// Load number sets for response
+			if config != model.NumberSetConfigStandard {
+				if err := grid.LoadNumberSets(r.Context()); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+			}
+
+			// Lock the pool if requested (defaults to true when not already locked)
+			shouldLock := !pool.IsLocked() // Default: lock if not already locked
+			if data.Data != nil && data.Data.LockPool != nil {
+				shouldLock = *data.Data.LockPool && !pool.IsLocked()
+			}
+			if shouldLock {
+				pool.SetLocks(time.Now())
+				if err := pool.Save(r.Context()); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+			}
+
+			// Load the BDL event so it's included in the response
+			if err := grid.LoadBDLEvent(r.Context()); err != nil {
+				logrus.WithError(err).Warn("could not load BDL event after draw")
+			}
+
+			s.broker.Publish(pool.Token(), PoolEvent{Type: EventGridUpdated})
+
+			s.writeJSONResponse(w, http.StatusOK, drawResponse{
+				GridJSON:  grid.JSON(),
+				PoolLocks: pool.Locks(),
+			})
 			return
 		case "save":
 			if data.Data == nil {
@@ -994,6 +1484,10 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 			awayTeamColor2 := v.Color("Away Team Colors", data.Data.AwayTeamColor2, true)
 			notes := v.PrintableWithNewline("Notes", data.Data.Notes, true)
 			notes = v.MaxLength("Notes", notes, model.NotesMaxLength)
+			brandingImageURL := v.URL("Branding Image URL", data.Data.BrandingImageURL, true)
+			brandingImageURL = v.MaxLength("Branding Image URL", brandingImageURL, model.BrandingImageURLMaxLength)
+			brandingImageAlt := v.Printable("Branding Image Alt", data.Data.BrandingImageAlt, true)
+			brandingImageAlt = v.MaxLength("Branding Image Alt", brandingImageAlt, model.BrandingImageAltMaxLength)
 
 			if pool.GridType() != model.GridTypeRoll100 && data.Data.Rollover {
 				v.AddError("rollover", "Rollover is not valid for this pool type")
@@ -1012,17 +1506,86 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 				grid = pool.NewGrid()
 			}
 
+			// Prevent changing linked event if current event is final
+			if grid.BDLEventID() != nil {
+				if err := grid.LoadBDLEvent(r.Context()); err != nil {
+					s.writeErrorResponse(w, http.StatusInternalServerError, err)
+					return
+				}
+				if grid.BDLEvent() != nil && grid.BDLEvent().Status == model.BDLEventStatusFinal {
+					// Check if trying to change to a different event (or unlink)
+					currentID := *grid.BDLEventID()
+					newID := data.Data.BDLEventID
+					if newID == nil || *newID != currentID {
+						s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
+							Status: statusError,
+							Error:  "Cannot change linked event after the game has ended",
+						})
+						return
+					}
+				}
+			}
+
+			grid.SetBDLEventID(data.Data.BDLEventID)
+
+			// Auto-populate team names and colors when event is linked (only if empty)
+			if data.Data.BDLEventID != nil {
+				event, err := s.model.SportsEventByIDWithTeams(r.Context(), *data.Data.BDLEventID)
+				if err == nil && event != nil {
+					// Set full team names only if not provided
+					if homeTeamName == "" && event.HomeTeam() != nil {
+						homeTeamName = event.HomeTeam().FullName
+					}
+					if awayTeamName == "" && event.AwayTeam() != nil {
+						awayTeamName = event.AwayTeam().FullName
+					}
+
+					// Set colors only if not provided and team has them
+					if homeTeamColor1 == "" && event.HomeTeam() != nil && event.HomeTeam().Color != nil {
+						homeTeamColor1 = "#" + *event.HomeTeam().Color
+					}
+					if homeTeamColor2 == "" && event.HomeTeam() != nil && event.HomeTeam().AlternateColor != nil {
+						homeTeamColor2 = "#" + *event.HomeTeam().AlternateColor
+					}
+					if awayTeamColor1 == "" && event.AwayTeam() != nil && event.AwayTeam().Color != nil {
+						awayTeamColor1 = "#" + *event.AwayTeam().Color
+					}
+					if awayTeamColor2 == "" && event.AwayTeam() != nil && event.AwayTeam().AlternateColor != nil {
+						awayTeamColor2 = "#" + *event.AwayTeam().AlternateColor
+					}
+				}
+			}
+
 			grid.SetEventDate(eventDate)
 			grid.SetLabel(label)
 			grid.SetHomeTeamName(homeTeamName)
 			grid.SetAwayTeamName(awayTeamName)
 			grid.SetRollover(data.Data.Rollover)
+
+			// Handle payout config - validate and set if provided
+			if data.Data.PayoutConfig != nil {
+				if *data.Data.PayoutConfig == "" {
+					// Empty string means clear the payout config (use pool default)
+					grid.SetPayoutConfig(nil)
+				} else if !model.IsValidNumberSetConfig(*data.Data.PayoutConfig) {
+					s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
+						Status: statusError,
+						Error:  "Invalid payout configuration",
+					})
+					return
+				} else {
+					config := model.NumberSetConfig(*data.Data.PayoutConfig)
+					grid.SetPayoutConfig(&config)
+				}
+			}
 			settings := grid.Settings()
 			settings.SetNotes(notes)
 			settings.SetHomeTeamColor1(homeTeamColor1)
 			settings.SetHomeTeamColor2(homeTeamColor2)
 			settings.SetAwayTeamColor1(awayTeamColor1)
 			settings.SetAwayTeamColor2(awayTeamColor2)
+			settings.SetBrandingImageURL(brandingImageURL)
+			settings.SetBrandingImageAlt(brandingImageAlt)
 
 			if err := grid.Save(r.Context()); err != nil {
 				if err == model.ErrGridLimit {
@@ -1034,12 +1597,18 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 				return
 			}
 
+			// Load the BDL event so it's included in the response
+			if err := grid.LoadBDLEvent(r.Context()); err != nil {
+				logrus.WithError(err).Warn("could not load BDL event after save")
+			}
+
+			s.broker.Publish(pool.Token(), PoolEvent{Type: EventGridUpdated})
+
 			s.writeJSONResponse(w, http.StatusAccepted, grid.JSON())
 			return
 		}
 
 		s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("unsupported action %s", data.Action))
-		return
 	}
 }
 
@@ -1050,8 +1619,16 @@ func (s *Server) postPoolTokenGridIDSquareSquareIDAnnotationEndpoint() http.Hand
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		grid := r.Context().Value(ctxGridKey).(*model.Grid)
-		squareID := r.Context().Value(ctxSquareIDKey).(int)
+		grid, ok := gridFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+		squareID, ok := squareIDFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 
 		var payloadData payload
 		if err := json.NewDecoder(r.Body).Decode(&payloadData); err != nil {
@@ -1089,6 +1666,11 @@ func (s *Server) postPoolTokenGridIDSquareSquareIDAnnotationEndpoint() http.Hand
 			return
 		}
 
+		pool, _ := poolFromContext(r.Context())
+		if pool != nil {
+			s.broker.Publish(pool.Token(), PoolEvent{Type: EventGridUpdated})
+		}
+
 		status := http.StatusOK
 		if isNew {
 			status = http.StatusCreated
@@ -1100,16 +1682,28 @@ func (s *Server) postPoolTokenGridIDSquareSquareIDAnnotationEndpoint() http.Hand
 
 func (s *Server) deletePoolTokenGridIDSquareSquareIDAnnotationEndpoint() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		grid := r.Context().Value(ctxGridKey).(*model.Grid)
-		squareID := r.Context().Value(ctxSquareIDKey).(int)
+		grid, ok := gridFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+		squareID, ok := squareIDFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 
 		if err := grid.DeleteAnnotationBySquareID(r.Context(), squareID); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
 
+		pool, _ := poolFromContext(r.Context())
+		if pool != nil {
+			s.broker.Publish(pool.Token(), PoolEvent{Type: EventGridUpdated})
+		}
+
 		w.WriteHeader(http.StatusNoContent)
-		return
 	}
 }
 
@@ -1117,14 +1711,19 @@ func (s *Server) postPoolTokenMemberEndpoint() http.HandlerFunc {
 	type payload struct {
 		Password string `json:"password"`
 		JWT      string `json:"jwt"`
+		Invite   string `json:"invite"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := r.Context().Value(ctxUserKey).(*model.User)
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 		token := mux.Vars(r)["token"]
 		pool, err := s.model.PoolByToken(r.Context(), token)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				s.writeErrorResponse(w, http.StatusNotFound, nil)
 				return
 			}
@@ -1138,7 +1737,20 @@ func (s *Server) postPoolTokenMemberEndpoint() http.HandlerFunc {
 			return
 		}
 
-		if data.JWT != "" {
+		if data.Invite != "" {
+			invite, err := s.model.PoolInviteByToken(r.Context(), data.Invite)
+			if err != nil {
+				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("invalid invite token"))
+				return
+			}
+
+			if invite.PoolID != pool.ID() ||
+				!pool.CheckIDIsValid(invite.CheckID) ||
+				time.Now().After(invite.ExpiresAt) {
+				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("invalid invite token"))
+				return
+			}
+		} else if data.JWT != "" {
 			j, err := s.smjwt.Validate(data.JWT, &inviteClaims{})
 			if err != nil {
 				s.writeErrorResponse(w, http.StatusBadRequest, err)
@@ -1147,8 +1759,17 @@ func (s *Server) postPoolTokenMemberEndpoint() http.HandlerFunc {
 
 			claims := j.Claims.(*inviteClaims)
 
-			if !claims.VerifyAudience(sqmgrInviteAudience, true) ||
-				!claims.VerifyIssuer(model.IssuerSqMGR, true) ||
+			// Verify audience
+			audValid := false
+			for _, aud := range claims.Audience {
+				if aud == sqmgrInviteAudience {
+					audValid = true
+					break
+				}
+			}
+
+			if !audValid ||
+				claims.Issuer != model.IssuerSqMGR ||
 				!pool.CheckIDIsValid(claims.CheckID) {
 				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("invalid join token"))
 				return
@@ -1169,5 +1790,6 @@ func (s *Server) postPoolTokenMemberEndpoint() http.HandlerFunc {
 
 type poolResponse struct {
 	*model.PoolJSON
-	IsAdmin bool `json:"isAdmin"`
+	IsAdmin                  bool `json:"isAdmin"`
+	CanChangeNumberSetConfig bool `json:"canChangeNumberSetConfig,omitempty"`
 }

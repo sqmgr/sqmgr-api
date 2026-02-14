@@ -1,17 +1,18 @@
 /*
-Copyright 2019 Tom Peters
+Copyright (C) 2019 Tom Peters
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-   http://www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 package main
@@ -19,12 +20,13 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/sqmgr/sqmgr-api/internal/config"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/sqmgr/sqmgr-api/internal/config"
 
 	"github.com/gorilla/handlers"
 	"github.com/sirupsen/logrus"
@@ -34,7 +36,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
-var addr = flag.String("addr", getEnvOrElse("ADDR", ":5000"), "address for the server to listen on")
+var addr = flag.String("addr", getEnvOrElse("ADDR", ":8000"), "address for the server to listen on")
 var sql = flag.String("sql", "./sql", "path to the SQL migrations")
 var migrate = flag.Bool("migrate", false, "whether to run the database migrations")
 
@@ -72,7 +74,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         *addr,
-		Handler:      handlers.CombinedLoggingHandler(os.Stdout, handlers.ProxyHeaders(s)),
+		Handler:      handlers.ProxyHeaders(handlers.CombinedLoggingHandler(os.Stdout, s)),
 		ReadTimeout:  readTimeout,
 		WriteTimeout: writeTimeout,
 	}
@@ -95,6 +97,9 @@ func main() {
 	}
 	if err := srv.Shutdown(context.Background()); err != nil {
 		logrus.WithError(err).Fatalln("could not shut down server")
+	}
+	if err := db.Close(); err != nil {
+		logrus.WithError(err).Errorln("could not close database")
 	}
 	logrus.Infoln("shutdown complete")
 }

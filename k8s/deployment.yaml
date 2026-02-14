@@ -20,32 +20,34 @@ spec:
       imagePullSecrets:
         - name: github
       containers:
-      - name: sqmgr
-        envFrom:
-          - secretRef:
-              name: sqmgr-config
-        env:
-        - name: SQMGR_CONF_DSN
-          value: 'dbname=$(PG_DBNAME) host=$(PG_HOST) port=$(PG_PORT) user=$(PG_USER) sslmode=$(PG_SSLMODE) password=$(PG_PASSWORD)'
-        - name: SQMGR_CONF_JWT_PUBLIC_KEY
-          value: /opt/sqmgr/jwt-keys/public.pem
-        - name: SQMGR_CONF_JWT_PRIVATE_KEY
-          value: /opt/sqmgr/jwt-keys/private.pem
-        image: weters/sqmgr-api:latest
-        imagePullPolicy: Always
-        args:
-          - '-migrate'
-        volumeMounts:
-          - mountPath: /opt/sqmgr/jwt-keys
-            name: jwt-keys
-        readinessProbe:
-          httpGet:
-            port: 5000
-            path: /
-        livenessProbe:
-          httpGet:
-            port: 5000
-            path: /
+        - name: sqmgr
+          envFrom:
+            - secretRef:
+                name: sqmgr-config
+            - secretRef:
+                name: sqmgr-auth0
+          env:
+            - name: SQMGR_CONF_DSN
+              value: 'dbname=$(PG_DBNAME) host=$(PG_HOST) port=$(PG_PORT) user=$(PG_USER) sslmode=$(PG_SSLMODE) password=$(PG_PASSWORD)'
+            - name: SQMGR_CONF_JWT_PUBLIC_KEY
+              value: /opt/sqmgr/jwt-keys/public.pem
+            - name: SQMGR_CONF_JWT_PRIVATE_KEY
+              value: /opt/sqmgr/jwt-keys/private.pem
+          image: ghcr.io/sqmgr/sqmgr-api:latest
+          imagePullPolicy: Always
+          args:
+            - '-migrate'
+          volumeMounts:
+            - mountPath: /opt/sqmgr/jwt-keys
+              name: jwt-keys
+          readinessProbe:
+            httpGet:
+              port: 8000
+              path: /
+          livenessProbe:
+            httpGet:
+              port: 8000
+              path: /
       volumes:
         - name: jwt-keys
           secret:

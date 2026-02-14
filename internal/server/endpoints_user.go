@@ -1,17 +1,18 @@
 /*
-Copyright 2019 Tom Peters
+Copyright (C) 2019 Tom Peters
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-   http://www.apache.org/licenses/LICENSE-2.0
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 package server
@@ -21,13 +22,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/google/uuid"
-	"github.com/gorilla/mux"
-	"github.com/sqmgr/sqmgr-api/pkg/model"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+	"github.com/sqmgr/sqmgr-api/pkg/model"
 )
 
 // User has 7 days on this token
@@ -39,7 +41,11 @@ func (s *Server) userHandler(next http.Handler) http.Handler {
 		vars := mux.Vars(r)
 		userID, _ := strconv.ParseInt(vars["id"], 10, 64)
 
-		user := r.Context().Value(ctxUserKey).(*model.User)
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 		if user.ID != userID {
 			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
@@ -55,14 +61,66 @@ func (s *Server) getUserSelfEndpoint() http.HandlerFunc {
 		UserID  int64           `json:"id"`
 		StoreID string          `json:"store_id"`
 		Store   model.UserStore `json:"store"`
+		IsAdmin bool            `json:"is_admin"`
+		Email   *string         `json:"email"`
+		Created time.Time       `json:"created"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := r.Context().Value(ctxUserKey).(*model.User)
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 		s.writeJSONResponse(w, http.StatusOK, response{
 			UserID:  user.ID,
 			StoreID: user.StoreID,
 			Store:   user.Store,
+			IsAdmin: user.IsAdmin,
+			Email:   user.Email,
+			Created: user.Created,
+		})
+	}
+}
+
+func (s *Server) getUserSelfStatsEndpoint() http.HandlerFunc {
+	type response struct {
+		PoolsCreated  int64 `json:"poolsCreated"`
+		PoolsJoined   int64 `json:"poolsJoined"`
+		ActivePools   int64 `json:"activePools"`
+		ArchivedPools int64 `json:"archivedPools"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+
+		poolsCreatedTotal, err := s.model.PoolsOwnedByUserIDCount(r.Context(), user.ID, true)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		poolsCreatedActive, err := s.model.PoolsOwnedByUserIDCount(r.Context(), user.ID, false)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		poolsJoined, err := s.model.PoolsJoinedByUserIDCount(r.Context(), user.ID)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, response{
+			PoolsCreated:  poolsCreatedTotal,
+			PoolsJoined:   poolsJoined,
+			ActivePools:   poolsCreatedActive,
+			ArchivedPools: poolsCreatedTotal - poolsCreatedActive,
 		})
 	}
 }
@@ -77,7 +135,11 @@ func (s *Server) getUserIDPoolMembershipEndpoint() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := r.Context().Value(ctxUserIDKey).(int64)
+		userID, ok := userIDFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 		membership := mux.Vars(r)["membership"]
 
 		offset, _ := strconv.ParseInt(r.FormValue("offset"), 10, 64)
@@ -140,10 +202,14 @@ func (s *Server) getUserIDPoolMembershipEndpoint() http.HandlerFunc {
 
 func (s *Server) deleteUserIDPoolTokenEndpoint() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := r.Context().Value(ctxUserIDKey).(int64)
+		userID, ok := userIDFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 		user, err := s.model.GetUserByID(r.Context(), userID)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				s.writeErrorResponse(w, http.StatusNotFound, errors.New("user not found"))
 				return
 			}
@@ -152,7 +218,7 @@ func (s *Server) deleteUserIDPoolTokenEndpoint() http.HandlerFunc {
 		poolToken := mux.Vars(r)["token"]
 		pool, err := s.model.PoolByToken(r.Context(), poolToken)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				s.writeErrorResponse(w, http.StatusNotFound, errors.New("pool not found"))
 				return
 			}
@@ -177,10 +243,14 @@ func (s *Server) postUserIDGuestJWT() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := r.Context().Value(ctxUserIDKey).(int64)
+		userID, ok := userIDFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
 		user, err := s.model.GetUserByID(r.Context(), userID)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				s.writeErrorResponse(w, http.StatusNotFound, errors.New("user not found"))
 				return
 			}
@@ -197,9 +267,18 @@ func (s *Server) postUserIDGuestJWT() http.HandlerFunc {
 			return
 		}
 
-		claims := token.Claims.(*jwt.StandardClaims)
-		if !claims.VerifyIssuer(model.IssuerSqMGR, true) ||
-			!claims.VerifyAudience(audienceSqMGR, true) {
+		claims := token.Claims.(*jwt.RegisteredClaims)
+
+		// Verify audience
+		audValid := false
+		for _, aud := range claims.Audience {
+			if aud == audienceSqMGR {
+				audValid = true
+				break
+			}
+		}
+
+		if claims.Issuer != model.IssuerSqMGR || !audValid {
 			s.writeErrorResponse(w, http.StatusBadRequest, errors.New("invalid guest JWT"))
 			return
 		}
@@ -244,10 +323,10 @@ func (s *Server) postUserGuestEndpoint() http.HandlerFunc {
 		expiresAt := time.Now().Add(guestJWTExpiresDuration)
 
 		uid := fmt.Sprintf("sqmgr|%s", u.String())
-		claims := jwt.StandardClaims{
-			Audience:  audienceSqMGR,
-			ExpiresAt: expiresAt.Unix(),
-			IssuedAt:  time.Now().Unix(),
+		claims := jwt.RegisteredClaims{
+			Audience:  jwt.ClaimStrings{audienceSqMGR},
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    model.IssuerSqMGR,
 			Subject:   uid,
 		}
