@@ -150,6 +150,26 @@ func IsValidNumberSetType(setType string) bool {
 	return ok
 }
 
+// IsValidNumberSetConfigForLeague returns true if the config is valid for the given sports league
+func IsValidNumberSetConfigForLeague(config NumberSetConfig, league SportsLeague) bool {
+	// NCAAB uses halves, not quarters, so "1st, 2nd, 3rd, Final" is not valid
+	if league == SportsLeagueNCAAB && config == NumberSetConfig123F {
+		return false
+	}
+	return IsValidNumberSetConfig(string(config))
+}
+
+// ValidNumberSetConfigsForLeague returns valid number set configurations for a specific league
+func ValidNumberSetConfigsForLeague(league SportsLeague) []NumberSetConfigInfo {
+	configs := make([]NumberSetConfigInfo, 0, len(validNumberSetConfigs))
+	for _, c := range validNumberSetConfigs {
+		if IsValidNumberSetConfigForLeague(c.Key, league) {
+			configs = append(configs, c)
+		}
+	}
+	return configs
+}
+
 // LongLabel returns the long descriptive label for a number set type
 func (n NumberSetType) LongLabel() string {
 	if info, ok := numberSetTypeInfos[n]; ok {

@@ -159,3 +159,55 @@ func TestNumberSetTypeScan(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(setType).Should(gomega.Equal(NumberSetTypeAll))
 }
+
+func TestIsValidNumberSetConfigForLeague(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	// NFL should allow all valid configs
+	g.Expect(IsValidNumberSetConfigForLeague(NumberSetConfigStandard, SportsLeagueNFL)).Should(gomega.BeTrue())
+	g.Expect(IsValidNumberSetConfigForLeague(NumberSetConfig123F, SportsLeagueNFL)).Should(gomega.BeTrue())
+	g.Expect(IsValidNumberSetConfigForLeague(NumberSetConfigHF, SportsLeagueNFL)).Should(gomega.BeTrue())
+
+	// NCAAB should NOT allow 123f (1st, 2nd, 3rd, Final) but should allow others
+	g.Expect(IsValidNumberSetConfigForLeague(NumberSetConfigStandard, SportsLeagueNCAAB)).Should(gomega.BeTrue())
+	g.Expect(IsValidNumberSetConfigForLeague(NumberSetConfig123F, SportsLeagueNCAAB)).Should(gomega.BeFalse())
+	g.Expect(IsValidNumberSetConfigForLeague(NumberSetConfigHF, SportsLeagueNCAAB)).Should(gomega.BeTrue())
+
+	// NBA should allow all valid configs
+	g.Expect(IsValidNumberSetConfigForLeague(NumberSetConfigStandard, SportsLeagueNBA)).Should(gomega.BeTrue())
+	g.Expect(IsValidNumberSetConfigForLeague(NumberSetConfig123F, SportsLeagueNBA)).Should(gomega.BeTrue())
+	g.Expect(IsValidNumberSetConfigForLeague(NumberSetConfigHF, SportsLeagueNBA)).Should(gomega.BeTrue())
+
+	// Invalid config should return false for any league
+	g.Expect(IsValidNumberSetConfigForLeague(NumberSetConfig("invalid"), SportsLeagueNFL)).Should(gomega.BeFalse())
+	g.Expect(IsValidNumberSetConfigForLeague(NumberSetConfig("invalid"), SportsLeagueNCAAB)).Should(gomega.BeFalse())
+}
+
+func TestValidNumberSetConfigsForLeague(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	// NFL should get all 3 valid configs
+	nflConfigs := ValidNumberSetConfigsForLeague(SportsLeagueNFL)
+	g.Expect(len(nflConfigs)).Should(gomega.Equal(3))
+
+	// NCAAB should only get 2 configs (standard and hf, not 123f)
+	ncaabConfigs := ValidNumberSetConfigsForLeague(SportsLeagueNCAAB)
+	g.Expect(len(ncaabConfigs)).Should(gomega.Equal(2))
+
+	// Verify NCAAB configs don't include 123f
+	for _, config := range ncaabConfigs {
+		g.Expect(config.Key).ShouldNot(gomega.Equal(NumberSetConfig123F))
+	}
+
+	// Verify NCAAB configs do include standard and hf
+	keys := make([]NumberSetConfig, len(ncaabConfigs))
+	for i, config := range ncaabConfigs {
+		keys[i] = config.Key
+	}
+	g.Expect(keys).Should(gomega.ContainElement(NumberSetConfigStandard))
+	g.Expect(keys).Should(gomega.ContainElement(NumberSetConfigHF))
+
+	// NBA should get all 3 valid configs
+	nbaConfigs := ValidNumberSetConfigsForLeague(SportsLeagueNBA)
+	g.Expect(len(nbaConfigs)).Should(gomega.Equal(3))
+}

@@ -283,7 +283,30 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 				return
 			}
 
-			pool.SetNumberSetConfig(model.NumberSetConfig(resp.NumberSetConfig))
+			// Validate the config is valid for all linked events
+			newConfig := model.NumberSetConfig(resp.NumberSetConfig)
+			grids, err := pool.Grids(r.Context(), 0, model.MaxGridsPerPool)
+			if err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+
+			for _, grid := range grids {
+				if err := grid.LoadBDLEvent(r.Context()); err != nil {
+					continue
+				}
+				if grid.BDLEvent() != nil {
+					if !model.IsValidNumberSetConfigForLeague(newConfig, grid.BDLEvent().League) {
+						s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
+							Status: statusError,
+							Error:  fmt.Sprintf("Cannot use '%s' configuration: one or more grids are linked to %s games which don't support this configuration", resp.NumberSetConfig, grid.BDLEvent().League),
+						})
+						return
+					}
+				}
+			}
+
+			pool.SetNumberSetConfig(newConfig)
 			err = pool.Save(r.Context())
 		default:
 			s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("unsupported action %s", resp.Action))
@@ -1575,6 +1598,21 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 					return
 				} else {
 					config := model.NumberSetConfig(*data.Data.PayoutConfig)
+
+					// Validate config is valid for the linked event's league
+					if data.Data.BDLEventID != nil {
+						event, err := s.model.SportsEventByID(r.Context(), *data.Data.BDLEventID)
+						if err == nil && event != nil {
+							if !model.IsValidNumberSetConfigForLeague(config, event.League) {
+								s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
+									Status: statusError,
+									Error:  fmt.Sprintf("The payout configuration '%s' is not valid for %s games", *data.Data.PayoutConfig, event.League),
+								})
+								return
+							}
+						}
+					}
+
 					grid.SetPayoutConfig(&config)
 				}
 			}
