@@ -285,7 +285,8 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 
 			// Validate the config is valid for all linked events
 			newConfig := model.NumberSetConfig(resp.NumberSetConfig)
-			grids, err := pool.Grids(r.Context(), 0, model.MaxGridsPerPool)
+			var grids []*model.Grid
+			grids, err = pool.Grids(r.Context(), 0, model.MaxGridsPerPool)
 			if err != nil {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
