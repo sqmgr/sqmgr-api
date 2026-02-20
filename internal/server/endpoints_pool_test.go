@@ -180,6 +180,139 @@ func TestPoolGridSquareAdminHandler_MissingUserContext(t *testing.T) {
 	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
 }
 
+func TestPoolAdminHandler_MissingPoolContext(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	s := &Server{
+		Router: mux.NewRouter(),
+		broker: NewPoolBroker(),
+	}
+
+	nextCalled := false
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nextCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	s.Router.Path("/pool/{token}/test").Methods(http.MethodGet).Handler(s.poolAdminHandler(nextHandler))
+
+	req := httptest.NewRequest(http.MethodGet, "/pool/test-token/test", nil)
+	rec := httptest.NewRecorder()
+
+	// No pool in context
+	s.Router.ServeHTTP(rec, req)
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusInternalServerError))
+	g.Expect(nextCalled).Should(gomega.BeFalse())
+}
+
+func TestPoolAdminHandler_MissingUserContext(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+
+	m := model.New(db)
+	s := &Server{
+		Router: mux.NewRouter(),
+		model:  m,
+		broker: NewPoolBroker(),
+	}
+
+	nextCalled := false
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nextCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	s.Router.Path("/pool/{token}/test").Methods(http.MethodGet).Handler(s.poolAdminHandler(nextHandler))
+
+	poolToken := "test-admin-missing-user"
+	now := time.Now()
+
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	if err != nil {
+		t.Fatalf("failed to load pool: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/pool/"+poolToken+"/test", nil)
+	rec := httptest.NewRecorder()
+
+	// Pool in context but no user
+	ctx := context.WithValue(req.Context(), ctxPoolKey, poolForContext)
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusInternalServerError))
+	g.Expect(nextCalled).Should(gomega.BeFalse())
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPoolAdminHandler_NonAdminGetsForbidden(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+
+	m := model.New(db)
+	s := &Server{
+		Router: mux.NewRouter(),
+		model:  m,
+		broker: NewPoolBroker(),
+	}
+
+	nextCalled := false
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nextCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	s.Router.Path("/pool/{token}/test").Methods(http.MethodGet).Handler(s.poolAdminHandler(nextHandler))
+
+	poolToken := "test-admin-nonadmin"
+	now := time.Now()
+
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	if err != nil {
+		t.Fatalf("failed to load pool: %v", err)
+	}
+
+	// User 200 is not the owner (100), so IsAdminOf queries DB
+	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_admin").
+		WithArgs(int64(1), int64(200)).
+		WillReturnRows(sqlmock.NewRows([]string{"bool"}))
+
+	user := &model.User{Model: m, ID: 200, Store: model.UserStoreAuth0}
+
+	req := httptest.NewRequest(http.MethodGet, "/pool/"+poolToken+"/test", nil)
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusForbidden))
+	g.Expect(nextCalled).Should(gomega.BeFalse())
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
 func TestGetPoolTokenEndpoint_MissingUserContext(t *testing.T) {
 	g := gomega.NewWithT(t)
 
@@ -481,7 +614,7 @@ func setupTestServerForDrawNumbers(t *testing.T) (*Server, sqlmock.Sqlmock, *mod
 		broker: NewPoolBroker(),
 	}
 
-	s.Router.Path("/pool/{token}/grid/{id}").Methods(http.MethodPost).Handler(s.postPoolTokenGridIDEndpoint())
+	s.Router.Path("/pool/{token}/grid/{id}").Methods(http.MethodPost).Handler(s.poolAdminHandler(s.postPoolTokenGridIDEndpoint()))
 
 	return s, mock, m
 }
@@ -1083,7 +1216,7 @@ func setupTestServerForInviteToken(t *testing.T) (*Server, sqlmock.Sqlmock, *mod
 		broker: NewPoolBroker(),
 	}
 
-	s.Router.Path("/pool/{token}/invitetoken").Methods(http.MethodGet).Handler(s.getPoolTokenInviteTokenEndpoint())
+	s.Router.Path("/pool/{token}/invitetoken").Methods(http.MethodGet).Handler(s.poolAdminHandler(s.getPoolTokenInviteTokenEndpoint()))
 
 	return s, mock, m
 }
@@ -1910,6 +2043,588 @@ func TestSaveGrid_AllowsKeepingSameEventWhenFinal(t *testing.T) {
 
 	// Should succeed
 	g.Expect(rec.Code).Should(gomega.Equal(http.StatusAccepted))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func setupTestServerForBulkSquares(t *testing.T) (*Server, sqlmock.Sqlmock, *model.Model) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+
+	m := model.New(db)
+	s := &Server{
+		Router: mux.NewRouter(),
+		model:  m,
+		broker: NewPoolBroker(),
+	}
+
+	s.Router.Path("/pool/{token}/squares/bulk").Methods(http.MethodPost).Handler(s.poolAdminHandler(s.postPoolTokenSquaresBulkEndpoint()))
+
+	return s, mock, m
+}
+
+func TestPostPoolTokenSquaresBulk_NonAdminGetsForbidden(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForBulkSquares(t)
+
+	// User with ID 200 (not the pool owner)
+	user := &model.User{
+		Model: m,
+		ID:    200,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-bulk-nonadmin"
+	now := time.Now()
+
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// IsAdminOf query — returns empty (not admin)
+	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_admin").
+		WithArgs(int64(1), int64(200)).
+		WillReturnRows(sqlmock.NewRows([]string{"bool"}))
+
+	body := `{"squareIds": [1], "action": "claim", "claimant": "Alice"}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/squares/bulk", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusForbidden))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPostPoolTokenSquaresBulk_InvalidActionReturnsBadRequest(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForBulkSquares(t)
+
+	// Admin user (same ID as pool owner)
+	user := &model.User{
+		Model: m,
+		ID:    100,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-bulk-invalid-action"
+	now := time.Now()
+
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	body := `{"squareIds": [1], "action": "invalid_action"}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/squares/bulk", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusBadRequest))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPostPoolTokenSquaresBulk_ClaimSucceeds(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForBulkSquares(t)
+
+	user := &model.User{
+		Model: m,
+		ID:    100,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-bulk-claim"
+	now := time.Now()
+
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// SquareBySquareID for square 1 — unclaimed
+	squareRows := sqlmock.NewRows(squareColumns()).
+		AddRow(int64(10), 1, nil, nil, "unclaimed", nil, now, nil, nil)
+	mock.ExpectQuery("SELECT .+ FROM pool_squares ps").
+		WithArgs(int64(1), 1).
+		WillReturnRows(squareRows)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT \\* FROM update_pool_square").
+		WithArgs(int64(10), model.PoolSquareStateClaimed, "Alice", int64(100), sqlmock.AnyArg(), "admin: bulk claim", true).
+		WillReturnRows(sqlmock.NewRows([]string{"ok"}).AddRow(true))
+	mock.ExpectCommit()
+
+	body := `{"squareIds": [1], "action": "claim", "claimant": "Alice"}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/squares/bulk", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var result map[string]interface{}
+	err = json.Unmarshal(rec.Body.Bytes(), &result)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	g.Expect(result).Should(gomega.HaveKey("results"))
+
+	results := result["results"].([]interface{})
+	g.Expect(results).Should(gomega.HaveLen(1))
+	first := results[0].(map[string]interface{})
+	g.Expect(first["ok"]).Should(gomega.BeTrue())
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPostPoolTokenSquaresBulk_UnclaimSucceeds(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForBulkSquares(t)
+
+	user := &model.User{
+		Model: m,
+		ID:    100,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-bulk-unclaim"
+	now := time.Now()
+
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Square 1 — claimed
+	squareRows := sqlmock.NewRows(squareColumns()).
+		AddRow(int64(10), 1, nil, int64(200), "claimed", "Bob", now, nil, nil)
+	mock.ExpectQuery("SELECT .+ FROM pool_squares ps").
+		WithArgs(int64(1), 1).
+		WillReturnRows(squareRows)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT \\* FROM update_pool_square").
+		WithArgs(int64(10), model.PoolSquareStateUnclaimed, "Bob", int64(200), sqlmock.AnyArg(), "admin: bulk unclaim", true).
+		WillReturnRows(sqlmock.NewRows([]string{"ok"}).AddRow(true))
+	mock.ExpectCommit()
+
+	body := `{"squareIds": [1], "action": "unclaim"}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/squares/bulk", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var result map[string]interface{}
+	err = json.Unmarshal(rec.Body.Bytes(), &result)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	results := result["results"].([]interface{})
+	g.Expect(results).Should(gomega.HaveLen(1))
+	g.Expect(results[0].(map[string]interface{})["ok"]).Should(gomega.BeTrue())
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPostPoolTokenSquaresBulk_SetStateSucceeds(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForBulkSquares(t)
+
+	user := &model.User{
+		Model: m,
+		ID:    100,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-bulk-setstate"
+	now := time.Now()
+
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Square 1 — claimed
+	squareRows := sqlmock.NewRows(squareColumns()).
+		AddRow(int64(10), 1, nil, int64(200), "claimed", "Carol", now, nil, nil)
+	mock.ExpectQuery("SELECT .+ FROM pool_squares ps").
+		WithArgs(int64(1), 1).
+		WillReturnRows(squareRows)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT \\* FROM update_pool_square").
+		WithArgs(int64(10), model.PoolSquareStatePaidFull, "Carol", int64(200), sqlmock.AnyArg(), "admin: bulk set state to paid-full", true).
+		WillReturnRows(sqlmock.NewRows([]string{"ok"}).AddRow(true))
+	mock.ExpectCommit()
+
+	body := `{"squareIds": [1], "action": "set_state", "state": "paid-full"}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/squares/bulk", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var result map[string]interface{}
+	err = json.Unmarshal(rec.Body.Bytes(), &result)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	results := result["results"].([]interface{})
+	g.Expect(results).Should(gomega.HaveLen(1))
+	g.Expect(results[0].(map[string]interface{})["ok"]).Should(gomega.BeTrue())
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPostPoolTokenSquaresBulk_AlreadyClaimedReturnsPartialError(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForBulkSquares(t)
+
+	user := &model.User{
+		Model: m,
+		ID:    100,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-bulk-partial"
+	now := time.Now()
+
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Square 1 — unclaimed → will be claimed
+	square1Rows := sqlmock.NewRows(squareColumns()).
+		AddRow(int64(10), 1, nil, nil, "unclaimed", nil, now, nil, nil)
+	mock.ExpectQuery("SELECT .+ FROM pool_squares ps").
+		WithArgs(int64(1), 1).
+		WillReturnRows(square1Rows)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT \\* FROM update_pool_square").
+		WithArgs(int64(10), model.PoolSquareStateClaimed, "Alice", int64(100), sqlmock.AnyArg(), "admin: bulk claim", true).
+		WillReturnRows(sqlmock.NewRows([]string{"ok"}).AddRow(true))
+	mock.ExpectCommit()
+
+	// Square 3 — already claimed → returns partial error (no DB ops beyond the select)
+	square3Rows := sqlmock.NewRows(squareColumns()).
+		AddRow(int64(12), 3, nil, int64(200), "claimed", "Bob", now, nil, nil)
+	mock.ExpectQuery("SELECT .+ FROM pool_squares ps").
+		WithArgs(int64(1), 3).
+		WillReturnRows(square3Rows)
+
+	body := `{"squareIds": [1, 3], "action": "claim", "claimant": "Alice"}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/squares/bulk", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var result map[string]interface{}
+	err = json.Unmarshal(rec.Body.Bytes(), &result)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	results := result["results"].([]interface{})
+	g.Expect(results).Should(gomega.HaveLen(2))
+
+	first := results[0].(map[string]interface{})
+	g.Expect(first["ok"]).Should(gomega.BeTrue())
+	g.Expect(first["squareId"]).Should(gomega.BeEquivalentTo(1))
+
+	second := results[1].(map[string]interface{})
+	g.Expect(second["ok"]).Should(gomega.BeFalse())
+	g.Expect(second["squareId"]).Should(gomega.BeEquivalentTo(3))
+	g.Expect(second["error"]).Should(gomega.Equal("already claimed"))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestAdminSetState_CannotChangeStateOfUnclaimedSquare(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSquareUpdate(t)
+
+	user := &model.User{
+		Model: m,
+		ID:    100,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-admin-setstate-unclaimed"
+	now := time.Now()
+
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Square is unclaimed
+	squareRows := sqlmock.NewRows(squareColumns()).
+		AddRow(int64(10), 1, nil, nil, "unclaimed", nil, now, nil, nil)
+	mock.ExpectQuery("SELECT .+ FROM pool_squares ps").
+		WithArgs(int64(1), 1).
+		WillReturnRows(squareRows)
+
+	body := `{"state": "paid-full"}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/square/1", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusBadRequest))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPostPoolTokenSquaresBulk_SetStateFailsForUnclaimedSquare(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForBulkSquares(t)
+
+	user := &model.User{
+		Model: m,
+		ID:    100,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-bulk-setstate-unclaimed"
+	now := time.Now()
+
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Square 1 — claimed → succeeds
+	square1Rows := sqlmock.NewRows(squareColumns()).
+		AddRow(int64(10), 1, nil, int64(100), "claimed", "Alice", now, nil, nil)
+	mock.ExpectQuery("SELECT .+ FROM pool_squares ps").
+		WithArgs(int64(1), 1).
+		WillReturnRows(square1Rows)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT \\* FROM update_pool_square").
+		WithArgs(int64(10), model.PoolSquareStatePaidFull, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), true).
+		WillReturnRows(sqlmock.NewRows([]string{"ok"}).AddRow(true))
+	mock.ExpectCommit()
+
+	// Square 2 — unclaimed → returns partial error (no DB ops beyond the select)
+	square2Rows := sqlmock.NewRows(squareColumns()).
+		AddRow(int64(11), 2, nil, nil, "unclaimed", nil, now, nil, nil)
+	mock.ExpectQuery("SELECT .+ FROM pool_squares ps").
+		WithArgs(int64(1), 2).
+		WillReturnRows(square2Rows)
+
+	body := `{"squareIds": [1, 2], "action": "set_state", "state": "paid-full"}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/squares/bulk", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var result map[string]interface{}
+	err = json.Unmarshal(rec.Body.Bytes(), &result)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	results := result["results"].([]interface{})
+	g.Expect(results).Should(gomega.HaveLen(2))
+
+	first := results[0].(map[string]interface{})
+	g.Expect(first["ok"]).Should(gomega.BeTrue())
+	g.Expect(first["squareId"]).Should(gomega.BeEquivalentTo(1))
+
+	second := results[1].(map[string]interface{})
+	g.Expect(second["ok"]).Should(gomega.BeFalse())
+	g.Expect(second["squareId"]).Should(gomega.BeEquivalentTo(2))
+	g.Expect(second["error"]).Should(gomega.Equal("square must be claimed first"))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPostPoolTokenSquaresBulk_SetStateToClaimedSucceeds(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForBulkSquares(t)
+
+	user := &model.User{
+		Model: m,
+		ID:    100,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-bulk-setstate-claimed"
+	now := time.Now()
+
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Square 1 — paid-full, being reverted to claimed
+	squareRows := sqlmock.NewRows(squareColumns()).
+		AddRow(int64(10), 1, nil, int64(200), "paid-full", "Dave", now, nil, nil)
+	mock.ExpectQuery("SELECT .+ FROM pool_squares ps").
+		WithArgs(int64(1), 1).
+		WillReturnRows(squareRows)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT \\* FROM update_pool_square").
+		WithArgs(int64(10), model.PoolSquareStateClaimed, "Dave", int64(200), sqlmock.AnyArg(), "admin: bulk set state to claimed", true).
+		WillReturnRows(sqlmock.NewRows([]string{"ok"}).AddRow(true))
+	mock.ExpectCommit()
+
+	body := `{"squareIds": [1], "action": "set_state", "state": "claimed"}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/squares/bulk", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var result map[string]interface{}
+	err = json.Unmarshal(rec.Body.Bytes(), &result)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	results := result["results"].([]interface{})
+	g.Expect(results).Should(gomega.HaveLen(1))
+	g.Expect(results[0].(map[string]interface{})["ok"]).Should(gomega.BeTrue())
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPostPoolTokenSquaresBulk_SetStateWithNoteUsesProvidedNote(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForBulkSquares(t)
+
+	user := &model.User{
+		Model: m,
+		ID:    100,
+		Store: model.UserStoreAuth0,
+	}
+
+	poolToken := "test-bulk-setstate-note"
+	now := time.Now()
+
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	// Square 1 — claimed, setting to paid-full with a custom note
+	squareRows := sqlmock.NewRows(squareColumns()).
+		AddRow(int64(10), 1, nil, int64(200), "claimed", "Eve", now, nil, nil)
+	mock.ExpectQuery("SELECT .+ FROM pool_squares ps").
+		WithArgs(int64(1), 1).
+		WillReturnRows(squareRows)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT \\* FROM update_pool_square").
+		WithArgs(int64(10), model.PoolSquareStatePaidFull, "Eve", int64(200), sqlmock.AnyArg(), "cash received", true).
+		WillReturnRows(sqlmock.NewRows([]string{"ok"}).AddRow(true))
+	mock.ExpectCommit()
+
+	body := `{"squareIds": [1], "action": "set_state", "state": "paid-full", "note": "cash received"}`
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/squares/bulk", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var result map[string]interface{}
+	err = json.Unmarshal(rec.Body.Bytes(), &result)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	results := result["results"].([]interface{})
+	g.Expect(results).Should(gomega.HaveLen(1))
+	g.Expect(results[0].(map[string]interface{})["ok"]).Should(gomega.BeTrue())
 
 	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
 }

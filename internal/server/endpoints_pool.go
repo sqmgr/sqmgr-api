@@ -120,6 +120,31 @@ func (s *Server) poolGridHandler(next http.Handler) http.Handler {
 	})
 }
 
+func (s *Server) poolAdminHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+
+		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		} else if !isAdmin {
+			s.writeErrorResponse(w, http.StatusForbidden, nil)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *Server) poolGridSquareAdminHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		pool, ok := poolFromContext(r.Context())
@@ -172,19 +197,6 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 		pool, ok := poolFromContext(r.Context())
 		if !ok {
 			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
-			return
-		}
-		user, ok := userFromContext(r.Context())
-		if !ok {
-			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
-			return
-		}
-
-		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
-			s.writeErrorResponse(w, http.StatusInternalServerError, err)
-			return
-		} else if !isAdmin {
-			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
 		}
 
@@ -348,19 +360,6 @@ func (s *Server) getPoolTokenLogEndpoint() http.HandlerFunc {
 		pool, ok := poolFromContext(r.Context())
 		if !ok {
 			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
-			return
-		}
-		user, ok := userFromContext(r.Context())
-		if !ok {
-			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
-			return
-		}
-
-		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
-			s.writeErrorResponse(w, http.StatusInternalServerError, err)
-			return
-		} else if !isAdmin {
-			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
 		}
 
@@ -601,21 +600,9 @@ func (s *Server) getPoolTokenInviteTokenEndpoint() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, ok := userFromContext(r.Context())
-		if !ok {
-			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
-			return
-		}
 		pool, ok := poolFromContext(r.Context())
 		if !ok {
 			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
-			return
-		}
-		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
-			s.writeErrorResponse(w, http.StatusInternalServerError, err)
-			return
-		} else if !isAdmin {
-			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
 		}
 
@@ -1191,6 +1178,10 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 		} else if isAdmin {
 			// admin actions
 			if payload.State.IsValid() {
+				if square.State == model.PoolSquareStateUnclaimed && payload.State != model.PoolSquareStateUnclaimed {
+					s.writeErrorResponse(w, http.StatusBadRequest, errors.New("cannot change state of an unclaimed square"))
+					return
+				}
 				square.State = payload.State
 			}
 
@@ -1304,19 +1295,6 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 		pool, ok := poolFromContext(r.Context())
 		if !ok {
 			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
-			return
-		}
-		user, ok := userFromContext(r.Context())
-		if !ok {
-			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
-			return
-		}
-
-		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
-			s.writeErrorResponse(w, http.StatusInternalServerError, err)
-			return
-		} else if !isAdmin {
-			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
 		}
 
@@ -1824,6 +1802,153 @@ func (s *Server) postPoolTokenMemberEndpoint() http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) postPoolTokenSquaresBulkEndpoint() http.HandlerFunc {
+	type squareResult struct {
+		SquareID int    `json:"squareId"`
+		OK       bool   `json:"ok"`
+		Error    string `json:"error,omitempty"`
+	}
+
+	type requestPayload struct {
+		SquareIDs []int                 `json:"squareIds"`
+		Action    string                `json:"action"`
+		Claimant  string                `json:"claimant"`
+		State     model.PoolSquareState `json:"state"`
+		Note      string                `json:"note"`
+	}
+
+	type response struct {
+		Results []squareResult `json:"results"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+		user, ok := userFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+
+		var req requestPayload
+		if ok := s.parseJSONPayload(w, r, &req); !ok {
+			return
+		}
+
+		if len(req.SquareIDs) == 0 {
+			s.writeErrorResponse(w, http.StatusBadRequest, errors.New("squareIds must not be empty"))
+			return
+		}
+
+		switch req.Action {
+		case "claim":
+			if req.Claimant == "" {
+				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("claimant is required for claim action"))
+				return
+			}
+		case "unclaim":
+			// no additional fields required
+		case "set_state":
+			if req.State != model.PoolSquareStateClaimed && req.State != model.PoolSquareStatePaidPartial && req.State != model.PoolSquareStatePaidFull {
+				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("state must be claimed, paid-partial, or paid-full"))
+				return
+			}
+		default:
+			s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("invalid action: %s", req.Action))
+			return
+		}
+
+		results := make([]squareResult, 0, len(req.SquareIDs))
+		for _, squareID := range req.SquareIDs {
+			if squareID < 1 || squareID > pool.NumberOfSquares() {
+				results = append(results, squareResult{
+					SquareID: squareID,
+					OK:       false,
+					Error:    "invalid square ID",
+				})
+				continue
+			}
+
+			square, err := pool.SquareBySquareID(squareID)
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					results = append(results, squareResult{SquareID: squareID, OK: false, Error: "square not found"})
+				} else {
+					results = append(results, squareResult{SquareID: squareID, OK: false, Error: "internal error"})
+				}
+				continue
+			}
+
+			if req.Action == "claim" && square.State != model.PoolSquareStateUnclaimed {
+				results = append(results, squareResult{SquareID: squareID, OK: false, Error: "already claimed"})
+				continue
+			}
+
+			if req.Action == "set_state" && square.State == model.PoolSquareStateUnclaimed {
+				results = append(results, squareResult{SquareID: squareID, OK: false, Error: "square must be claimed first"})
+				continue
+			}
+
+			tx, err := s.model.DB.BeginTx(r.Context(), nil)
+			if err != nil {
+				results = append(results, squareResult{SquareID: squareID, OK: false, Error: "internal error"})
+				continue
+			}
+
+			var saveErr error
+			switch req.Action {
+			case "claim":
+				square.SetClaimant(req.Claimant)
+				square.State = model.PoolSquareStateClaimed
+				square.SetUserID(user.ID)
+				saveErr = square.Save(r.Context(), tx, true, model.PoolSquareLog{
+					RemoteAddr: r.RemoteAddr,
+					Note:       "admin: bulk claim",
+				})
+			case "unclaim":
+				square.State = model.PoolSquareStateUnclaimed
+				saveErr = square.Save(r.Context(), tx, true, model.PoolSquareLog{
+					RemoteAddr: r.RemoteAddr,
+					Note:       "admin: bulk unclaim",
+				})
+			case "set_state":
+				square.State = req.State
+				setStateNote := fmt.Sprintf("admin: bulk set state to %s", req.State)
+				if req.Note != "" {
+					setStateNote = req.Note
+				}
+				saveErr = square.Save(r.Context(), tx, true, model.PoolSquareLog{
+					RemoteAddr: r.RemoteAddr,
+					Note:       setStateNote,
+				})
+			}
+
+			if saveErr != nil {
+				_ = tx.Rollback()
+				errMsg := "internal error"
+				if saveErr == model.ErrSquareAlreadyClaimed {
+					errMsg = "already claimed"
+				}
+				results = append(results, squareResult{SquareID: squareID, OK: false, Error: errMsg})
+				continue
+			}
+
+			if err := tx.Commit(); err != nil {
+				results = append(results, squareResult{SquareID: squareID, OK: false, Error: "internal error"})
+				continue
+			}
+
+			results = append(results, squareResult{SquareID: squareID, OK: true})
+		}
+
+		s.broker.Publish(pool.Token(), PoolEvent{Type: EventSquareUpdated})
+		s.writeJSONResponse(w, http.StatusOK, response{Results: results})
 	}
 }
 
