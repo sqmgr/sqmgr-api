@@ -1885,6 +1885,15 @@ func (s *Server) postPoolTokenSquaresBulkEndpoint() http.HandlerFunc {
 				continue
 			}
 
+			if pool.GridType() == model.GridTypeRoll100 && square.ParentID > 0 {
+				results = append(results, squareResult{
+					SquareID: squareID,
+					OK:       false,
+					Error:    "cannot directly edit a secondary square; edit the primary square instead",
+				})
+				continue
+			}
+
 			if req.Action == "claim" && square.State != model.PoolSquareStateUnclaimed {
 				results = append(results, squareResult{SquareID: squareID, OK: false, Error: "already claimed"})
 				continue
@@ -1917,6 +1926,23 @@ func (s *Server) postPoolTokenSquaresBulkEndpoint() http.HandlerFunc {
 					RemoteAddr: r.RemoteAddr,
 					Note:       "admin: bulk unclaim",
 				})
+				if saveErr == nil && pool.GridType() == model.GridTypeRoll100 {
+					childSquares, childErr := square.ChildSquares(r.Context(), tx)
+					if childErr != nil {
+						saveErr = childErr
+					} else {
+						for _, child := range childSquares {
+							child.State = model.PoolSquareStateUnclaimed
+							if childErr = child.Save(r.Context(), tx, true, model.PoolSquareLog{
+								RemoteAddr: r.RemoteAddr,
+								Note:       fmt.Sprintf("admin: bulk unclaim (secondary of square %d)", square.SquareID),
+							}); childErr != nil {
+								saveErr = childErr
+								break
+							}
+						}
+					}
+				}
 			case "set_state":
 				square.State = req.State
 				setStateNote := fmt.Sprintf("admin: bulk set state to %s", req.State)
