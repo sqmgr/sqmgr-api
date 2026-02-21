@@ -19,6 +19,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -32,6 +33,7 @@ type config struct {
 	auth0MgmtDomain    string
 	auth0MgmtClientID  string
 	auth0MgmtClientSec string
+	corsAllowedOrigins []string
 }
 
 var instance *config
@@ -78,6 +80,12 @@ func Auth0MgmtClientSecret() string {
 	return instance.auth0MgmtClientSec
 }
 
+// CORSAllowedOrigins returns the list of allowed CORS origins
+func CORSAllowedOrigins() []string {
+	mustHaveInstance()
+	return instance.corsAllowedOrigins
+}
+
 func mustHaveInstance() {
 	if instance == nil {
 		panic("config: must call Load() first")
@@ -97,9 +105,11 @@ func Load() error {
 	_ = viper.BindEnv("auth0_mgmt_domain")
 	_ = viper.BindEnv("auth0_mgmt_client_id")
 	_ = viper.BindEnv("auth0_mgmt_client_secret")
+	_ = viper.BindEnv("cors_allowed_origins")
 
 	viper.SetDefault("dsn", "host=localhost port=5432 user=postgres sslmode=disable")
 	viper.SetDefault("auth0_jwks_url", "https://sqmgr.auth0.com/.well-known/jwks.json")
+	viper.SetDefault("cors_allowed_origins", "https://sqmgr.com,https://www.sqmgr.com,http://localhost:8080")
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, isNotFoundError := err.(viper.ConfigFileNotFoundError); !isNotFoundError {
@@ -107,6 +117,14 @@ func Load() error {
 		}
 
 		logrus.Warn(err)
+	}
+
+	var corsOrigins []string
+	for _, origin := range strings.Split(viper.GetString("cors_allowed_origins"), ",") {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			corsOrigins = append(corsOrigins, origin)
+		}
 	}
 
 	instance = &config{
@@ -117,6 +135,7 @@ func Load() error {
 		auth0MgmtDomain:    viper.GetString("auth0_mgmt_domain"),
 		auth0MgmtClientID:  viper.GetString("auth0_mgmt_client_id"),
 		auth0MgmtClientSec: viper.GetString("auth0_mgmt_client_secret"),
+		corsAllowedOrigins: corsOrigins,
 	}
 
 	return nil

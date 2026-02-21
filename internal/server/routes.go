@@ -18,10 +18,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package server
 
 import (
+	"net/http"
+
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
-	"net/http"
+	"github.com/sqmgr/sqmgr-api/internal/config"
 )
 
 var optionsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
@@ -122,6 +124,7 @@ func (s *Server) setupRoutes() {
 	}
 
 	c := cors.New(cors.Options{
+		AllowedOrigins: config.CORSAllowedOrigins(),
 		AllowedMethods: []string{http.MethodGet, http.MethodDelete, http.MethodPost, http.MethodPatch},
 		AllowedHeaders: []string{"Authorization", "Content-Type"},
 	})

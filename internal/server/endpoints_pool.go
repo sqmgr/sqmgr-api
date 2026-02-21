@@ -650,7 +650,7 @@ func (s *Server) getPoolTokenGridEndpoint() http.HandlerFunc {
 		if limit < 1 {
 			limit = defaultPerPage
 		} else if limit > maxPerPage {
-			s.writeErrorResponse(w, http.StatusBadGateway, fmt.Errorf("limit cannot exceed %d", maxPerPage))
+			s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("limit cannot exceed %d", maxPerPage))
 			return
 		}
 
