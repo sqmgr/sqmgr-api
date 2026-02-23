@@ -180,6 +180,17 @@ WHERE
 	return nil
 }
 
+// HasAdminVisibility returns true if the user should see admin-level details
+// for a pool. This includes pool admins and site admins. Site admins get
+// read-only visibility but not write authority over pools they don't own;
+// write operations use IsAdminOf directly.
+func (u *User) HasAdminVisibility(ctx context.Context, p *Pool) (bool, error) {
+	if u.IsAdmin {
+		return true, nil
+	}
+	return u.IsAdminOf(ctx, p)
+}
+
 // IsAdminOf will return true if the user is the admin of the grid
 func (u *User) IsAdminOf(ctx context.Context, p *Pool) (bool, error) {
 	if u.ID == p.userID {

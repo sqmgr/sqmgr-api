@@ -133,6 +133,8 @@ func (s *Server) poolAdminHandler(next http.Handler) http.Handler {
 			return
 		}
 
+		// Note: uses IsAdminOf (not HasAdminVisibility) intentionally;
+		// site admins get read-only visibility on pools but not write authority.
 		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
@@ -169,6 +171,8 @@ func (s *Server) poolGridSquareAdminHandler(next http.Handler) http.Handler {
 			return
 		}
 
+		// Note: uses IsAdminOf (not HasAdminVisibility) intentionally;
+		// site admins get read-only visibility on pools but not write authority.
 		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
@@ -570,7 +574,7 @@ func (s *Server) getPoolTokenEndpoint() http.HandlerFunc {
 			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
 			return
 		}
-		isAdminOf, err := user.IsAdminOf(r.Context(), pool)
+		isAdminOf, err := user.HasAdminVisibility(r.Context(), pool)
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
@@ -859,7 +863,7 @@ func (s *Server) getPoolTokenSquareIDEndpoint() http.HandlerFunc {
 			}
 		}
 
-		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
+		if isAdmin, err := user.HasAdminVisibility(r.Context(), pool); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
 		} else if isAdmin {
