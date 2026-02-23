@@ -57,12 +57,12 @@ var issToStore = map[string]UserStore{
 // User represents a SqMGR user
 type User struct {
 	*Model
-	ID      int64
-	Store   UserStore
-	StoreID string
-	IsAdmin bool
-	Email   *string
-	Created time.Time
+	ID          int64
+	Store       UserStore
+	StoreID     string
+	IsSiteAdmin bool
+	Email       *string
+	Created     time.Time
 
 	// not stored in the database
 	Token *jwt.Token
@@ -89,7 +89,7 @@ func (u *User) HasPermission(action Permission) bool {
 func (m *Model) userByRow(row *sql.Row) (*User, error) {
 	var u User
 	u.Model = m
-	if err := row.Scan(&u.ID, &u.Store, &u.StoreID, &u.IsAdmin, &u.Email, &u.Created); err != nil {
+	if err := row.Scan(&u.ID, &u.Store, &u.StoreID, &u.IsSiteAdmin, &u.Email, &u.Created); err != nil {
 		return nil, fmt.Errorf("scanning user row: %w", err)
 	}
 
@@ -98,7 +98,7 @@ func (m *Model) userByRow(row *sql.Row) (*User, error) {
 
 // GetUserByID will return a user by its ID.
 func (m *Model) GetUserByID(ctx context.Context, id int64) (*User, error) {
-	row := m.DB.QueryRowContext(ctx, "SELECT id, store, store_id, is_admin, email, created FROM users WHERE id = $1", id)
+	row := m.DB.QueryRowContext(ctx, "SELECT id, store, store_id, is_site_admin, email, created FROM users WHERE id = $1", id)
 	return m.userByRow(row)
 }
 
@@ -109,16 +109,16 @@ func (m *Model) GetUser(ctx context.Context, issuer, storeID string) (*User, err
 		return nil, fmt.Errorf("invalid issuer: %s", issuer)
 	}
 
-	row := m.DB.QueryRowContext(ctx, "SELECT id, store, store_id, is_admin, email, created FROM get_user($1, $2)", store, storeID)
+	row := m.DB.QueryRowContext(ctx, "SELECT id, store, store_id, is_site_admin, email, created FROM get_user($1, $2)", store, storeID)
 	return m.userByRow(row)
 }
 
 // JoinPool will link a user to a pool.
 func (u *User) JoinPool(ctx context.Context, p *Pool) error {
 	// no-op
-	if isAdmin, err := u.IsAdminOf(ctx, p); err != nil {
-		return fmt.Errorf("checking admin status: %w", err)
-	} else if isAdmin {
+	if isManager, err := u.IsManagerOf(ctx, p); err != nil {
+		return fmt.Errorf("checking manager status: %w", err)
+	} else if isManager {
 		return nil
 	}
 
@@ -161,45 +161,45 @@ func (u *User) IsMemberOf(ctx context.Context, p *Pool) (bool, error) {
 	return ok, nil
 }
 
-// SetAdminOf will set the user as an admin in the pool. Note: this user must
+// SetManagerOf will set the user as a manager in the pool. Note: this user must
 // already be a member
-func (u *User) SetAdminOf(ctx context.Context, p *Pool, isAdmin bool) error {
+func (u *User) SetManagerOf(ctx context.Context, p *Pool, isManager bool) error {
 	_, err := u.DB.ExecContext(ctx, `
 UPDATE
     pools_users
 SET
-    is_admin = $1,
+    is_manager = $1,
     modified = (NOW() AT TIME ZONE 'UTC')
 WHERE
 	pool_id = $2 AND
-  	user_id = $3`, isAdmin, p.ID(), u.ID)
+  	user_id = $3`, isManager, p.ID(), u.ID)
 	if err != nil {
-		return fmt.Errorf("updating admin status: %w", err)
+		return fmt.Errorf("updating manager status: %w", err)
 	}
 
 	return nil
 }
 
-// HasAdminVisibility returns true if the user should see admin-level details
-// for a pool. This includes pool admins and site admins. Site admins get
+// HasManagerVisibility returns true if the user should see manager-level details
+// for a pool. This includes pool managers and site admins. Site admins get
 // read-only visibility but not write authority over pools they don't own;
-// write operations use IsAdminOf directly.
-func (u *User) HasAdminVisibility(ctx context.Context, p *Pool) (bool, error) {
-	if u.IsAdmin {
+// write operations use IsManagerOf directly.
+func (u *User) HasManagerVisibility(ctx context.Context, p *Pool) (bool, error) {
+	if u.IsSiteAdmin {
 		return true, nil
 	}
-	return u.IsAdminOf(ctx, p)
+	return u.IsManagerOf(ctx, p)
 }
 
-// IsAdminOf will return true if the user is the admin of the grid
-func (u *User) IsAdminOf(ctx context.Context, p *Pool) (bool, error) {
+// IsManagerOf will return true if the user is a manager of the pool
+func (u *User) IsManagerOf(ctx context.Context, p *Pool) (bool, error) {
 	if u.ID == p.userID {
 		return true, nil
 	}
 
-	// otherwise, check to see if they are an admin
+	// otherwise, check to see if they are a manager
 
-	row := u.DB.QueryRowContext(ctx, "SELECT true FROM pools_users WHERE pool_id = $1 AND user_id = $2 AND is_admin", p.id, u.ID)
+	row := u.DB.QueryRowContext(ctx, "SELECT true FROM pools_users WHERE pool_id = $1 AND user_id = $2 AND is_manager", p.id, u.ID)
 
 	var ok bool
 	if err := row.Scan(&ok); err != nil {
@@ -207,7 +207,7 @@ func (u *User) IsAdminOf(ctx context.Context, p *Pool) (bool, error) {
 			return false, nil
 		}
 
-		return false, fmt.Errorf("checking admin status: %w", err)
+		return false, fmt.Errorf("checking manager status: %w", err)
 	}
 
 	return ok, nil

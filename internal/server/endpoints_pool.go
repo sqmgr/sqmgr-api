@@ -66,7 +66,7 @@ func (s *Server) poolHandler(next http.Handler) http.Handler {
 		}
 
 		// Site admins can access any pool without joining
-		if !user.IsAdmin {
+		if !user.IsSiteAdmin {
 			if (pool.IsLocked() && pool.OpenAccessOnLock()) || !pool.PasswordRequired() {
 				// Auto-join user to pool since no password is required
 				if err := user.JoinPool(r.Context(), pool); err != nil {
@@ -120,7 +120,7 @@ func (s *Server) poolGridHandler(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) poolAdminHandler(next http.Handler) http.Handler {
+func (s *Server) poolManagerHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		pool, ok := poolFromContext(r.Context())
 		if !ok {
@@ -133,12 +133,12 @@ func (s *Server) poolAdminHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		// Note: uses IsAdminOf (not HasAdminVisibility) intentionally;
+		// Note: uses IsManagerOf (not HasManagerVisibility) intentionally;
 		// site admins get read-only visibility on pools but not write authority.
-		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
+		if isManager, err := user.IsManagerOf(r.Context(), pool); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
-		} else if !isAdmin {
+		} else if !isManager {
 			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
 		}
@@ -147,7 +147,7 @@ func (s *Server) poolAdminHandler(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) poolGridSquareAdminHandler(next http.Handler) http.Handler {
+func (s *Server) poolGridSquareManagerHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		pool, ok := poolFromContext(r.Context())
 		if !ok {
@@ -171,12 +171,12 @@ func (s *Server) poolGridSquareAdminHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		// Note: uses IsAdminOf (not HasAdminVisibility) intentionally;
+		// Note: uses IsManagerOf (not HasManagerVisibility) intentionally;
 		// site admins get read-only visibility on pools but not write authority.
-		if isAdmin, err := user.IsAdminOf(r.Context(), pool); err != nil {
+		if isManager, err := user.IsManagerOf(r.Context(), pool); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
-		} else if !isAdmin {
+		} else if !isManager {
 			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
 		}
@@ -345,8 +345,8 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 
 		s.writeJSONResponse(w, http.StatusOK, poolResponse{
 			PoolJSON:                 pool.JSON(),
-			IsAdmin:                  true,
-			IsPoolAdmin:              true,
+			HasManagerVisibility:     true,
+			IsPoolManager:            true,
 			CanChangeNumberSetConfig: canChange,
 		})
 	}
@@ -557,9 +557,9 @@ func (s *Server) postPoolEndpoint() http.HandlerFunc {
 		}
 
 		s.writeJSONResponse(w, http.StatusCreated, poolResponse{
-			PoolJSON:    pool.JSON(),
-			IsAdmin:     true,
-			IsPoolAdmin: true,
+			PoolJSON:             pool.JSON(),
+			HasManagerVisibility: true,
+			IsPoolManager:        true,
 		})
 	}
 }
@@ -576,22 +576,22 @@ func (s *Server) getPoolTokenEndpoint() http.HandlerFunc {
 			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
 			return
 		}
-		isPoolAdmin, err := user.IsAdminOf(r.Context(), pool)
+		isPoolManager, err := user.IsManagerOf(r.Context(), pool)
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
 
-		// Site admins get read-only admin visibility even if they're not pool admins
-		isAdminVisible := isPoolAdmin || user.IsAdmin
+		// Site admins get read-only manager visibility even if they're not pool managers
+		hasManagerVisibility := isPoolManager || user.IsSiteAdmin
 
 		resp := poolResponse{
-			PoolJSON:    pool.JSON(),
-			IsAdmin:     isAdminVisible,
-			IsPoolAdmin: isPoolAdmin,
+			PoolJSON:             pool.JSON(),
+			HasManagerVisibility: hasManagerVisibility,
+			IsPoolManager:        isPoolManager,
 		}
 
-		if isAdminVisible {
+		if hasManagerVisibility {
 			canChange, err := pool.CanChangeNumberSetConfig(r.Context())
 			if err != nil {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
@@ -869,10 +869,10 @@ func (s *Server) getPoolTokenSquareIDEndpoint() http.HandlerFunc {
 			}
 		}
 
-		if isAdmin, err := user.HasAdminVisibility(r.Context(), pool); err != nil {
+		if hasVisibility, err := user.HasManagerVisibility(r.Context(), pool); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
-		} else if isAdmin {
+		} else if hasVisibility {
 			if err := square.LoadLogs(r.Context()); err != nil {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
@@ -957,14 +957,14 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 
 		lr := logrus.WithField("square-id", squareID)
 
-		isAdmin, err := user.IsAdminOf(r.Context(), pool)
+		isPoolManager, err := user.IsManagerOf(r.Context(), pool)
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
 
-		// if the user isn't an admin and the grid is locked, do not let the user do anything
-		if pool.IsLocked() && !isAdmin {
+		// if the user isn't a manager and the grid is locked, do not let the user do anything
+		if pool.IsLocked() && !isPoolManager {
 			s.writeErrorResponse(w, http.StatusForbidden, errors.New("the grid is locked"))
 			return
 		}
@@ -1000,8 +1000,8 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 		}
 
 		if payload.Rename {
-			if !isAdmin {
-				s.writeErrorResponse(w, http.StatusForbidden, errors.New("only an admin can rename a square"))
+			if !isPoolManager {
+				s.writeErrorResponse(w, http.StatusForbidden, errors.New("only a manager can rename a square"))
 				return
 			}
 
@@ -1185,8 +1185,8 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
 			}
-		} else if isAdmin {
-			// admin actions
+		} else if isPoolManager {
+			// manager actions
 			if payload.State.IsValid() {
 				if square.State == model.PoolSquareStateUnclaimed && payload.State != model.PoolSquareStateUnclaimed {
 					s.writeErrorResponse(w, http.StatusBadRequest, errors.New("cannot change state of an unclaimed square"))
@@ -1237,14 +1237,14 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 				return
 			}
 		} else {
-			lr.WithField("remoteAddr", r.RemoteAddr).Warn("non-admin tried to administer squares")
+			lr.WithField("remoteAddr", r.RemoteAddr).Warn("non-manager tried to administer squares")
 			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
 		}
 
 		s.broker.Publish(pool.Token(), PoolEvent{Type: EventSquareUpdated})
 
-		if isAdmin {
+		if isPoolManager {
 			if err := square.LoadLogs(r.Context()); err != nil {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
 				return
@@ -1990,7 +1990,7 @@ func (s *Server) postPoolTokenSquaresBulkEndpoint() http.HandlerFunc {
 
 type poolResponse struct {
 	*model.PoolJSON
-	IsAdmin                  bool `json:"isAdmin"`
-	IsPoolAdmin              bool `json:"isPoolAdmin"`
+	HasManagerVisibility     bool `json:"hasManagerVisibility"`
+	IsPoolManager            bool `json:"isPoolManager"`
 	CanChangeNumberSetConfig bool `json:"canChangeNumberSetConfig,omitempty"`
 }

@@ -45,12 +45,12 @@ func TestGetUserSelfEndpoint_ReturnsUserInfo(t *testing.T) {
 	created := time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)
 
 	user := &model.User{
-		ID:      123,
-		Store:   model.UserStoreAuth0,
-		StoreID: "auth0|abc123",
-		IsAdmin: false,
-		Email:   &email,
-		Created: created,
+		ID:          123,
+		Store:       model.UserStoreAuth0,
+		StoreID:     "auth0|abc123",
+		IsSiteAdmin: false,
+		Email:       &email,
+		Created:     created,
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/user/self", nil)
@@ -69,7 +69,7 @@ func TestGetUserSelfEndpoint_ReturnsUserInfo(t *testing.T) {
 	g.Expect(result["id"]).Should(gomega.BeEquivalentTo(123))
 	g.Expect(result["store_id"]).Should(gomega.Equal("auth0|abc123"))
 	g.Expect(result["store"]).Should(gomega.Equal("auth0"))
-	g.Expect(result["is_admin"]).Should(gomega.BeFalse())
+	g.Expect(result["is_site_admin"]).Should(gomega.BeFalse())
 	g.Expect(result["email"]).Should(gomega.Equal("test@example.com"))
 	g.Expect(result["created"]).Should(gomega.Equal("2024-01-15T10:30:00Z"))
 }
@@ -87,12 +87,12 @@ func TestGetUserSelfEndpoint_NilEmail(t *testing.T) {
 	created := time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)
 
 	user := &model.User{
-		ID:      456,
-		Store:   model.UserStoreSqMGR,
-		StoreID: "sqmgr|guest123",
-		IsAdmin: false,
-		Email:   nil,
-		Created: created,
+		ID:          456,
+		Store:       model.UserStoreSqMGR,
+		StoreID:     "sqmgr|guest123",
+		IsSiteAdmin: false,
+		Email:       nil,
+		Created:     created,
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/user/self", nil)
@@ -127,12 +127,12 @@ func TestGetUserSelfEndpoint_AdminUser(t *testing.T) {
 	created := time.Now()
 
 	user := &model.User{
-		ID:      1,
-		Store:   model.UserStoreAuth0,
-		StoreID: "auth0|admin",
-		IsAdmin: true,
-		Email:   &email,
-		Created: created,
+		ID:          1,
+		Store:       model.UserStoreAuth0,
+		StoreID:     "auth0|admin",
+		IsSiteAdmin: true,
+		Email:       &email,
+		Created:     created,
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/user/self", nil)
@@ -148,7 +148,7 @@ func TestGetUserSelfEndpoint_AdminUser(t *testing.T) {
 	err := json.Unmarshal(rec.Body.Bytes(), &result)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-	g.Expect(result["is_admin"]).Should(gomega.BeTrue())
+	g.Expect(result["is_site_admin"]).Should(gomega.BeTrue())
 }
 
 func TestUserHandler_MissingUserContext(t *testing.T) {

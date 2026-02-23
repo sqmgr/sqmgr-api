@@ -105,7 +105,7 @@ func TestPoolGridHandler_MissingPoolContext(t *testing.T) {
 	g.Expect(nextCalled).Should(gomega.BeFalse())
 }
 
-func TestPoolGridSquareAdminHandler_MissingPoolContext(t *testing.T) {
+func TestPoolGridSquareManagerHandler_MissingPoolContext(t *testing.T) {
 	g := gomega.NewWithT(t)
 
 	s := &Server{
@@ -119,7 +119,7 @@ func TestPoolGridSquareAdminHandler_MissingPoolContext(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	s.Router.Path("/pool/{token}/grid/{id}/square/{square_id}").Methods(http.MethodPost).Handler(s.poolGridSquareAdminHandler(nextHandler))
+	s.Router.Path("/pool/{token}/grid/{id}/square/{square_id}").Methods(http.MethodPost).Handler(s.poolGridSquareManagerHandler(nextHandler))
 
 	req := httptest.NewRequest(http.MethodPost, "/pool/test-token/grid/1/square/5", nil)
 	rec := httptest.NewRecorder()
@@ -131,7 +131,7 @@ func TestPoolGridSquareAdminHandler_MissingPoolContext(t *testing.T) {
 	g.Expect(nextCalled).Should(gomega.BeFalse())
 }
 
-func TestPoolGridSquareAdminHandler_MissingUserContext(t *testing.T) {
+func TestPoolGridSquareManagerHandler_MissingUserContext(t *testing.T) {
 	g := gomega.NewWithT(t)
 
 	db, mock, err := sqlmock.New()
@@ -152,7 +152,7 @@ func TestPoolGridSquareAdminHandler_MissingUserContext(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	s.Router.Path("/pool/{token}/grid/{id}/square/{square_id}").Methods(http.MethodPost).Handler(s.poolGridSquareAdminHandler(nextHandler))
+	s.Router.Path("/pool/{token}/grid/{id}/square/{square_id}").Methods(http.MethodPost).Handler(s.poolGridSquareManagerHandler(nextHandler))
 
 	poolToken := "test-missing-user-sq"
 	now := time.Now()
@@ -181,7 +181,7 @@ func TestPoolGridSquareAdminHandler_MissingUserContext(t *testing.T) {
 	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
 }
 
-func TestPoolAdminHandler_MissingPoolContext(t *testing.T) {
+func TestPoolManagerHandler_MissingPoolContext(t *testing.T) {
 	g := gomega.NewWithT(t)
 
 	s := &Server{
@@ -195,7 +195,7 @@ func TestPoolAdminHandler_MissingPoolContext(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	s.Router.Path("/pool/{token}/test").Methods(http.MethodGet).Handler(s.poolAdminHandler(nextHandler))
+	s.Router.Path("/pool/{token}/test").Methods(http.MethodGet).Handler(s.poolManagerHandler(nextHandler))
 
 	req := httptest.NewRequest(http.MethodGet, "/pool/test-token/test", nil)
 	rec := httptest.NewRecorder()
@@ -207,7 +207,7 @@ func TestPoolAdminHandler_MissingPoolContext(t *testing.T) {
 	g.Expect(nextCalled).Should(gomega.BeFalse())
 }
 
-func TestPoolAdminHandler_MissingUserContext(t *testing.T) {
+func TestPoolManagerHandler_MissingUserContext(t *testing.T) {
 	g := gomega.NewWithT(t)
 
 	db, mock, err := sqlmock.New()
@@ -228,7 +228,7 @@ func TestPoolAdminHandler_MissingUserContext(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	s.Router.Path("/pool/{token}/test").Methods(http.MethodGet).Handler(s.poolAdminHandler(nextHandler))
+	s.Router.Path("/pool/{token}/test").Methods(http.MethodGet).Handler(s.poolManagerHandler(nextHandler))
 
 	poolToken := "test-admin-missing-user"
 	now := time.Now()
@@ -257,7 +257,7 @@ func TestPoolAdminHandler_MissingUserContext(t *testing.T) {
 	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
 }
 
-func TestPoolAdminHandler_NonAdminGetsForbidden(t *testing.T) {
+func TestPoolManagerHandler_NonManagerGetsForbidden(t *testing.T) {
 	g := gomega.NewWithT(t)
 
 	db, mock, err := sqlmock.New()
@@ -278,7 +278,7 @@ func TestPoolAdminHandler_NonAdminGetsForbidden(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	s.Router.Path("/pool/{token}/test").Methods(http.MethodGet).Handler(s.poolAdminHandler(nextHandler))
+	s.Router.Path("/pool/{token}/test").Methods(http.MethodGet).Handler(s.poolManagerHandler(nextHandler))
 
 	poolToken := "test-admin-nonadmin"
 	now := time.Now()
@@ -295,8 +295,8 @@ func TestPoolAdminHandler_NonAdminGetsForbidden(t *testing.T) {
 		t.Fatalf("failed to load pool: %v", err)
 	}
 
-	// User 200 is not the owner (100), so IsAdminOf queries DB
-	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_admin").
+	// User 200 is not the owner (100), so IsManagerOf queries DB
+	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_manager").
 		WithArgs(int64(1), int64(200)).
 		WillReturnRows(sqlmock.NewRows([]string{"bool"}))
 
@@ -534,8 +534,8 @@ func TestGetPoolTokenEndpoint_AdminReceivesCanChangeNumberSetConfig(t *testing.T
 	err = json.Unmarshal(rec.Body.Bytes(), &result)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-	// Admin should receive isAdmin = true and canChangeNumberSetConfig field
-	g.Expect(result["isAdmin"]).Should(gomega.BeTrue())
+	// Admin should receive hasManagerVisibility = true and canChangeNumberSetConfig field
+	g.Expect(result["hasManagerVisibility"]).Should(gomega.BeTrue())
 	g.Expect(result).Should(gomega.HaveKey("canChangeNumberSetConfig"))
 	g.Expect(result["canChangeNumberSetConfig"]).Should(gomega.BeTrue())
 
@@ -569,9 +569,9 @@ func TestGetPoolTokenEndpoint_NonAdminDoesNotReceiveCanChangeNumberSetConfig(t *
 	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-	// Since user (ID=200) is not owner (user_id=100), IsAdminOf will query pools_users
-	// Return no rows to indicate user is not an admin
-	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_admin").
+	// Since user (ID=200) is not owner (user_id=100), IsManagerOf will query pools_users
+	// Return no rows to indicate user is not a manager
+	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_manager").
 		WithArgs(int64(1), int64(200)).
 		WillReturnRows(sqlmock.NewRows([]string{"bool"})) // empty = not admin
 
@@ -592,8 +592,8 @@ func TestGetPoolTokenEndpoint_NonAdminDoesNotReceiveCanChangeNumberSetConfig(t *
 	err = json.Unmarshal(rec.Body.Bytes(), &result)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-	// Non-admin should receive isAdmin = false
-	g.Expect(result["isAdmin"]).Should(gomega.BeFalse())
+	// Non-manager should receive hasManagerVisibility = false
+	g.Expect(result["hasManagerVisibility"]).Should(gomega.BeFalse())
 
 	// canChangeNumberSetConfig should NOT be present (omitempty in struct)
 	_, hasKey := result["canChangeNumberSetConfig"]
@@ -615,7 +615,7 @@ func setupTestServerForDrawNumbers(t *testing.T) (*Server, sqlmock.Sqlmock, *mod
 		broker: NewPoolBroker(),
 	}
 
-	s.Router.Path("/pool/{token}/grid/{id}").Methods(http.MethodPost).Handler(s.poolAdminHandler(s.postPoolTokenGridIDEndpoint()))
+	s.Router.Path("/pool/{token}/grid/{id}").Methods(http.MethodPost).Handler(s.poolManagerHandler(s.postPoolTokenGridIDEndpoint()))
 
 	return s, mock, m
 }
@@ -904,10 +904,10 @@ func TestPoolHandler_SiteAdminBypassesPasswordProtectedPool(t *testing.T) {
 
 	// Site admin user (different ID from pool owner)
 	user := &model.User{
-		Model:   m,
-		ID:      999,
-		Store:   model.UserStoreAuth0,
-		IsAdmin: true,
+		Model:       m,
+		ID:          999,
+		Store:       model.UserStoreAuth0,
+		IsSiteAdmin: true,
 	}
 
 	poolToken := "test-admin-bypass"
@@ -941,10 +941,10 @@ func TestPoolHandler_SiteAdminNotAutoJoined(t *testing.T) {
 
 	// Site admin user
 	user := &model.User{
-		Model:   m,
-		ID:      999,
-		Store:   model.UserStoreAuth0,
-		IsAdmin: true,
+		Model:       m,
+		ID:          999,
+		Store:       model.UserStoreAuth0,
+		IsSiteAdmin: true,
 	}
 
 	poolToken := "test-admin-no-join"
@@ -978,10 +978,10 @@ func TestPoolHandler_NonAdminNonMemberDenied(t *testing.T) {
 
 	// Regular user (not site admin, not pool owner)
 	user := &model.User{
-		Model:   m,
-		ID:      200,
-		Store:   model.UserStoreAuth0,
-		IsAdmin: false,
+		Model:       m,
+		ID:          200,
+		Store:       model.UserStoreAuth0,
+		IsSiteAdmin: false,
 	}
 
 	poolToken := "test-non-member-denied"
@@ -1217,7 +1217,7 @@ func setupTestServerForInviteToken(t *testing.T) (*Server, sqlmock.Sqlmock, *mod
 		broker: NewPoolBroker(),
 	}
 
-	s.Router.Path("/pool/{token}/invitetoken").Methods(http.MethodGet).Handler(s.poolAdminHandler(s.getPoolTokenInviteTokenEndpoint()))
+	s.Router.Path("/pool/{token}/invitetoken").Methods(http.MethodGet).Handler(s.poolManagerHandler(s.getPoolTokenInviteTokenEndpoint()))
 
 	return s, mock, m
 }
@@ -1356,8 +1356,8 @@ func TestGetPoolTokenInviteToken_NonAdminForbidden(t *testing.T) {
 	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-	// IsAdminOf query - user 200 is not admin
-	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_admin").
+	// IsManagerOf query - user 200 is not manager
+	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_manager").
 		WithArgs(int64(1), int64(200)).
 		WillReturnRows(sqlmock.NewRows([]string{"bool"}))
 
@@ -1421,8 +1421,8 @@ func TestPostPoolTokenMember_JoinWithInviteToken(t *testing.T) {
 		WithArgs("validToken").
 		WillReturnRows(inviteRows)
 
-	// JoinPool: first checks IsAdminOf (user 200 != owner 100, so queries DB)
-	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_admin").
+	// JoinPool: first checks IsManagerOf (user 200 != owner 100, so queries DB)
+	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_manager").
 		WithArgs(int64(1), int64(200)).
 		WillReturnRows(sqlmock.NewRows([]string{"bool"})) // not admin
 
@@ -2061,7 +2061,7 @@ func setupTestServerForBulkSquares(t *testing.T) (*Server, sqlmock.Sqlmock, *mod
 		broker: NewPoolBroker(),
 	}
 
-	s.Router.Path("/pool/{token}/squares/bulk").Methods(http.MethodPost).Handler(s.poolAdminHandler(s.postPoolTokenSquaresBulkEndpoint()))
+	s.Router.Path("/pool/{token}/squares/bulk").Methods(http.MethodPost).Handler(s.poolManagerHandler(s.postPoolTokenSquaresBulkEndpoint()))
 
 	return s, mock, m
 }
@@ -2090,8 +2090,8 @@ func TestPostPoolTokenSquaresBulk_NonAdminGetsForbidden(t *testing.T) {
 	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-	// IsAdminOf query — returns empty (not admin)
-	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_admin").
+	// IsManagerOf query — returns empty (not manager)
+	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_manager").
 		WithArgs(int64(1), int64(200)).
 		WillReturnRows(sqlmock.NewRows([]string{"bool"}))
 
@@ -2784,10 +2784,10 @@ func TestGetSquareDetail_SiteAdminSeesLogsAndUserInfo(t *testing.T) {
 
 	// Site admin user (NOT the pool owner)
 	user := &model.User{
-		Model:   m,
-		ID:      999,
-		Store:   model.UserStoreAuth0,
-		IsAdmin: true,
+		Model:       m,
+		ID:          999,
+		Store:       model.UserStoreAuth0,
+		IsSiteAdmin: true,
 	}
 
 	poolToken := "test-site-admin-square"
@@ -2812,7 +2812,7 @@ func TestGetSquareDetail_SiteAdminSeesLogsAndUserInfo(t *testing.T) {
 		WithArgs(int64(1), 5).
 		WillReturnRows(squareRows)
 
-	// HasAdminVisibility short-circuits for site admins (user.IsAdmin == true),
+	// HasManagerVisibility short-circuits for site admins (user.IsSiteAdmin == true),
 	// so no pools_users query is issued.
 
 	// Site admin triggers LoadLogs
@@ -2826,7 +2826,7 @@ func TestGetSquareDetail_SiteAdminSeesLogsAndUserInfo(t *testing.T) {
 	email := "player1@example.com"
 	mock.ExpectQuery("SELECT .+ FROM users WHERE id = \\$1").
 		WithArgs(int64(300)).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "store", "store_id", "is_admin", "email", "created"}).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "store", "store_id", "is_site_admin", "email", "created"}).
 			AddRow(int64(300), model.UserStoreAuth0, "auth0|300", false, &email, now))
 
 	req := httptest.NewRequest(http.MethodGet, "/pool/"+poolToken+"/square/5", nil)
@@ -2885,8 +2885,8 @@ func TestGetSquareDetail_NonAdminDoesNotSeeLogs(t *testing.T) {
 		WithArgs(int64(1), 5).
 		WillReturnRows(squareRows)
 
-	// IsAdminOf check: not owner, not pool admin
-	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_admin").
+	// IsManagerOf check: not owner, not pool manager
+	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_manager").
 		WithArgs(int64(1), int64(200)).
 		WillReturnRows(sqlmock.NewRows([]string{"bool"}))
 
@@ -2915,16 +2915,16 @@ func TestGetSquareDetail_NonAdminDoesNotSeeLogs(t *testing.T) {
 	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
 }
 
-func TestGetPoolTokenEndpoint_SiteAdminGetsIsAdminTrue(t *testing.T) {
+func TestGetPoolTokenEndpoint_SiteAdminGetsManagerVisibilityTrue(t *testing.T) {
 	g := gomega.NewWithT(t)
 	s, mock, m := setupTestServerForPool(t)
 
 	// Site admin user (NOT the pool owner)
 	user := &model.User{
-		Model:   m,
-		ID:      999,
-		Store:   model.UserStoreAuth0,
-		IsAdmin: true,
+		Model:       m,
+		ID:          999,
+		Store:       model.UserStoreAuth0,
+		IsSiteAdmin: true,
 	}
 
 	poolToken := "test-site-admin-pool"
@@ -2940,13 +2940,13 @@ func TestGetPoolTokenEndpoint_SiteAdminGetsIsAdminTrue(t *testing.T) {
 	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-	// IsAdminOf is called first: site admin (ID=999) is not pool owner (user_id=100),
+	// IsManagerOf is called first: site admin (ID=999) is not pool owner (user_id=100),
 	// so it queries pools_users and finds no rows.
-	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_admin").
+	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_manager").
 		WithArgs(int64(1), int64(999)).
-		WillReturnRows(sqlmock.NewRows([]string{"bool"})) // empty = not pool admin
+		WillReturnRows(sqlmock.NewRows([]string{"bool"})) // empty = not pool manager
 
-	// Since user.IsAdmin is true, isAdminVisible is true, so CanChangeNumberSetConfig is called
+	// Since user.IsSiteAdmin is true, hasManagerVisibility is true, so CanChangeNumberSetConfig is called
 	gridsRows := sqlmock.NewRows(gridColumns())
 	mock.ExpectQuery("SELECT .+ FROM grids WHERE pool_id = \\$1").
 		WithArgs(int64(1), int64(0), 50).
@@ -2966,10 +2966,10 @@ func TestGetPoolTokenEndpoint_SiteAdminGetsIsAdminTrue(t *testing.T) {
 	err = json.Unmarshal(rec.Body.Bytes(), &result)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-	// Site admin should receive isAdmin = true (read-only visibility)
-	g.Expect(result["isAdmin"]).Should(gomega.BeTrue())
+	// Site admin should receive hasManagerVisibility = true (read-only visibility)
+	g.Expect(result["hasManagerVisibility"]).Should(gomega.BeTrue())
 	// Site admin should NOT be pool admin
-	g.Expect(result["isPoolAdmin"]).Should(gomega.BeFalse())
+	g.Expect(result["isPoolManager"]).Should(gomega.BeFalse())
 	// Site admin should also receive canChangeNumberSetConfig
 	g.Expect(result).Should(gomega.HaveKey("canChangeNumberSetConfig"))
 

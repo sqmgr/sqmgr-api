@@ -62,23 +62,23 @@ func TestJoinGrid(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(ok).Should(gomega.BeTrue())
 
-	isAdminOf, err := u.IsAdminOf(context.Background(), pool)
+	isManagerOf, err := u.IsManagerOf(context.Background(), pool)
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(isAdminOf).Should(gomega.BeTrue())
+	g.Expect(isManagerOf).Should(gomega.BeTrue())
 
-	isAdminOf, err = u2.IsAdminOf(context.Background(), pool)
+	isManagerOf, err = u2.IsManagerOf(context.Background(), pool)
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(isAdminOf).Should(gomega.BeFalse())
+	g.Expect(isManagerOf).Should(gomega.BeFalse())
 
-	u2.SetAdminOf(context.Background(), pool, true)
-	isAdminOf, err = u2.IsAdminOf(context.Background(), pool)
+	u2.SetManagerOf(context.Background(), pool, true)
+	isManagerOf, err = u2.IsManagerOf(context.Background(), pool)
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(isAdminOf).Should(gomega.BeTrue())
+	g.Expect(isManagerOf).Should(gomega.BeTrue())
 
-	u2.SetAdminOf(context.Background(), pool, false)
-	isAdminOf, err = u2.IsAdminOf(context.Background(), pool)
+	u2.SetManagerOf(context.Background(), pool, false)
+	isManagerOf, err = u2.IsManagerOf(context.Background(), pool)
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(isAdminOf).Should(gomega.BeFalse())
+	g.Expect(isManagerOf).Should(gomega.BeFalse())
 }
 
 func TestGetUserByID(t *testing.T) {
@@ -111,7 +111,7 @@ func ensureIntegration(t *testing.T) {
 	}
 }
 
-func TestUserIsAdmin(t *testing.T) {
+func TestUserIsSiteAdmin(t *testing.T) {
 	ensureIntegration(t)
 
 	g := gomega.NewWithT(t)
@@ -121,19 +121,19 @@ func TestUserIsAdmin(t *testing.T) {
 	// Create a user
 	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(user.IsAdmin).Should(gomega.BeFalse())
+	g.Expect(user.IsSiteAdmin).Should(gomega.BeFalse())
 
 	// Set user as admin directly in database
-	_, err = m.DB.ExecContext(ctx, "UPDATE users SET is_admin = true WHERE id = $1", user.ID)
+	_, err = m.DB.ExecContext(ctx, "UPDATE users SET is_site_admin = true WHERE id = $1", user.ID)
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Reload user via GetUserByID
 	reloadedUser, err := m.GetUserByID(ctx, user.ID)
 	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(reloadedUser.IsAdmin).Should(gomega.BeTrue())
+	g.Expect(reloadedUser.IsSiteAdmin).Should(gomega.BeTrue())
 
 	// Clean up - reset admin status
-	_, err = m.DB.ExecContext(ctx, "UPDATE users SET is_admin = false WHERE id = $1", user.ID)
+	_, err = m.DB.ExecContext(ctx, "UPDATE users SET is_site_admin = false WHERE id = $1", user.ID)
 	g.Expect(err).Should(gomega.Succeed())
 }
 

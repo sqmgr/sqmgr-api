@@ -153,12 +153,12 @@ func (s *Server) postAdminPoolJoinEndpoint() http.HandlerFunc {
 // getAdminUserEndpoint returns user profile and stats for admin view
 func (s *Server) getAdminUserEndpoint() http.HandlerFunc {
 	type userResponse struct {
-		ID      int64           `json:"id"`
-		Store   model.UserStore `json:"store"`
-		StoreID string          `json:"storeId"`
-		Email   *string         `json:"email"`
-		IsAdmin bool            `json:"isAdmin"`
-		Created string          `json:"created"`
+		ID          int64           `json:"id"`
+		Store       model.UserStore `json:"store"`
+		StoreID     string          `json:"storeId"`
+		Email       *string         `json:"email"`
+		IsSiteAdmin bool            `json:"isSiteAdmin"`
+		Created     string          `json:"created"`
 	}
 	type response struct {
 		User  userResponse          `json:"user"`
@@ -193,12 +193,12 @@ func (s *Server) getAdminUserEndpoint() http.HandlerFunc {
 
 		s.writeJSONResponse(w, http.StatusOK, response{
 			User: userResponse{
-				ID:      user.ID,
-				Store:   user.Store,
-				StoreID: user.StoreID,
-				Email:   user.Email,
-				IsAdmin: user.IsAdmin,
-				Created: user.Created.Format("2006-01-02T15:04:05Z07:00"),
+				ID:          user.ID,
+				Store:       user.Store,
+				StoreID:     user.StoreID,
+				Email:       user.Email,
+				IsSiteAdmin: user.IsSiteAdmin,
+				Created:     user.Created.Format("2006-01-02T15:04:05Z07:00"),
 			},
 			Stats: stats,
 		})

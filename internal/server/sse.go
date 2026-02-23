@@ -64,7 +64,7 @@ func (s *Server) getPoolTokenEventsEndpoint() http.HandlerFunc {
 			return
 		}
 
-		if !user.IsAdmin {
+		if !user.IsSiteAdmin {
 			isMember, err := user.IsMemberOf(r.Context(), pool)
 			if err != nil {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)

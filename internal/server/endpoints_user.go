@@ -58,12 +58,12 @@ func (s *Server) userHandler(next http.Handler) http.Handler {
 
 func (s *Server) getUserSelfEndpoint() http.HandlerFunc {
 	type response struct {
-		UserID  int64           `json:"id"`
-		StoreID string          `json:"store_id"`
-		Store   model.UserStore `json:"store"`
-		IsAdmin bool            `json:"is_admin"`
-		Email   *string         `json:"email"`
-		Created time.Time       `json:"created"`
+		UserID      int64           `json:"id"`
+		StoreID     string          `json:"store_id"`
+		Store       model.UserStore `json:"store"`
+		IsSiteAdmin bool            `json:"is_site_admin"`
+		Email       *string         `json:"email"`
+		Created     time.Time       `json:"created"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -73,12 +73,12 @@ func (s *Server) getUserSelfEndpoint() http.HandlerFunc {
 			return
 		}
 		s.writeJSONResponse(w, http.StatusOK, response{
-			UserID:  user.ID,
-			StoreID: user.StoreID,
-			Store:   user.Store,
-			IsAdmin: user.IsAdmin,
-			Email:   user.Email,
-			Created: user.Created,
+			UserID:      user.ID,
+			StoreID:     user.StoreID,
+			Store:       user.Store,
+			IsSiteAdmin: user.IsSiteAdmin,
+			Email:       user.Email,
+			Created:     user.Created,
 		})
 	}
 }

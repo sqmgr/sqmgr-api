@@ -217,7 +217,7 @@ func (p *PoolSquare) SetParentSquare(ctx context.Context, tx *sql.Tx, square *Po
 }
 
 // Save will save the pool square and the associated log data to the database
-func (p *PoolSquare) Save(ctx context.Context, dbFn Queryable, isAdmin bool, poolSquareLog PoolSquareLog) error {
+func (p *PoolSquare) Save(ctx context.Context, dbFn Queryable, isManager bool, poolSquareLog PoolSquareLog) error {
 	var claimant *string
 	if p.claimant != "" {
 		claimant = &p.claimant
@@ -236,7 +236,7 @@ func (p *PoolSquare) Save(ctx context.Context, dbFn Queryable, isAdmin bool, poo
 	}
 
 	const query = "SELECT * FROM update_pool_square($1, $2, $3, $4, $5, $6, $7)"
-	row := dbFn.QueryRowContext(ctx, query, p.ID, p.State, claimant, userID, remoteAddr, poolSquareLog.Note, isAdmin)
+	row := dbFn.QueryRowContext(ctx, query, p.ID, p.State, claimant, userID, remoteAddr, poolSquareLog.Note, isManager)
 
 	var ok bool
 	if err := row.Scan(&ok); err != nil {

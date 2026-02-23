@@ -29,7 +29,7 @@ func (s *Server) adminHandler(next http.Handler) http.Handler {
 			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
 			return
 		}
-		if !user.IsAdmin {
+		if !user.IsSiteAdmin {
 			s.writeErrorResponse(w, http.StatusForbidden, nil)
 			return
 		}

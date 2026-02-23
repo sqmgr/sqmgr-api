@@ -46,7 +46,7 @@ func TestAdminHandler_AllowsAdmin(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	// Add admin user to context
-	adminUser := &model.User{IsAdmin: true}
+	adminUser := &model.User{IsSiteAdmin: true}
 	ctx := context.WithValue(req.Context(), ctxUserKey, adminUser)
 
 	// Call the handler
@@ -75,7 +75,7 @@ func TestAdminHandler_DeniesNonAdmin(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	// Add non-admin user to context
-	nonAdminUser := &model.User{IsAdmin: false}
+	nonAdminUser := &model.User{IsSiteAdmin: false}
 	ctx := context.WithValue(req.Context(), ctxUserKey, nonAdminUser)
 
 	// Call the handler
@@ -137,7 +137,7 @@ func TestGetAdminUserEndpoint_InvalidID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/admin/user/abc", nil)
 	rec := httptest.NewRecorder()
 
-	adminUser := &model.User{IsAdmin: true}
+	adminUser := &model.User{IsSiteAdmin: true}
 	ctx := context.WithValue(req.Context(), ctxUserKey, adminUser)
 
 	s.Router.ServeHTTP(rec, req.WithContext(ctx))
@@ -160,7 +160,7 @@ func TestGetAdminUserPoolsEndpoint_InvalidID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/admin/user/abc/pools", nil)
 	rec := httptest.NewRecorder()
 
-	adminUser := &model.User{IsAdmin: true}
+	adminUser := &model.User{IsSiteAdmin: true}
 	ctx := context.WithValue(req.Context(), ctxUserKey, adminUser)
 
 	s.Router.ServeHTTP(rec, req.WithContext(ctx))

@@ -71,21 +71,21 @@ func (s *Server) setupRoutes() {
 	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/square/{id:[0-9]+}").Methods(http.MethodGet).Handler(s.getPoolTokenSquareIDEndpoint())
 	authPoolRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/square/{id:[0-9]+}").Methods(http.MethodPost).Handler(s.postPoolTokenSquareIDEndpoint())
 
-	// Pool admin routes — require pool admin privileges
-	authPoolAdminRouter := authPoolRouter.NewRoute().Subrouter()
-	authPoolAdminRouter.Use(s.poolAdminHandler)
-	authPoolAdminRouter.Path("/pool/{token:[A-Za-z0-9_-]+}").Methods(http.MethodPost).Handler(s.postPoolTokenEndpoint())
-	authPoolAdminRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/grid/{id:[0-9]+}").Methods(http.MethodPost).Handler(s.postPoolTokenGridIDEndpoint())
-	authPoolAdminRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/invitetoken").Methods(http.MethodGet).Handler(s.getPoolTokenInviteTokenEndpoint())
-	authPoolAdminRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/log").Methods(http.MethodGet).Handler(s.getPoolTokenLogEndpoint())
-	authPoolAdminRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/squares/bulk").Methods(http.MethodPost).Handler(s.postPoolTokenSquaresBulkEndpoint())
+	// Pool manager routes — require pool manager privileges
+	authPoolManagerRouter := authPoolRouter.NewRoute().Subrouter()
+	authPoolManagerRouter.Use(s.poolManagerHandler)
+	authPoolManagerRouter.Path("/pool/{token:[A-Za-z0-9_-]+}").Methods(http.MethodPost).Handler(s.postPoolTokenEndpoint())
+	authPoolManagerRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/grid/{id:[0-9]+}").Methods(http.MethodPost).Handler(s.postPoolTokenGridIDEndpoint())
+	authPoolManagerRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/invitetoken").Methods(http.MethodGet).Handler(s.getPoolTokenInviteTokenEndpoint())
+	authPoolManagerRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/log").Methods(http.MethodGet).Handler(s.getPoolTokenLogEndpoint())
+	authPoolManagerRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/squares/bulk").Methods(http.MethodPost).Handler(s.postPoolTokenSquaresBulkEndpoint())
 
 	authPoolGridRouter := authPoolRouter.NewRoute().Subrouter()
 	authPoolGridRouter.Use(s.poolGridHandler)
-	authPoolGridSquareAdminRouter := authPoolGridRouter.NewRoute().Subrouter()
-	authPoolGridSquareAdminRouter.Use(s.poolGridSquareAdminHandler)
-	authPoolGridSquareAdminRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/grid/{id:[0-9]+}/square/{square_id:[0-9]+}/annotation").Methods(http.MethodPost).Handler(s.postPoolTokenGridIDSquareSquareIDAnnotationEndpoint())
-	authPoolGridSquareAdminRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/grid/{id:[0-9]+}/square/{square_id:[0-9]+}/annotation").Methods(http.MethodDelete).Handler(s.deletePoolTokenGridIDSquareSquareIDAnnotationEndpoint())
+	authPoolGridSquareManagerRouter := authPoolGridRouter.NewRoute().Subrouter()
+	authPoolGridSquareManagerRouter.Use(s.poolGridSquareManagerHandler)
+	authPoolGridSquareManagerRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/grid/{id:[0-9]+}/square/{square_id:[0-9]+}/annotation").Methods(http.MethodPost).Handler(s.postPoolTokenGridIDSquareSquareIDAnnotationEndpoint())
+	authPoolGridSquareManagerRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/grid/{id:[0-9]+}/square/{square_id:[0-9]+}/annotation").Methods(http.MethodDelete).Handler(s.deletePoolTokenGridIDSquareSquareIDAnnotationEndpoint())
 
 	authUserRouter := authRouter.NewRoute().Subrouter()
 	authUserRouter.Use(s.userHandler)

@@ -325,7 +325,7 @@ type AdminUser struct {
 	ID          int64     `json:"id"`
 	Store       UserStore `json:"store"`
 	Email       *string   `json:"email"`
-	IsAdmin     bool      `json:"isAdmin"`
+	IsSiteAdmin bool      `json:"isSiteAdmin"`
 	PoolsOwned  int64     `json:"poolsOwned"`
 	PoolsJoined int64     `json:"poolsJoined"`
 	Created     string    `json:"created"`
@@ -356,7 +356,7 @@ func (m *Model) GetAllUsers(ctx context.Context, search string, offset int64, li
 			u.id,
 			u.store,
 			u.email,
-			u.is_admin,
+			u.is_site_admin,
 			(SELECT COUNT(*) FROM pools p WHERE p.user_id = u.id) as pools_owned,
 			(SELECT COUNT(*) FROM pools_users pu JOIN pools p ON p.id = pu.pool_id WHERE pu.user_id = u.id AND p.user_id != u.id) as pools_joined,
 			u.created
@@ -399,7 +399,7 @@ func scanAdminUsers(rows interface {
 			&user.ID,
 			&user.Store,
 			&user.Email,
-			&user.IsAdmin,
+			&user.IsSiteAdmin,
 			&user.PoolsOwned,
 			&user.PoolsJoined,
 			&user.Created,
