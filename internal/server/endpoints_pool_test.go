@@ -2940,10 +2940,13 @@ func TestGetPoolTokenEndpoint_SiteAdminGetsIsAdminTrue(t *testing.T) {
 	poolForContext, err := s.model.PoolByToken(context.Background(), poolToken)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-	// HasAdminVisibility short-circuits for site admins (user.IsAdmin == true),
-	// so no pools_users query is issued.
+	// IsAdminOf is called first: site admin (ID=999) is not pool owner (user_id=100),
+	// so it queries pools_users and finds no rows.
+	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_admin").
+		WithArgs(int64(1), int64(999)).
+		WillReturnRows(sqlmock.NewRows([]string{"bool"})) // empty = not pool admin
 
-	// Since site admin causes isAdminOf to be true, CanChangeNumberSetConfig is called
+	// Since user.IsAdmin is true, isAdminVisible is true, so CanChangeNumberSetConfig is called
 	gridsRows := sqlmock.NewRows(gridColumns())
 	mock.ExpectQuery("SELECT .+ FROM grids WHERE pool_id = \\$1").
 		WithArgs(int64(1), int64(0), 50).
@@ -2963,8 +2966,10 @@ func TestGetPoolTokenEndpoint_SiteAdminGetsIsAdminTrue(t *testing.T) {
 	err = json.Unmarshal(rec.Body.Bytes(), &result)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-	// Site admin should receive isAdmin = true
+	// Site admin should receive isAdmin = true (read-only visibility)
 	g.Expect(result["isAdmin"]).Should(gomega.BeTrue())
+	// Site admin should NOT be pool admin
+	g.Expect(result["isPoolAdmin"]).Should(gomega.BeFalse())
 	// Site admin should also receive canChangeNumberSetConfig
 	g.Expect(result).Should(gomega.HaveKey("canChangeNumberSetConfig"))
 

@@ -346,6 +346,7 @@ func (s *Server) postPoolTokenEndpoint() http.HandlerFunc {
 		s.writeJSONResponse(w, http.StatusOK, poolResponse{
 			PoolJSON:                 pool.JSON(),
 			IsAdmin:                  true,
+			IsPoolAdmin:              true,
 			CanChangeNumberSetConfig: canChange,
 		})
 	}
@@ -556,8 +557,9 @@ func (s *Server) postPoolEndpoint() http.HandlerFunc {
 		}
 
 		s.writeJSONResponse(w, http.StatusCreated, poolResponse{
-			PoolJSON: pool.JSON(),
-			IsAdmin:  true,
+			PoolJSON:    pool.JSON(),
+			IsAdmin:     true,
+			IsPoolAdmin: true,
 		})
 	}
 }
@@ -574,18 +576,22 @@ func (s *Server) getPoolTokenEndpoint() http.HandlerFunc {
 			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
 			return
 		}
-		isAdminOf, err := user.HasAdminVisibility(r.Context(), pool)
+		isPoolAdmin, err := user.IsAdminOf(r.Context(), pool)
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
 
+		// Site admins get read-only admin visibility even if they're not pool admins
+		isAdminVisible := isPoolAdmin || user.IsAdmin
+
 		resp := poolResponse{
-			PoolJSON: pool.JSON(),
-			IsAdmin:  isAdminOf,
+			PoolJSON:    pool.JSON(),
+			IsAdmin:     isAdminVisible,
+			IsPoolAdmin: isPoolAdmin,
 		}
 
-		if isAdminOf {
+		if isAdminVisible {
 			canChange, err := pool.CanChangeNumberSetConfig(r.Context())
 			if err != nil {
 				s.writeErrorResponse(w, http.StatusInternalServerError, err)
@@ -1985,5 +1991,6 @@ func (s *Server) postPoolTokenSquaresBulkEndpoint() http.HandlerFunc {
 type poolResponse struct {
 	*model.PoolJSON
 	IsAdmin                  bool `json:"isAdmin"`
+	IsPoolAdmin              bool `json:"isPoolAdmin"`
 	CanChangeNumberSetConfig bool `json:"canChangeNumberSetConfig,omitempty"`
 }
