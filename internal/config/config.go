@@ -109,7 +109,7 @@ func Load() error {
 
 	viper.SetDefault("dsn", "host=localhost port=5432 user=postgres sslmode=disable")
 	viper.SetDefault("auth0_jwks_url", "https://sqmgr.auth0.com/.well-known/jwks.json")
-	viper.SetDefault("cors_allowed_origins", "https://sqmgr.com,https://www.sqmgr.com,http://localhost:8080")
+	viper.SetDefault("cors_allowed_origins", "https://sqmgr.com,https://www.sqmgr.com,https://beta.sqmgr.com,http://localhost:8080")
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, isNotFoundError := err.(viper.ConfigFileNotFoundError); !isNotFoundError {
