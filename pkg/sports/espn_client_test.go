@@ -623,6 +623,7 @@ func TestGetTeamSchedule(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		g.Expect(r.URL.Path).Should(gomega.Equal("/basketball/mens-college-basketball/teams/2084/schedule"))
+		g.Expect(r.URL.Query().Get("seasontype")).Should(gomega.Equal("2"))
 
 		response := espnTeamScheduleResponse{
 			Team: espnTeam{
@@ -737,7 +738,7 @@ func TestGetTeamSchedule(t *testing.T) {
 		RateLimit: 100,
 	})
 
-	events, err := client.GetTeamSchedule(context.Background(), LeagueNCAAB, "2084")
+	events, err := client.GetTeamSchedule(context.Background(), LeagueNCAAB, "2084", SeasonTypeRegular)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(events)).Should(gomega.Equal(2))
 
@@ -769,7 +770,7 @@ func TestGetTeamScheduleInvalidLeague(t *testing.T) {
 
 	client := NewClient(Config{})
 
-	_, err := client.GetTeamSchedule(context.Background(), League("invalid"), "123")
+	_, err := client.GetTeamSchedule(context.Background(), League("invalid"), "123", SeasonTypeRegular)
 	g.Expect(err).ShouldNot(gomega.Succeed())
 }
 

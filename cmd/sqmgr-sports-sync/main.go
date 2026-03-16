@@ -317,35 +317,43 @@ func syncTeamSchedules(ctx context.Context, m *model.Model, client *sports.Clien
 	var allEvents []sports.Event
 	seenIDs := make(map[string]bool)
 
-	for i, team := range teams {
-		teamLog := leagueLog.WithFields(logrus.Fields{
-			"teamID":   team.ID,
-			"teamName": team.Name,
-			"progress": fmt.Sprintf("%d/%d", i+1, len(teams)),
-		})
+	// Fetch both regular season and postseason schedules for each team
+	seasonTypes := []sports.SeasonType{sports.SeasonTypeRegular, sports.SeasonTypePostseason}
 
-		teamLog.Debug("fetching team schedule")
+	for _, seasonType := range seasonTypes {
+		leagueLog.WithField("seasonType", seasonType).Info("fetching team schedules")
 
-		events, err := client.GetTeamSchedule(ctx, sports.League(league), team.ID)
-		if err != nil {
-			teamLog.WithError(err).Warn("failed to fetch team schedule")
-			continue
-		}
+		for i, team := range teams {
+			teamLog := leagueLog.WithFields(logrus.Fields{
+				"teamID":     team.ID,
+				"teamName":   team.Name,
+				"seasonType": seasonType,
+				"progress":   fmt.Sprintf("%d/%d", i+1, len(teams)),
+			})
 
-		// Deduplicate events (each game appears in both teams' schedules)
-		for _, e := range events {
-			if !seenIDs[e.ID] {
-				seenIDs[e.ID] = true
-				allEvents = append(allEvents, e)
+			teamLog.Debug("fetching team schedule")
+
+			events, err := client.GetTeamSchedule(ctx, sports.League(league), team.ID, seasonType)
+			if err != nil {
+				teamLog.WithError(err).Warn("failed to fetch team schedule")
+				continue
 			}
-		}
 
-		// Log progress every 50 teams
-		if (i+1)%50 == 0 {
-			leagueLog.WithFields(logrus.Fields{
-				"progress":    fmt.Sprintf("%d/%d", i+1, len(teams)),
-				"eventsFound": len(allEvents),
-			}).Info("sync progress")
+			// Deduplicate events (each game appears in both teams' schedules)
+			for _, e := range events {
+				if !seenIDs[e.ID] {
+					seenIDs[e.ID] = true
+					allEvents = append(allEvents, e)
+				}
+			}
+
+			// Log progress every 50 teams
+			if (i+1)%50 == 0 {
+				leagueLog.WithFields(logrus.Fields{
+					"progress":    fmt.Sprintf("%d/%d", i+1, len(teams)),
+					"eventsFound": len(allEvents),
+				}).Info("sync progress")
+			}
 		}
 	}
 

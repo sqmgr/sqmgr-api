@@ -340,15 +340,22 @@ func (c *Client) GetSeasonInfo(ctx context.Context, league League) (*SeasonInfo,
 	}, nil
 }
 
-// GetTeamSchedule fetches the full schedule for a specific team
-func (c *Client) GetTeamSchedule(ctx context.Context, league League, teamID string) ([]Event, error) {
+// GetTeamSchedule fetches the schedule for a specific team, optionally filtered by season type.
+// If seasonType is 0, no season type filter is applied (ESPN defaults to regular season).
+func (c *Client) GetTeamSchedule(ctx context.Context, league League, teamID string, seasonType SeasonType) ([]Event, error) {
 	if !league.IsValid() {
 		return nil, fmt.Errorf("invalid league: %s", league)
 	}
 
 	path := fmt.Sprintf("/%s/teams/%s/schedule", league.ESPNPath(), teamID)
 
-	resp, err := c.doRequest(ctx, path, nil)
+	var query url.Values
+	if seasonType > 0 {
+		query = url.Values{}
+		query.Set("seasontype", strconv.Itoa(int(seasonType)))
+	}
+
+	resp, err := c.doRequest(ctx, path, query)
 	if err != nil {
 		return nil, err
 	}
