@@ -56,9 +56,9 @@ func CalculateWinningSquare(homeScore, awayScore int, homeNumbers, awayNumbers [
 		awayPos5 := awayPos / 2
 		return (awayPos5 * 5) + homePos5 + 1
 	case GridTypeStd50:
-		// 5x10 grid: each square covers 2 away positions, 1 home position
-		awayPos5 := awayPos / 2
-		return (awayPos5 * 10) + homePos + 1
+		// 10x5 grid: each square covers 1 away position, 2 home positions
+		homePos5 := homePos / 2
+		return (awayPos * 5) + homePos5 + 1
 	default:
 		// 10x10 grid (std100, roll100)
 		return (awayPos * 10) + homePos + 1

@@ -295,37 +295,42 @@ func TestCalculateWinningSquareStd50(t *testing.T) {
 	homeNumbers := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 	awayNumbers := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 
-	// For std50 (5x10), each square covers 2 away positions, 1 home position
-	// awayPos5 = awayPos / 2, homePos stays the same
-	// squareID = (awayPos5 * 10) + homePos + 1
+	// For std50 (10x5), each square covers 1 away position, 2 home positions
+	// homePos5 = homePos / 2, awayPos stays the same
+	// squareID = (awayPos * 5) + homePos5 + 1
 
 	// Score 0-0: home digit 0 at pos 0, away digit 0 at pos 0
-	// awayPos5 = 0, square = (0 * 10) + 0 + 1 = 1
+	// homePos5 = 0, square = (0 * 5) + 0 + 1 = 1
 	result := CalculateWinningSquare(0, 0, homeNumbers, awayNumbers, GridTypeStd50)
 	g.Expect(result).Should(gomega.Equal(1))
 
-	// Score 0-1: home digit 0 at pos 0, away digit 1 at pos 1
-	// awayPos5 = 0, square = (0 * 10) + 0 + 1 = 1 (same row)
-	result = CalculateWinningSquare(0, 1, homeNumbers, awayNumbers, GridTypeStd50)
+	// Score 1-0: home digit 1 at pos 1, away digit 0 at pos 0
+	// homePos5 = 0, square = (0 * 5) + 0 + 1 = 1 (same column)
+	result = CalculateWinningSquare(1, 0, homeNumbers, awayNumbers, GridTypeStd50)
 	g.Expect(result).Should(gomega.Equal(1))
 
-	// Score 0-2: home digit 0 at pos 0, away digit 2 at pos 2
-	// awayPos5 = 1, square = (1 * 10) + 0 + 1 = 11
-	result = CalculateWinningSquare(0, 2, homeNumbers, awayNumbers, GridTypeStd50)
-	g.Expect(result).Should(gomega.Equal(11))
+	// Score 2-0: home digit 2 at pos 2, away digit 0 at pos 0
+	// homePos5 = 1, square = (0 * 5) + 1 + 1 = 2
+	result = CalculateWinningSquare(2, 0, homeNumbers, awayNumbers, GridTypeStd50)
+	g.Expect(result).Should(gomega.Equal(2))
+
+	// Score 0-1: home digit 0 at pos 0, away digit 1 at pos 1
+	// homePos5 = 0, square = (1 * 5) + 0 + 1 = 6
+	result = CalculateWinningSquare(0, 1, homeNumbers, awayNumbers, GridTypeStd50)
+	g.Expect(result).Should(gomega.Equal(6))
 
 	// Score 24-17: home digit 4 at pos 4, away digit 7 at pos 7
-	// awayPos5 = 3, square = (3 * 10) + 4 + 1 = 35
+	// homePos5 = 2, square = (7 * 5) + 2 + 1 = 38
 	result = CalculateWinningSquare(24, 17, homeNumbers, awayNumbers, GridTypeStd50)
-	g.Expect(result).Should(gomega.Equal(35))
+	g.Expect(result).Should(gomega.Equal(38))
 
 	// Score 28-24: home digit 8 at pos 8, away digit 4 at pos 4
-	// awayPos5 = 2, square = (2 * 10) + 8 + 1 = 29
+	// homePos5 = 4, square = (4 * 5) + 4 + 1 = 25
 	result = CalculateWinningSquare(28, 24, homeNumbers, awayNumbers, GridTypeStd50)
-	g.Expect(result).Should(gomega.Equal(29))
+	g.Expect(result).Should(gomega.Equal(25))
 
 	// Score 99-99: home digit 9 at pos 9, away digit 9 at pos 9
-	// awayPos5 = 4, square = (4 * 10) + 9 + 1 = 50
+	// homePos5 = 4, square = (9 * 5) + 4 + 1 = 50
 	result = CalculateWinningSquare(99, 99, homeNumbers, awayNumbers, GridTypeStd50)
 	g.Expect(result).Should(gomega.Equal(50))
 }
