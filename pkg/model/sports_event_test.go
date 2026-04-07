@@ -722,7 +722,7 @@ func TestSyncGridsFromEvent(t *testing.T) {
 		g.Expect(grid.Settings().AwayTeamColor1()).Should(gomega.Equal("#0b162a"))
 	})
 
-	t.Run("does not overwrite user-customized colors", func(t *testing.T) {
+	t.Run("updates colors when teams change", func(t *testing.T) {
 		g := gomega.NewWithT(t)
 
 		event, _, grid := createTestGridLinkedToEvent(t, m, ctx, "Dallas Cowboys", "New York Giants", "003594", "0b2265")
@@ -731,25 +731,52 @@ func TestSyncGridsFromEvent(t *testing.T) {
 		_, err := m.SyncGridsFromEvent(ctx, event.ID)
 		g.Expect(err).Should(gomega.Succeed())
 
-		// Manually set custom colors (simulating user customization)
+		// Verify initial colors
 		err = grid.LoadSettings(ctx)
 		g.Expect(err).Should(gomega.Succeed())
-		grid.Settings().SetHomeTeamColor1("#ff0000")
-		grid.Settings().SetAwayTeamColor1("#0000ff")
-		err = grid.Settings().Save(ctx, m.DB)
+		g.Expect(grid.Settings().HomeTeamColor1()).Should(gomega.Equal("#003594"))
+		g.Expect(grid.Settings().AwayTeamColor1()).Should(gomega.Equal("#0b2265"))
+
+		// Now change the event's teams to new teams with different colors
+		newHomeTeam := &SportsTeam{
+			ID:             "test-new-home-" + randString(),
+			League:         SportsLeagueNFL,
+			Name:           "Eagles",
+			FullName:       "Philadelphia Eagles",
+			Abbreviation:   "PHI",
+			Color:          strPtr("004c54"),
+			AlternateColor: strPtr("a5acaf"),
+		}
+		newAwayTeam := &SportsTeam{
+			ID:             "test-new-away-" + randString(),
+			League:         SportsLeagueNFL,
+			Name:           "Commanders",
+			FullName:       "Washington Commanders",
+			Abbreviation:   "WSH",
+			Color:          strPtr("5a1414"),
+			AlternateColor: strPtr("ffb612"),
+		}
+		err = m.UpsertSportsTeam(ctx, nil, newHomeTeam)
+		g.Expect(err).Should(gomega.Succeed())
+		err = m.UpsertSportsTeam(ctx, nil, newAwayTeam)
 		g.Expect(err).Should(gomega.Succeed())
 
-		// Sync again - colors should NOT be overwritten since they're non-null
+		// Update event to point to new teams
+		event.HomeTeamID = newHomeTeam.ID
+		event.AwayTeamID = newAwayTeam.ID
+		err = m.UpsertSportsEvent(ctx, nil, event)
+		g.Expect(err).Should(gomega.Succeed())
+
+		// Sync again - colors should update to match new teams
 		count, err := m.SyncGridsFromEvent(ctx, event.ID)
 		g.Expect(err).Should(gomega.Succeed())
+		g.Expect(count).Should(gomega.BeNumerically(">=", 1))
 
-		// Verify custom colors are preserved
+		// Verify colors updated to new team colors
 		err = grid.LoadSettings(ctx)
 		g.Expect(err).Should(gomega.Succeed())
-		g.Expect(grid.Settings().HomeTeamColor1()).Should(gomega.Equal("#ff0000"))
-		g.Expect(grid.Settings().AwayTeamColor1()).Should(gomega.Equal("#0000ff"))
-
-		_ = count
+		g.Expect(grid.Settings().HomeTeamColor1()).Should(gomega.Equal("#004c54"))
+		g.Expect(grid.Settings().AwayTeamColor1()).Should(gomega.Equal("#5a1414"))
 	})
 
 	t.Run("no update when names already match", func(t *testing.T) {

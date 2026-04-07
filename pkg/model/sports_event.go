@@ -827,8 +827,7 @@ func (m *Model) LoadTeamsForSportsEvents(ctx context.Context, events []*SportsEv
 }
 
 // SyncGridsFromEvent syncs team names and colors from a sports event to all linked active grids.
-// Team names are always synced to match the event's teams. Colors are only set when the grid's
-// colors are currently null (unset), so user-customized colors are preserved.
+// Both team names and colors are synced whenever they differ from the event's current teams.
 // Returns the total number of rows affected across both queries.
 func (m *Model) SyncGridsFromEvent(ctx context.Context, eventID int64) (int64, error) {
 	// Update grid team names where they differ or are null
@@ -855,7 +854,7 @@ func (m *Model) SyncGridsFromEvent(ctx context.Context, eventID int64) (int64, e
 		return 0, err
 	}
 
-	// Update grid_settings colors only when currently null
+	// Update grid_settings colors where they differ from the team's colors
 	const colorsQuery = `
 		UPDATE grid_settings gs
 		SET home_team_color_1 = '#' || st_home.color,
@@ -870,10 +869,12 @@ func (m *Model) SyncGridsFromEvent(ctx context.Context, eventID int64) (int64, e
 		WHERE gs.grid_id = g.id
 		  AND se.id = $1
 		  AND g.state = 'active'
-		  AND gs.home_team_color_1 IS NULL
-		  AND gs.away_team_color_1 IS NULL
 		  AND st_home.color IS NOT NULL
 		  AND st_away.color IS NOT NULL
+		  AND (gs.home_team_color_1 IS DISTINCT FROM '#' || st_home.color
+		       OR gs.home_team_color_2 IS DISTINCT FROM '#' || st_home.alternate_color
+		       OR gs.away_team_color_1 IS DISTINCT FROM '#' || st_away.color
+		       OR gs.away_team_color_2 IS DISTINCT FROM '#' || st_away.alternate_color)
 	`
 	colorsResult, err := m.DB.ExecContext(ctx, colorsQuery, eventID)
 	if err != nil {
