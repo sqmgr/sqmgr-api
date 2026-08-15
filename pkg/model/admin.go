@@ -20,6 +20,7 @@ package model
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -48,83 +49,123 @@ type AdminPool struct {
 	Created         string          `json:"created"`
 }
 
+// Supported values for StatsFilter.Period. Any other value (including the empty
+// string) is treated the same as StatsPeriodAll, i.e. no time filtering.
+const (
+	StatsPeriodAll    = "all"
+	StatsPeriodHour   = "1h"
+	StatsPeriodDay    = "24h"
+	StatsPeriodWeek   = "week"
+	StatsPeriodMonth  = "month"
+	StatsPeriodYear   = "year"
+	StatsPeriodCustom = "custom"
+)
+
+// StatsFilter describes how admin stats should be restricted by time. When
+// Period is StatsPeriodCustom, Start and End bound the range; End is inclusive
+// of the entire day it names. For every other period the range is derived from
+// the current time.
+type StatsFilter struct {
+	Period string
+	Start  time.Time
+	End    time.Time
+}
+
 // periodToInterval converts a period string to a PostgreSQL interval
 func periodToInterval(period string) string {
 	switch period {
-	case "1h":
+	case StatsPeriodHour:
 		return "1 hour"
-	case "24h":
+	case StatsPeriodDay:
 		return "1 day"
-	case "week":
+	case StatsPeriodWeek:
 		return "7 days"
-	case "month":
+	case StatsPeriodMonth:
 		return "30 days"
-	case "year":
+	case StatsPeriodYear:
 		return "365 days"
 	default:
 		return ""
 	}
 }
 
+// condition returns the SQL condition (without a leading WHERE or AND) that
+// restricts the given timestamp column to the filter's range, along with any
+// bind arguments. An empty condition means no time filtering should be applied.
+// The column name is supplied by callers within this package and is never
+// user-controlled; user-supplied dates are always bound as parameters.
+//
+// The placeholders are hardcoded to $1/$2 because this is the only
+// parameterized condition statsCount combines into a query; staticCondition
+// values passed to statsCount are always literal, args-free SQL fragments. If
+// statsCount is ever changed to accept a staticCondition with its own bind
+// arguments, these placeholder numbers (and the args returned here) will need
+// to be renumbered to account for it.
+func (f StatsFilter) condition(column string) (string, []interface{}) {
+	if f.Period == StatsPeriodCustom {
+		// The end date is inclusive, so compare against the start of the
+		// following day.
+		return fmt.Sprintf("%s >= $1 AND %s < $2", column, column),
+			[]interface{}{f.Start, f.End.AddDate(0, 0, 1)}
+	}
+
+	if interval := periodToInterval(f.Period); interval != "" {
+		return fmt.Sprintf("%s > NOW() - INTERVAL '%s'", column, interval), nil
+	}
+
+	return "", nil
+}
+
+// statsCount runs a COUNT(*) against table, combining an optional static
+// condition with the filter's time condition on timeColumn.
+func (m *Model) statsCount(ctx context.Context, table, staticCondition, timeColumn string, filter StatsFilter) (int64, error) {
+	conditions := make([]string, 0, 2)
+	if staticCondition != "" {
+		conditions = append(conditions, staticCondition)
+	}
+
+	timeCondition, args := filter.condition(timeColumn)
+	if timeCondition != "" {
+		conditions = append(conditions, timeCondition)
+	}
+
+	query := "SELECT COUNT(*) FROM " + table
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	var count int64
+	if err := m.DB.QueryRowContext(ctx, query, args...).Scan(&count); err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 // GetAdminStats returns site-wide statistics filtered by time period
-// Supported periods: "24h", "week", "month", "year", "all" (default)
-func (m *Model) GetAdminStats(ctx context.Context, period string) (*AdminStats, error) {
+func (m *Model) GetAdminStats(ctx context.Context, filter StatsFilter) (*AdminStats, error) {
 	stats := &AdminStats{}
 
-	interval := periodToInterval(period)
-	var timeFilter string
-	if interval != "" {
-		timeFilter = fmt.Sprintf(" WHERE created > NOW() - INTERVAL '%s'", interval)
+	counts := []struct {
+		label           string
+		table           string
+		staticCondition string
+		timeColumn      string
+		dest            *int64
+	}{
+		{"total pools", "pools", "", "created", &stats.TotalPools},
+		{"total users", "users", "store = 'auth0'", "created", &stats.TotalUsers},
+		{"guest users", "users", "store = 'sqmgr'", "created", &stats.GuestUsers},
+		{"active pools", "pools", "archived = false", "created", &stats.ActivePools},
+		{"claimed squares", "pool_squares", "state != 'unclaimed'", "modified", &stats.ClaimedSquares},
 	}
 
-	// Total pools
-	query := "SELECT COUNT(*) FROM pools"
-	if timeFilter != "" {
-		query += timeFilter
-	}
-	row := m.DB.QueryRowContext(ctx, query)
-	if err := row.Scan(&stats.TotalPools); err != nil {
-		return nil, fmt.Errorf("counting total pools: %w", err)
-	}
-
-	// Total users (non-guest)
-	query = "SELECT COUNT(*) FROM users WHERE store = 'auth0'"
-	if interval != "" {
-		query += fmt.Sprintf(" AND created > NOW() - INTERVAL '%s'", interval)
-	}
-	row = m.DB.QueryRowContext(ctx, query)
-	if err := row.Scan(&stats.TotalUsers); err != nil {
-		return nil, fmt.Errorf("counting total users: %w", err)
-	}
-
-	// Guest users
-	query = "SELECT COUNT(*) FROM users WHERE store = 'sqmgr'"
-	if interval != "" {
-		query += fmt.Sprintf(" AND created > NOW() - INTERVAL '%s'", interval)
-	}
-	row = m.DB.QueryRowContext(ctx, query)
-	if err := row.Scan(&stats.GuestUsers); err != nil {
-		return nil, fmt.Errorf("counting guest users: %w", err)
-	}
-
-	// Active pools
-	query = "SELECT COUNT(*) FROM pools WHERE archived = false"
-	if interval != "" {
-		query += fmt.Sprintf(" AND created > NOW() - INTERVAL '%s'", interval)
-	}
-	row = m.DB.QueryRowContext(ctx, query)
-	if err := row.Scan(&stats.ActivePools); err != nil {
-		return nil, fmt.Errorf("counting active pools: %w", err)
-	}
-
-	// Claimed squares (state != 'unclaimed')
-	query = "SELECT COUNT(*) FROM pool_squares WHERE state != 'unclaimed'"
-	if interval != "" {
-		query += fmt.Sprintf(" AND modified > NOW() - INTERVAL '%s'", interval)
-	}
-	row = m.DB.QueryRowContext(ctx, query)
-	if err := row.Scan(&stats.ClaimedSquares); err != nil {
-		return nil, fmt.Errorf("counting claimed squares: %w", err)
+	for _, c := range counts {
+		count, err := m.statsCount(ctx, c.table, c.staticCondition, c.timeColumn, filter)
+		if err != nil {
+			return nil, fmt.Errorf("counting %s: %w", c.label, err)
+		}
+		*c.dest = count
 	}
 
 	return stats, nil

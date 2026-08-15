@@ -25,6 +25,47 @@ import (
 	"github.com/onsi/gomega"
 )
 
+func TestStatsFilterCondition(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	// No time filtering for "all", unknown, or empty periods
+	for _, period := range []string{StatsPeriodAll, "invalid", ""} {
+		cond, args := StatsFilter{Period: period}.condition("created")
+		g.Expect(cond).Should(gomega.BeEmpty(), "period %q", period)
+		g.Expect(args).Should(gomega.BeEmpty(), "period %q", period)
+	}
+
+	// Relative periods use an interval and no bind arguments
+	intervals := map[string]string{
+		StatsPeriodHour:  "1 hour",
+		StatsPeriodDay:   "1 day",
+		StatsPeriodWeek:  "7 days",
+		StatsPeriodMonth: "30 days",
+		StatsPeriodYear:  "365 days",
+	}
+	for period, interval := range intervals {
+		cond, args := StatsFilter{Period: period}.condition("created")
+		g.Expect(cond).Should(gomega.Equal("created > NOW() - INTERVAL '"+interval+"'"), "period %q", period)
+		g.Expect(args).Should(gomega.BeEmpty(), "period %q", period)
+	}
+
+	// The custom range binds parameters and treats the end date as inclusive
+	start := time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2024, 3, 31, 0, 0, 0, 0, time.UTC)
+	cond, args := StatsFilter{Period: StatsPeriodCustom, Start: start, End: end}.condition("modified")
+	g.Expect(cond).Should(gomega.Equal("modified >= $1 AND modified < $2"))
+	g.Expect(args).Should(gomega.HaveLen(2))
+	g.Expect(args[0]).Should(gomega.Equal(start))
+	g.Expect(args[1]).Should(gomega.Equal(time.Date(2024, 4, 1, 0, 0, 0, 0, time.UTC)))
+
+	// A single-day range still covers that entire day
+	day := time.Date(2024, 2, 29, 0, 0, 0, 0, time.UTC)
+	cond, args = StatsFilter{Period: StatsPeriodCustom, Start: day, End: day}.condition("created")
+	g.Expect(cond).Should(gomega.Equal("created >= $1 AND created < $2"))
+	g.Expect(args[0]).Should(gomega.Equal(day))
+	g.Expect(args[1]).Should(gomega.Equal(time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC)))
+}
+
 func TestGetAdminStats(t *testing.T) {
 	ensureIntegration(t)
 
@@ -43,7 +84,7 @@ func TestGetAdminStats(t *testing.T) {
 	g.Expect(sqmgrUser.ID).Should(gomega.BeNumerically(">", 0))
 
 	// Get initial stats
-	initialStats, err := m.GetAdminStats(ctx, "all")
+	initialStats, err := m.GetAdminStats(ctx, StatsFilter{Period: StatsPeriodAll})
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Create an active pool
@@ -75,7 +116,7 @@ func TestGetAdminStats(t *testing.T) {
 	g.Expect(pool2).ShouldNot(gomega.BeNil())
 
 	// Get updated stats
-	stats, err := m.GetAdminStats(ctx, "all")
+	stats, err := m.GetAdminStats(ctx, StatsFilter{Period: StatsPeriodAll})
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Verify counts increased correctly
@@ -101,24 +142,80 @@ func TestGetAdminStatsWithPeriod(t *testing.T) {
 	g.Expect(pool).ShouldNot(gomega.BeNil())
 
 	// Test "all" period - should include the new pool
-	allStats, err := m.GetAdminStats(ctx, "all")
+	allStats, err := m.GetAdminStats(ctx, StatsFilter{Period: StatsPeriodAll})
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(allStats.TotalPools).Should(gomega.BeNumerically(">", 0))
 
-	// Test "24h" period - should include the just-created pool
-	dayStats, err := m.GetAdminStats(ctx, "24h")
-	g.Expect(err).Should(gomega.Succeed())
-	g.Expect(dayStats.TotalPools).Should(gomega.BeNumerically(">", 0))
+	// Every relative period should run and include the just-created pool
+	for _, period := range []string{StatsPeriodHour, StatsPeriodDay, StatsPeriodWeek, StatsPeriodMonth, StatsPeriodYear} {
+		periodStats, err := m.GetAdminStats(ctx, StatsFilter{Period: period})
+		g.Expect(err).Should(gomega.Succeed(), "period %q", period)
+		g.Expect(periodStats.TotalPools).Should(gomega.BeNumerically(">", 0), "period %q", period)
+		g.Expect(periodStats.TotalPools).Should(gomega.BeNumerically("<=", allStats.TotalPools), "period %q", period)
+	}
 
 	// Test invalid period - should default to "all" behavior (no time filter)
-	invalidStats, err := m.GetAdminStats(ctx, "invalid")
+	invalidStats, err := m.GetAdminStats(ctx, StatsFilter{Period: "invalid"})
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(invalidStats.TotalPools).Should(gomega.Equal(allStats.TotalPools))
 
 	// Test empty period - should default to "all" behavior
-	emptyStats, err := m.GetAdminStats(ctx, "")
+	emptyStats, err := m.GetAdminStats(ctx, StatsFilter{})
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(emptyStats.TotalPools).Should(gomega.Equal(allStats.TotalPools))
+}
+
+func TestGetAdminStatsCustomRange(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Rows are created with (now() at time zone 'utc'), so bound the range in UTC
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	yesterday := today.AddDate(0, 0, -1)
+	tomorrow := today.AddDate(0, 0, 1)
+
+	// Baselines: one range that ends today (inclusive) and one that ends before today
+	before, err := m.GetAdminStats(ctx, StatsFilter{Period: StatsPeriodCustom, Start: yesterday, End: today})
+	g.Expect(err).Should(gomega.Succeed())
+
+	pastBefore, err := m.GetAdminStats(ctx, StatsFilter{Period: StatsPeriodCustom, Start: yesterday.AddDate(0, 0, -1), End: yesterday})
+	g.Expect(err).Should(gomega.Succeed())
+
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	pool, err := m.NewPool(ctx, user.ID, "Custom Range Pool "+randString(), GridTypeStd25, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(pool).ShouldNot(gomega.BeNil())
+
+	// The end date is inclusive, so a range ending today must include the pool
+	// that was just created
+	inclusive, err := m.GetAdminStats(ctx, StatsFilter{Period: StatsPeriodCustom, Start: yesterday, End: today})
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(inclusive.TotalPools).Should(gomega.Equal(before.TotalPools + 1))
+	g.Expect(inclusive.ActivePools).Should(gomega.Equal(before.ActivePools + 1))
+	g.Expect(inclusive.TotalUsers).Should(gomega.Equal(before.TotalUsers + 1))
+
+	// A range that ends before today must exclude it
+	past, err := m.GetAdminStats(ctx, StatsFilter{Period: StatsPeriodCustom, Start: yesterday.AddDate(0, 0, -1), End: yesterday})
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(past.TotalPools).Should(gomega.Equal(pastBefore.TotalPools))
+	g.Expect(past.TotalUsers).Should(gomega.Equal(pastBefore.TotalUsers))
+
+	// A range that starts after today must exclude it too
+	future, err := m.GetAdminStats(ctx, StatsFilter{Period: StatsPeriodCustom, Start: tomorrow, End: tomorrow})
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(future.TotalPools).Should(gomega.Equal(int64(0)))
+	g.Expect(future.ActivePools).Should(gomega.Equal(int64(0)))
+	g.Expect(future.ClaimedSquares).Should(gomega.Equal(int64(0)))
+
+	// A single-day range covering today includes the new pool
+	singleDay, err := m.GetAdminStats(ctx, StatsFilter{Period: StatsPeriodCustom, Start: today, End: today})
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(singleDay.TotalPools).Should(gomega.BeNumerically(">=", 1))
 }
 
 func TestGetAllPools(t *testing.T) {

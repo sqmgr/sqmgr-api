@@ -21,8 +21,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -38,12 +40,62 @@ const maxAdminEventsLimit = 100
 
 // validStatsPeriods defines the valid period values for stats filtering
 var validStatsPeriods = map[string]bool{
-	"all":   true,
-	"1h":    true,
-	"24h":   true,
-	"week":  true,
-	"month": true,
-	"year":  true,
+	model.StatsPeriodAll:    true,
+	model.StatsPeriodHour:   true,
+	model.StatsPeriodDay:    true,
+	model.StatsPeriodWeek:   true,
+	model.StatsPeriodMonth:  true,
+	model.StatsPeriodYear:   true,
+	model.StatsPeriodCustom: true,
+}
+
+// statsDateFormat is the format expected for the start and end parameters when
+// period=custom
+const statsDateFormat = "2006-01-02"
+
+// parseStatsFilter builds a stats filter from the request's period, start, and
+// end parameters. Unrecognized periods fall back to "all". An error is returned
+// only for malformed custom ranges and should be surfaced as a 400.
+//
+// start and end are parsed as UTC midnight (time.Parse defaults to UTC when no
+// zone is present), and the resulting range is interpreted in UTC days, since
+// the created/modified columns store UTC timestamps. This means an admin in a
+// non-UTC timezone gets day boundaries aligned to UTC, not their local time.
+func parseStatsFilter(r *http.Request) (model.StatsFilter, error) {
+	period := r.FormValue("period")
+	if !validStatsPeriods[period] {
+		period = model.StatsPeriodAll
+	}
+
+	filter := model.StatsFilter{Period: period}
+	if period != model.StatsPeriodCustom {
+		return filter, nil
+	}
+
+	startStr := r.FormValue("start")
+	endStr := r.FormValue("end")
+	if startStr == "" || endStr == "" {
+		return filter, errors.New("start and end are required when period is custom")
+	}
+
+	start, err := time.Parse(statsDateFormat, startStr)
+	if err != nil {
+		return filter, fmt.Errorf("invalid start date %q; expected format YYYY-MM-DD", startStr)
+	}
+
+	end, err := time.Parse(statsDateFormat, endStr)
+	if err != nil {
+		return filter, fmt.Errorf("invalid end date %q; expected format YYYY-MM-DD", endStr)
+	}
+
+	if end.Before(start) {
+		return filter, errors.New("start date cannot be after end date")
+	}
+
+	filter.Start = start
+	filter.End = end
+
+	return filter, nil
 }
 
 // ensureUserEmail fetches and caches the email from Auth0 if needed
@@ -62,14 +114,13 @@ func (s *Server) ensureUserEmail(ctx context.Context, user *model.User) {
 // getAdminStatsEndpoint returns site-wide statistics
 func (s *Server) getAdminStatsEndpoint() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		period := r.FormValue("period")
-		logrus.WithField("form period", period).Info("getting admin stats")
-		if !validStatsPeriods[period] {
-			period = "all"
+		filter, err := parseStatsFilter(r)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, err)
+			return
 		}
 
-		logrus.WithField("set period", period).Info("getting admin stats")
-		stats, err := s.model.GetAdminStats(r.Context(), period)
+		stats, err := s.model.GetAdminStats(r.Context(), filter)
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
