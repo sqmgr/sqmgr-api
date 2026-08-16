@@ -76,6 +76,7 @@ func (s *Server) setupRoutes() {
 	authPoolManagerRouter.Use(s.poolManagerHandler)
 	authPoolManagerRouter.Path("/pool/{token:[A-Za-z0-9_-]+}").Methods(http.MethodPost).Handler(s.postPoolTokenEndpoint())
 	authPoolManagerRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/grid/{id:[0-9]+}").Methods(http.MethodPost).Handler(s.postPoolTokenGridIDEndpoint())
+	authPoolManagerRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/season").Methods(http.MethodPost).Handler(s.postPoolTokenSeasonEndpoint())
 	authPoolManagerRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/invitetoken").Methods(http.MethodGet).Handler(s.getPoolTokenInviteTokenEndpoint())
 	authPoolManagerRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/log").Methods(http.MethodGet).Handler(s.getPoolTokenLogEndpoint())
 	authPoolManagerRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/squares/bulk").Methods(http.MethodPost).Handler(s.postPoolTokenSquaresBulkEndpoint())

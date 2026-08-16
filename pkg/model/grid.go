@@ -387,6 +387,46 @@ FROM
 	return tx.Commit()
 }
 
+// IsPristine reports whether the grid is indistinguishable from a freshly
+// created grid, i.e. the user has not customized it in any way.
+//
+// A grid is created by the new_grid() SQL function, which inserts a row into
+// grids supplying only pool_id and ord, plus a row into grid_settings supplying
+// only grid_id. Every other column therefore takes its default: label,
+// home_team_name, away_team_name, home_numbers, away_numbers, event_date,
+// sports_event_id and payout_config are all NULL, manual_draw and rollover are
+// false, and state is 'active'. No grid_number_sets or grid_annotations rows
+// exist yet, and every grid_settings column (the team colors, notes, and the
+// branding image URL/alt) is NULL.
+//
+// Only in-memory state is inspected. Settings, number sets, and annotations
+// live in their own tables, so callers must have loaded them (LoadSettings,
+// LoadNumberSets, LoadAnnotations) for those parts of the check to be
+// meaningful. Settings that were never loaded are nil, which is reported as
+// not pristine; number sets and annotations that were never loaded are
+// indistinguishable from empty ones, so it's on the caller to load them.
+func (g *Grid) IsPristine() bool {
+	if g.label != nil ||
+		g.homeTeamName != nil ||
+		g.awayTeamName != nil ||
+		g.homeNumbers != nil ||
+		g.awayNumbers != nil ||
+		g.manualDraw ||
+		g.rollover ||
+		!g.eventDate.IsZero() ||
+		g.bdlEventID != nil ||
+		g.payoutConfig != nil ||
+		g.state != Active {
+		return false
+	}
+
+	if len(g.numberSets) > 0 || len(g.annotations) > 0 {
+		return false
+	}
+
+	return g.settings.IsPristine()
+}
+
 // Settings will return the settings
 func (g *Grid) Settings() *GridSettings {
 	return g.settings

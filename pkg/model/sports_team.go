@@ -22,6 +22,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -55,6 +56,49 @@ type SportsTeamJSON struct {
 	Location       string       `json:"location,omitempty"`
 	Color          string       `json:"color,omitempty"`
 	AlternateColor string       `json:"alternateColor,omitempty"`
+}
+
+// placeholderTeamName is the display name ESPN uses for a bracket slot whose
+// participant hasn't been decided yet
+const placeholderTeamName = "TBD"
+
+// DisplayName returns the name the team is shown under: the first of FullName,
+// Name, and Abbreviation that isn't blank, falling back to the team's id when
+// ESPN gave us no names at all. It mirrors the fallback chain the frontend uses
+// when rendering a team.
+func (t *SportsTeam) DisplayName() string {
+	for _, name := range []string{t.FullName, t.Name, t.Abbreviation} {
+		if trimmed := strings.TrimSpace(name); trimmed != "" {
+			return trimmed
+		}
+	}
+
+	return t.ID
+}
+
+// IsPlaceholder reports whether the team is an undetermined-opponent
+// placeholder rather than a real team.
+//
+// ESPN publishes every unfilled playoff bracket slot as its own row in
+// sports_teams: each one has a distinct id, but they all display as "TBD".
+// There's nothing in the id to key off of, so the displayed name is the only
+// reliable signal. Only DisplayName() is checked, so a real team stays a real
+// team even if a lesser-used name field happens to be "TBD" — what the user
+// sees is what decides.
+//
+// A placeholder team can't be matched by id — see
+// Model.UpcomingPostseasonSportsEvents for what callers do instead.
+func (t *SportsTeam) IsPlaceholder() bool {
+	return isPlaceholderName(t.DisplayName())
+}
+
+// isPlaceholderName reports whether name is exactly the placeholder marker,
+// ignoring surrounding whitespace and case. The comparison is deliberately
+// whole-string rather than a substring search so that a real team whose name
+// happens to contain those letters ("TBD Warriors", "Old TBD State") is never
+// mistaken for a placeholder.
+func isPlaceholderName(name string) bool {
+	return strings.EqualFold(strings.TrimSpace(name), placeholderTeamName)
 }
 
 // JSON returns the JSON representation of the team

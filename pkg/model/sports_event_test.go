@@ -983,3 +983,204 @@ func intPtr(i int) *int {
 func strPtr(s string) *string {
 	return &s
 }
+
+func TestSportsEventDisplayName(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	name := "Chiefs at Broncos"
+	withName := &SportsEvent{Name: &name, HomeTeamID: "3", AwayTeamID: "1"}
+	g.Expect(withName.DisplayName()).Should(gomega.Equal("Chiefs at Broncos"))
+
+	empty := ""
+	withEmptyName := &SportsEvent{Name: &empty, HomeTeamID: "3", AwayTeamID: "1"}
+	g.Expect(withEmptyName.DisplayName()).Should(gomega.Equal("1 @ 3"))
+
+	// no name and no loaded teams falls back to the team IDs
+	noName := &SportsEvent{HomeTeamID: "3", AwayTeamID: "1"}
+	g.Expect(noName.DisplayName()).Should(gomega.Equal("1 @ 3"))
+
+	// no name but loaded teams uses the full team names
+	noName.SetHomeTeam(&SportsTeam{ID: "3", FullName: "Denver Broncos"})
+	noName.SetAwayTeam(&SportsTeam{ID: "1", FullName: "Kansas City Chiefs"})
+	g.Expect(noName.DisplayName()).Should(gomega.Equal("Kansas City Chiefs @ Denver Broncos"))
+}
+
+func TestUpcomingSportsEventsForTeam(t *testing.T) {
+	if len(os.Getenv("INTEGRATION")) == 0 {
+		t.Skip("skipping. to run, use -integration flag")
+	}
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	team := &SportsTeam{
+		ID:           "test-team-" + randString(),
+		League:       SportsLeagueNFL,
+		Name:         "Chiefs",
+		FullName:     "Kansas City Chiefs",
+		Abbreviation: "KC",
+	}
+	opponent := &SportsTeam{
+		ID:           "test-opp-" + randString(),
+		League:       SportsLeagueNFL,
+		Name:         "Bills",
+		FullName:     "Buffalo Bills",
+		Abbreviation: "BUF",
+	}
+	other := &SportsTeam{
+		ID:           "test-other-" + randString(),
+		League:       SportsLeagueNFL,
+		Name:         "Broncos",
+		FullName:     "Denver Broncos",
+		Abbreviation: "DEN",
+	}
+
+	g.Expect(m.UpsertSportsTeam(ctx, nil, team)).Should(gomega.Succeed())
+	g.Expect(m.UpsertSportsTeam(ctx, nil, opponent)).Should(gomega.Succeed())
+	g.Expect(m.UpsertSportsTeam(ctx, nil, other)).Should(gomega.Succeed())
+
+	newEvent := func(homeID, awayID string, when time.Time, season int, status SportsEventStatus) *SportsEvent {
+		e := m.NewSportsEvent()
+		e.ESPNID = "test-event-" + randString()
+		e.League = SportsLeagueNFL
+		e.HomeTeamID = homeID
+		e.AwayTeamID = awayID
+		e.EventDate = when
+		e.Season = season
+		e.Status = status
+		g.Expect(m.UpsertSportsEvent(ctx, nil, e)).Should(gomega.Succeed())
+		return e
+	}
+
+	future := time.Now().Add(24 * time.Hour)
+
+	// should be returned (team is home, and away, in the current season)
+	newEvent(team.ID, opponent.ID, future, 2025, SportsEventStatusScheduled)
+	newEvent(opponent.ID, team.ID, future.Add(7*24*time.Hour), 2025, SportsEventStatusScheduled)
+
+	// should be excluded
+	newEvent(team.ID, opponent.ID, time.Now().Add(-24*time.Hour), 2025, SportsEventStatusScheduled) // in the past
+	newEvent(team.ID, opponent.ID, future.Add(48*time.Hour), 2025, SportsEventStatusFinal)          // not scheduled
+	newEvent(team.ID, opponent.ID, future.Add(365*24*time.Hour), 2026, SportsEventStatusScheduled)  // next season
+	newEvent(opponent.ID, other.ID, future.Add(72*time.Hour), 2025, SportsEventStatusScheduled)     // different teams
+
+	// a postponed game still carrying a stale season value must not hijack the
+	// selection. The season is pinned to the season of the *next* upcoming
+	// game, not to the lowest season that still has an upcoming game.
+	newEvent(team.ID, opponent.ID, future.Add(14*24*time.Hour), 2024, SportsEventStatusScheduled)
+
+	events, err := m.UpcomingSportsEventsForTeam(ctx, SportsLeagueNFL, team.ID)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(events).Should(gomega.HaveLen(2))
+
+	for _, e := range events {
+		g.Expect(e.Season).Should(gomega.Equal(2025))
+		g.Expect(e.Status).Should(gomega.Equal(SportsEventStatusScheduled))
+		g.Expect(e.HomeTeamID == team.ID || e.AwayTeamID == team.ID).Should(gomega.BeTrue())
+	}
+
+	// results are ordered by event date
+	g.Expect(events[0].EventDate.Before(events[1].EventDate)).Should(gomega.BeTrue())
+
+	// a team with no games returns an empty result
+	events, err = m.UpcomingSportsEventsForTeam(ctx, SportsLeagueNFL, "test-nonexistent-"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(events).Should(gomega.HaveLen(0))
+}
+
+func TestUpcomingPostseasonSportsEvents(t *testing.T) {
+	if len(os.Getenv("INTEGRATION")) == 0 {
+		t.Skip("skipping. to run, use -integration flag")
+	}
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// This query is league-wide rather than team-scoped, so it can't be
+	// isolated with random team ids the way the other tests here are. WNBA is
+	// used because no other test touches it, and its postseason rows are
+	// cleared first so that a re-run against a persistent integration database
+	// doesn't see the previous run's events.
+	league := SportsLeagueWNBA
+
+	// NCAAF is cleared for the same reason: the empty-league assertion at the
+	// end of this test asserts on it, so it must not depend on no other test
+	// (or a previous run) having seeded NCAAF postseason rows.
+	emptyLeague := SportsLeagueNCAAF
+
+	for _, l := range []SportsLeague{league, emptyLeague} {
+		_, err := getDB().ExecContext(ctx, `DELETE FROM sports_events WHERE league = $1 AND postseason = TRUE`, l)
+		g.Expect(err).Should(gomega.Succeed())
+	}
+
+	// Every unfilled bracket slot is a separate placeholder team as far as
+	// ESPN is concerned, which is the whole reason this query ignores teams
+	newTeam := func(name string) *SportsTeam {
+		team := &SportsTeam{
+			ID:           "test-post-" + randString(),
+			League:       league,
+			Name:         name,
+			FullName:     name,
+			Abbreviation: "TST",
+		}
+		g.Expect(m.UpsertSportsTeam(ctx, nil, team)).Should(gomega.Succeed())
+		return team
+	}
+
+	tbd1 := newTeam("TBD")
+	tbd2 := newTeam("TBD")
+	tbd3 := newTeam("TBD")
+	tbd4 := newTeam("TBD")
+	real1 := newTeam("Liberty")
+
+	newEvent := func(homeID, awayID string, when time.Time, season int, postseason bool, status SportsEventStatus) *SportsEvent {
+		e := m.NewSportsEvent()
+		e.ESPNID = "test-event-" + randString()
+		e.League = league
+		e.HomeTeamID = homeID
+		e.AwayTeamID = awayID
+		e.EventDate = when
+		e.Season = season
+		e.Postseason = postseason
+		e.Status = status
+		g.Expect(m.UpsertSportsEvent(ctx, nil, e)).Should(gomega.Succeed())
+		return e
+	}
+
+	future := time.Now().Add(24 * time.Hour)
+
+	// should be returned. Note that no two of these share a team, so an exact
+	// team-id match could never have found all three
+	first := newEvent(tbd1.ID, tbd2.ID, future, 2025, true, SportsEventStatusScheduled)
+	second := newEvent(real1.ID, tbd1.ID, future.Add(72*time.Hour), 2025, true, SportsEventStatusScheduled)
+	third := newEvent(tbd3.ID, tbd4.ID, future.Add(7*24*time.Hour), 2025, true, SportsEventStatusScheduled)
+
+	// should be excluded
+	newEvent(tbd1.ID, tbd2.ID, future.Add(time.Hour), 2025, false, SportsEventStatusScheduled)        // regular season
+	newEvent(tbd1.ID, tbd2.ID, time.Now().Add(-24*time.Hour), 2025, true, SportsEventStatusScheduled) // in the past
+	newEvent(tbd1.ID, tbd2.ID, future.Add(48*time.Hour), 2025, true, SportsEventStatusFinal)          // not scheduled
+	newEvent(tbd1.ID, tbd2.ID, future.Add(365*24*time.Hour), 2026, true, SportsEventStatusScheduled)  // next season
+
+	events, err := m.UpcomingPostseasonSportsEvents(ctx, league)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(events).Should(gomega.HaveLen(3))
+
+	espnIDs := make([]string, 0, len(events))
+	for _, e := range events {
+		espnIDs = append(espnIDs, e.ESPNID)
+
+		g.Expect(e.Postseason).Should(gomega.BeTrue())
+		g.Expect(e.Season).Should(gomega.Equal(2025))
+		g.Expect(e.Status).Should(gomega.Equal(SportsEventStatusScheduled))
+	}
+
+	// results are ordered by event date
+	g.Expect(espnIDs).Should(gomega.Equal([]string{first.ESPNID, second.ESPNID, third.ESPNID}))
+
+	// a league with no postseason games returns an empty result
+	events, err = m.UpcomingPostseasonSportsEvents(ctx, emptyLeague)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(events).Should(gomega.HaveLen(0))
+}

@@ -326,3 +326,74 @@ func TestGridPayoutConfigIntegration(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(grid.PayoutConfig()).Should(gomega.BeNil())
 }
+
+// freshGrid returns a Grid in the state new_grid() leaves it in: a grids row
+// with only pool_id and ord supplied, and an all-NULL grid_settings row.
+func freshGrid() *Grid {
+	return &Grid{
+		id:       1,
+		poolID:   1,
+		ord:      0,
+		state:    Active,
+		settings: &GridSettings{gridID: 1},
+	}
+}
+
+func TestGridIsPristine(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	g.Expect(freshGrid().IsPristine()).Should(gomega.BeTrue(), "a freshly created grid is pristine")
+
+	eventID := int64(5001)
+	payoutConfig := NumberSetConfigHF
+
+	// each mutation on its own must be enough to make the grid look customized
+	mutations := map[string]func(*Grid){
+		"label":              func(grid *Grid) { grid.SetLabel("Week 1") },
+		"home team name":     func(grid *Grid) { grid.SetHomeTeamName("Kansas City Chiefs") },
+		"away team name":     func(grid *Grid) { grid.SetAwayTeamName("Buffalo Bills") },
+		"home numbers":       func(grid *Grid) { grid.homeNumbers = []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9} },
+		"away numbers":       func(grid *Grid) { grid.awayNumbers = []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9} },
+		"manual draw":        func(grid *Grid) { grid.manualDraw = true },
+		"rollover":           func(grid *Grid) { grid.SetRollover(true) },
+		"event date":         func(grid *Grid) { grid.SetEventDate(time.Now()) },
+		"linked event":       func(grid *Grid) { grid.SetBDLEventID(&eventID) },
+		"payout config":      func(grid *Grid) { grid.SetPayoutConfig(&payoutConfig) },
+		"state":              func(grid *Grid) { grid.SetState(Deleted) },
+		"number sets":        func(grid *Grid) { grid.numberSets = map[NumberSetType]*GridNumberSet{NumberSetTypeAll: {}} },
+		"annotations":        func(grid *Grid) { grid.annotations = map[int]*GridAnnotation{1: {}} },
+		"notes":              func(grid *Grid) { grid.settings.SetNotes("bring snacks") },
+		"home team color 1":  func(grid *Grid) { grid.settings.SetHomeTeamColor1("#E31837") },
+		"home team color 2":  func(grid *Grid) { grid.settings.SetHomeTeamColor2("#FFB612") },
+		"away team color 1":  func(grid *Grid) { grid.settings.SetAwayTeamColor1("#00338D") },
+		"away team color 2":  func(grid *Grid) { grid.settings.SetAwayTeamColor2("#C60C30") },
+		"branding image url": func(grid *Grid) { grid.settings.SetBrandingImageURL("https://example.com/logo.png") },
+		"branding image alt": func(grid *Grid) { grid.settings.SetBrandingImageAlt("Logo") },
+	}
+
+	for name, mutate := range mutations {
+		grid := freshGrid()
+		mutate(grid)
+		g.Expect(grid.IsPristine()).Should(gomega.BeFalse(), name)
+	}
+
+	// an empty (but loaded) set of number sets and annotations is what a fresh
+	// grid has, so loading them must not make it look customized
+	grid := freshGrid()
+	grid.numberSets = map[NumberSetType]*GridNumberSet{}
+	grid.annotations = map[int]*GridAnnotation{}
+	g.Expect(grid.IsPristine()).Should(gomega.BeTrue(), "empty number sets and annotations")
+
+	// settings that were never loaded could hold anything, so the grid can't
+	// be claimed to be pristine
+	grid = freshGrid()
+	grid.settings = nil
+	g.Expect(grid.IsPristine()).Should(gomega.BeFalse(), "unloaded settings")
+
+	// clearing a customization returns the grid to pristine
+	grid = freshGrid()
+	grid.SetLabel("Week 1")
+	g.Expect(grid.IsPristine()).Should(gomega.BeFalse())
+	grid.SetLabel("")
+	g.Expect(grid.IsPristine()).Should(gomega.BeTrue())
+}

@@ -76,3 +76,32 @@ func TestMaxLength(t *testing.T) {
 	testMaxLength(g, s.BrandingImageURL, s.SetBrandingImageURL, BrandingImageURLMaxLength, "brandingImageURL")
 	testMaxLength(g, s.BrandingImageAlt, s.SetBrandingImageAlt, BrandingImageAltMaxLength, "brandingImageAlt")
 }
+
+func TestGridSettingsIsPristine(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	// a nil receiver means the settings were never loaded. Their contents are
+	// unknown, and callers gate destructive work on this check, so it has to
+	// fail closed
+	var nilSettings *GridSettings
+	g.Expect(nilSettings.IsPristine()).Should(gomega.BeFalse())
+
+	// this is what new_grid() inserts: only grid_id, everything else NULL
+	g.Expect((&GridSettings{gridID: 1}).IsPristine()).Should(gomega.BeTrue())
+
+	mutations := map[string]func(*GridSettings){
+		"home team color 1":  func(s *GridSettings) { s.SetHomeTeamColor1("#E31837") },
+		"home team color 2":  func(s *GridSettings) { s.SetHomeTeamColor2("#FFB612") },
+		"away team color 1":  func(s *GridSettings) { s.SetAwayTeamColor1("#00338D") },
+		"away team color 2":  func(s *GridSettings) { s.SetAwayTeamColor2("#C60C30") },
+		"notes":              func(s *GridSettings) { s.SetNotes("bring snacks") },
+		"branding image url": func(s *GridSettings) { s.SetBrandingImageURL("https://example.com/logo.png") },
+		"branding image alt": func(s *GridSettings) { s.SetBrandingImageAlt("Logo") },
+	}
+
+	for name, mutate := range mutations {
+		s := &GridSettings{gridID: 1}
+		mutate(s)
+		g.Expect(s.IsPristine()).Should(gomega.BeFalse(), name)
+	}
+}

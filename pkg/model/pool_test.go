@@ -506,3 +506,65 @@ func TestCanChangeNumberSetConfig_MultiSetWithNumbersDrawn(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(canChange).Should(gomega.BeFalse())
 }
+
+func TestPoolLinkedSportsEventIDs(t *testing.T) {
+	if len(os.Getenv("INTEGRATION")) == 0 {
+		t.Skip("skipping. to run, use -integration flag")
+	}
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	user, err := m.GetUser(ctx, IssuerSqMGR, randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	pool, err := m.NewPool(ctx, user.ID, "Linked Events Pool", GridTypeStd100, "linked-events-password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+
+	team := &SportsTeam{
+		ID:           "test-linked-" + randString(),
+		League:       SportsLeagueNFL,
+		Name:         "Chiefs",
+		FullName:     "Kansas City Chiefs",
+		Abbreviation: "KC",
+	}
+	g.Expect(m.UpsertSportsTeam(ctx, nil, team)).Should(gomega.Succeed())
+
+	newEvent := func() *SportsEvent {
+		e := m.NewSportsEvent()
+		e.ESPNID = "test-linked-event-" + randString()
+		e.League = SportsLeagueNFL
+		e.HomeTeamID = team.ID
+		e.AwayTeamID = team.ID
+		e.EventDate = time.Now().Add(24 * time.Hour)
+		e.Season = 2025
+		e.Status = SportsEventStatusScheduled
+		g.Expect(m.UpsertSportsEvent(ctx, nil, e)).Should(gomega.Succeed())
+		return e
+	}
+
+	activeEvent := newEvent()
+	deletedEvent := newEvent()
+
+	// the pool's default grid isn't linked to an event
+	ids, err := pool.LinkedSportsEventIDs(ctx)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(ids).Should(gomega.HaveLen(0))
+
+	activeGrid := pool.NewGrid()
+	activeGrid.SetBDLEventID(&activeEvent.ID)
+	g.Expect(activeGrid.Save(ctx)).Should(gomega.Succeed())
+
+	deletedGrid := pool.NewGrid()
+	deletedGrid.SetBDLEventID(&deletedEvent.ID)
+	g.Expect(deletedGrid.Save(ctx)).Should(gomega.Succeed())
+	deletedGrid.SetState(Deleted)
+	g.Expect(deletedGrid.Save(ctx)).Should(gomega.Succeed())
+
+	ids, err = pool.LinkedSportsEventIDs(ctx)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(ids).Should(gomega.HaveLen(1))
+	g.Expect(ids).Should(gomega.HaveKey(activeEvent.ID))
+	g.Expect(ids).ShouldNot(gomega.HaveKey(deletedEvent.ID))
+}

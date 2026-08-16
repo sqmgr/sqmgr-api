@@ -167,6 +167,28 @@ func (e *SportsEvent) JSON() *SportsEventJSON {
 	return json
 }
 
+// DisplayName returns a human friendly name for the event. It prefers the name
+// provided by the sports data source and otherwise falls back to an
+// "Away @ Home" label built from the loaded teams (or the team IDs if the teams
+// have not been loaded).
+func (e *SportsEvent) DisplayName() string {
+	if e.Name != nil && *e.Name != "" {
+		return *e.Name
+	}
+
+	away := e.AwayTeamID
+	if e.awayTeam != nil && e.awayTeam.FullName != "" {
+		away = e.awayTeam.FullName
+	}
+
+	home := e.HomeTeamID
+	if e.homeTeam != nil && e.homeTeam.FullName != "" {
+		home = e.homeTeam.FullName
+	}
+
+	return fmt.Sprintf("%s @ %s", away, home)
+}
+
 // HomeTeam returns the loaded home team
 func (e *SportsEvent) HomeTeam() *SportsTeam {
 	return e.homeTeam
@@ -413,6 +435,100 @@ func (m *Model) SportsEventsByLeague(ctx context.Context, league SportsLeague, s
 	}
 	defer rows.Close()
 
+	return m.sportsEventsFromRows(rows)
+}
+
+// UpcomingSportsEventsForTeam returns the team's remaining scheduled games for
+// the season that its next upcoming game belongs to.
+//
+// The season is pinned to whatever season the chronologically next upcoming
+// game is in, rather than to the lowest season with an upcoming game. Those are
+// usually the same, but a stale or postponed game that still carries an older
+// season value would otherwise hijack the selection and cause the endpoint to
+// link a season that's effectively over.
+//
+// Note that once the current season's games have all been played, the next
+// upcoming game is the first game of the following season, so that season's
+// schedule is what gets returned. That's intended: there's nothing left to link
+// in the season that just ended.
+func (m *Model) UpcomingSportsEventsForTeam(ctx context.Context, league SportsLeague, teamID string) ([]*SportsEvent, error) {
+	const query = `
+		SELECT ` + sportsEventColumns + `
+		FROM sports_events
+		WHERE league = $1
+		  AND (home_team_id = $2 OR away_team_id = $2)
+		  AND status = 'scheduled'
+		  AND event_date >= (NOW() AT TIME ZONE 'utc')
+		  AND season = (
+			SELECT season
+			FROM sports_events
+			WHERE league = $1
+			  AND (home_team_id = $2 OR away_team_id = $2)
+			  AND status = 'scheduled'
+			  AND event_date >= (NOW() AT TIME ZONE 'utc')
+			ORDER BY event_date ASC
+			LIMIT 1
+		  )
+		ORDER BY event_date ASC
+	`
+	rows, err := m.DB.QueryContext(ctx, query, league, teamID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return m.sportsEventsFromRows(rows)
+}
+
+// UpcomingPostseasonSportsEvents returns every remaining scheduled postseason
+// game in the league for the season that the next upcoming postseason game
+// belongs to.
+//
+// This exists because a playoff bracket can't be walked by team id. ESPN
+// publishes each undetermined bracket slot as its own row in sports_teams —
+// distinct ids, but all of them display as "TBD" (see
+// SportsTeam.IsPlaceholder). Asking UpcomingSportsEventsForTeam for one of
+// those ids therefore only returns the handful of games that happen to
+// reference that particular placeholder, not the postseason as a whole. When
+// the requested team is a placeholder, the team filter is dropped and the
+// league's entire remaining postseason is returned instead.
+//
+// The season is pinned the same way UpcomingSportsEventsForTeam pins it: to
+// whatever season the chronologically next upcoming game is in, so that a
+// stale or postponed game still carrying an older season value can't hijack
+// the selection.
+func (m *Model) UpcomingPostseasonSportsEvents(ctx context.Context, league SportsLeague) ([]*SportsEvent, error) {
+	const query = `
+		SELECT ` + sportsEventColumns + `
+		FROM sports_events
+		WHERE league = $1
+		  AND postseason = TRUE
+		  AND status = 'scheduled'
+		  AND event_date >= (NOW() AT TIME ZONE 'utc')
+		  AND season = (
+			SELECT season
+			FROM sports_events
+			WHERE league = $1
+			  AND postseason = TRUE
+			  AND status = 'scheduled'
+			  AND event_date >= (NOW() AT TIME ZONE 'utc')
+			ORDER BY event_date ASC
+			LIMIT 1
+		  )
+		ORDER BY event_date ASC
+	`
+	rows, err := m.DB.QueryContext(ctx, query, league)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return m.sportsEventsFromRows(rows)
+}
+
+// sportsEventsFromRows scans a *sql.Rows of sportsEventColumns into events. The
+// caller retains responsibility for closing rows.
+func (m *Model) sportsEventsFromRows(rows *sql.Rows) ([]*SportsEvent, error) {
 	var events []*SportsEvent
 	for rows.Next() {
 		event, err := m.sportsEventByRow(rows.Scan)
@@ -444,20 +560,7 @@ func (m *Model) UpcomingSportsEvents(ctx context.Context, league SportsLeague, l
 	}
 	defer rows.Close()
 
-	var events []*SportsEvent
-	for rows.Next() {
-		event, err := m.sportsEventByRow(rows.Scan)
-		if err != nil {
-			return nil, err
-		}
-		events = append(events, event)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return events, nil
+	return m.sportsEventsFromRows(rows)
 }
 
 // LinkableSportsEvents returns events that can be linked to a grid (scheduled or in_progress)
@@ -475,20 +578,7 @@ func (m *Model) LinkableSportsEvents(ctx context.Context, league SportsLeague, l
 	}
 	defer rows.Close()
 
-	var events []*SportsEvent
-	for rows.Next() {
-		event, err := m.sportsEventByRow(rows.Scan)
-		if err != nil {
-			return nil, err
-		}
-		events = append(events, event)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return events, nil
+	return m.sportsEventsFromRows(rows)
 }
 
 // InProgressSportsEvents returns all events currently in progress
@@ -505,20 +595,7 @@ func (m *Model) InProgressSportsEvents(ctx context.Context) ([]*SportsEvent, err
 	}
 	defer rows.Close()
 
-	var events []*SportsEvent
-	for rows.Next() {
-		event, err := m.sportsEventByRow(rows.Scan)
-		if err != nil {
-			return nil, err
-		}
-		events = append(events, event)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return events, nil
+	return m.sportsEventsFromRows(rows)
 }
 
 // EventsNeedingScoreUpdate returns events that may need score updates
@@ -537,20 +614,7 @@ func (m *Model) EventsNeedingScoreUpdate(ctx context.Context) ([]*SportsEvent, e
 	}
 	defer rows.Close()
 
-	var events []*SportsEvent
-	for rows.Next() {
-		event, err := m.sportsEventByRow(rows.Scan)
-		if err != nil {
-			return nil, err
-		}
-		events = append(events, event)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return events, nil
+	return m.sportsEventsFromRows(rows)
 }
 
 // UpsertSportsEvent inserts or updates a sports event by ESPN ID
@@ -735,16 +799,8 @@ func (m *Model) SearchSportsEvents(ctx context.Context, league SportsLeague, sta
 	}
 	defer rows.Close()
 
-	var events []*SportsEvent
-	for rows.Next() {
-		event, err := m.sportsEventByRow(rows.Scan)
-		if err != nil {
-			return nil, 0, err
-		}
-		events = append(events, event)
-	}
-
-	if err := rows.Err(); err != nil {
+	events, err := m.sportsEventsFromRows(rows)
+	if err != nil {
 		return nil, 0, err
 	}
 
@@ -778,16 +834,8 @@ func (m *Model) LinkableSportsEventsWithTotal(ctx context.Context, league Sports
 	}
 	defer rows.Close()
 
-	var events []*SportsEvent
-	for rows.Next() {
-		event, err := m.sportsEventByRow(rows.Scan)
-		if err != nil {
-			return nil, 0, err
-		}
-		events = append(events, event)
-	}
-
-	if err := rows.Err(); err != nil {
+	events, err := m.sportsEventsFromRows(rows)
+	if err != nil {
 		return nil, 0, err
 	}
 

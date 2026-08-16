@@ -1255,6 +1255,314 @@ func (s *Server) postPoolTokenSquareIDEndpoint() http.HandlerFunc {
 	}
 }
 
+// gridTeamInfo holds the team names and colors that can be derived from a
+// linked sports event
+type gridTeamInfo struct {
+	homeTeamName   string
+	homeTeamColor1 string
+	homeTeamColor2 string
+	awayTeamName   string
+	awayTeamColor1 string
+	awayTeamColor2 string
+}
+
+// applyEventTeamDefaults fills in any empty team name or color with the value
+// from the linked sports event. Values that are already set are never
+// overwritten. It's shared by the grid save endpoint and the link-to-season
+// endpoint so both populate grids from an event identically.
+func applyEventTeamDefaults(info gridTeamInfo, event *model.SportsEvent) gridTeamInfo {
+	if event == nil {
+		return info
+	}
+
+	// Set full team names only if not provided
+	if info.homeTeamName == "" && event.HomeTeam() != nil {
+		info.homeTeamName = event.HomeTeam().FullName
+	}
+	if info.awayTeamName == "" && event.AwayTeam() != nil {
+		info.awayTeamName = event.AwayTeam().FullName
+	}
+
+	// Set colors only if not provided and team has them
+	if info.homeTeamColor1 == "" && event.HomeTeam() != nil && event.HomeTeam().Color != nil {
+		info.homeTeamColor1 = "#" + *event.HomeTeam().Color
+	}
+	if info.homeTeamColor2 == "" && event.HomeTeam() != nil && event.HomeTeam().AlternateColor != nil {
+		info.homeTeamColor2 = "#" + *event.HomeTeam().AlternateColor
+	}
+	if info.awayTeamColor1 == "" && event.AwayTeam() != nil && event.AwayTeam().Color != nil {
+		info.awayTeamColor1 = "#" + *event.AwayTeam().Color
+	}
+	if info.awayTeamColor2 == "" && event.AwayTeam() != nil && event.AwayTeam().AlternateColor != nil {
+		info.awayTeamColor2 = "#" + *event.AwayTeam().AlternateColor
+	}
+
+	return info
+}
+
+// populateGridFromEvent applies everything the link-to-season flow derives from
+// a sports event to the grid: the event link (which also keeps the loaded event
+// around so that it's included in the response), the event date, the label, and
+// the team names and colors.
+//
+// It's used for both brand new grids and for a pristine grid that's being
+// reused, so it always starts from empty values rather than from whatever the
+// grid currently holds.
+func populateGridFromEvent(grid *model.Grid, event *model.SportsEvent) {
+	grid.SetBDLEvent(event)
+	grid.SetEventDate(event.EventDate)
+	grid.SetLabel(event.DisplayName())
+
+	teamInfo := applyEventTeamDefaults(gridTeamInfo{}, event)
+	grid.SetHomeTeamName(teamInfo.homeTeamName)
+	grid.SetAwayTeamName(teamInfo.awayTeamName)
+
+	if settings := grid.Settings(); settings != nil {
+		settings.SetHomeTeamColor1(teamInfo.homeTeamColor1)
+		settings.SetHomeTeamColor2(teamInfo.homeTeamColor2)
+		settings.SetAwayTeamColor1(teamInfo.awayTeamColor1)
+		settings.SetAwayTeamColor2(teamInfo.awayTeamColor2)
+	}
+}
+
+// pristineFirstGrid returns the pool's first (lowest ord) active grid when that
+// grid has never been customized, and nil otherwise. Settings, number sets, and
+// annotations are loaded so that Grid.IsPristine() can consider them.
+func pristineFirstGrid(ctx context.Context, pool *model.Pool) (*model.Grid, error) {
+	grids, err := pool.Grids(ctx, 0, 1)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(grids) == 0 {
+		return nil, nil
+	}
+
+	grid := grids[0]
+	if err := grid.LoadSettings(ctx); err != nil {
+		return nil, err
+	}
+
+	if err := grid.LoadNumberSets(ctx); err != nil {
+		return nil, err
+	}
+
+	if err := grid.LoadAnnotations(ctx); err != nil {
+		return nil, err
+	}
+
+	if !grid.IsPristine() {
+		return nil, nil
+	}
+
+	return grid, nil
+}
+
+// postPoolTokenSeasonEndpoint creates a grid for every remaining game of a
+// team's current season. Games that are already linked to an active grid in the
+// pool are skipped so that the endpoint can be safely re-run.
+//
+// A pool always starts life with one default grid. If that grid is still
+// pristine, the first game of the season is applied to it instead of leaving an
+// empty grid sitting in front of the season.
+func (s *Server) postPoolTokenSeasonEndpoint() http.HandlerFunc {
+	type payload struct {
+		League string `json:"league"`
+		TeamID string `json:"teamId"`
+	}
+
+	// Created counts every game that now has a grid, which includes the
+	// pristine grid that was updated in place. Replaced (0 or 1) reports how
+	// many of those grids already existed, so a caller can tell how many grids
+	// the pool actually gained.
+	type response struct {
+		Created  int               `json:"created"`
+		Replaced int               `json:"replaced"`
+		Skipped  int               `json:"skipped"`
+		Grids    []*model.GridJSON `json:"grids"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+
+		var data payload
+		if ok := s.parseJSONPayload(w, r, &data); !ok {
+			return
+		}
+
+		v := validator.New()
+		if data.League != string(model.SportsLeagueNFL) && data.League != string(model.SportsLeagueNCAAF) {
+			v.AddError("league", "League must be either nfl or ncaaf")
+		}
+
+		if data.TeamID == "" {
+			v.AddError("teamId", "A team is required")
+		}
+
+		if !v.OK() {
+			s.writeJSONResponse(w, http.StatusBadRequest, ErrorResponse{
+				Status:           statusError,
+				Code:             ErrCodeValidation,
+				Error:            validationErrorMessage,
+				ValidationErrors: v.Errors,
+			})
+			return
+		}
+
+		league := model.SportsLeague(data.League)
+
+		team, err := s.model.SportsTeamByID(r.Context(), data.TeamID, league)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("could not find the requested team"))
+				return
+			}
+
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		// A "TBD" team isn't a real team, it's an undetermined playoff bracket
+		// slot. ESPN spreads the bracket across many distinct placeholder team
+		// rows, so matching on the submitted id would only find a subset of the
+		// playoff games. The frontend collapses all of them into a single
+		// "Playoffs" option and sends an arbitrary one of the ids, so link the
+		// league's whole remaining postseason instead.
+		var events []*model.SportsEvent
+		if team.IsPlaceholder() {
+			events, err = s.model.UpcomingPostseasonSportsEvents(r.Context(), league)
+		} else {
+			events, err = s.model.UpcomingSportsEventsForTeam(r.Context(), league, data.TeamID)
+		}
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		if len(events) == 0 {
+			s.writeErrorResponse(w, http.StatusBadRequest, errors.New("there are no upcoming games for this team"))
+			return
+		}
+
+		if err := s.model.LoadTeamsForSportsEvents(r.Context(), events); err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		linkedEventIDs, err := pool.LinkedSportsEventIDs(r.Context())
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		toCreate := make([]*model.SportsEvent, 0, len(events))
+		for _, event := range events {
+			if _, ok := linkedEventIDs[event.ID]; ok {
+				continue
+			}
+
+			toCreate = append(toCreate, event)
+		}
+
+		skipped := len(events) - len(toCreate)
+
+		// If the pool's first grid has never been customized (the untouched
+		// default grid every new pool comes with), the first game is applied to
+		// it rather than creating a new grid in front of it.
+		var reuse *model.Grid
+		if len(toCreate) > 0 {
+			reuse, err = pristineFirstGrid(r.Context(), pool)
+			if err != nil {
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+		}
+
+		// A reused grid already exists, so it doesn't count against the pool's
+		// capacity
+		newGrids := len(toCreate)
+		if reuse != nil {
+			newGrids--
+		}
+
+		// Pre-flight capacity check so that we don't create a partial set of
+		// grids and then fail part way through. new_grid() enforces the same
+		// limit against the pool's active grids.
+		existing, err := pool.GridsCount(r.Context())
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		if existing+int64(newGrids) > model.MaxGridsPerPool {
+			s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("adding %d grids would exceed the limit of %d grids per pool. This pool already has %d", newGrids, model.MaxGridsPerPool, existing))
+			return
+		}
+
+		grids := make([]*model.GridJSON, 0, len(toCreate))
+
+		// number of the grids below that already existed and were updated in
+		// place rather than created. It's 0 or 1: only the pool's pristine
+		// first grid is ever reused.
+		replaced := 0
+
+		// publish is deferred-style: every exit path below (success, the grid
+		// limit backstop, and a generic failure part way through) must notify
+		// subscribers if at least one grid was created or replaced.
+		publish := func() {
+			if len(grids) > 0 {
+				s.broker.Publish(pool.Token(), PoolEvent{Type: EventGridUpdated})
+			}
+		}
+
+		for i, event := range toCreate {
+			// The first game replaces the pristine default grid when there is
+			// one; Save() takes the update path for a grid that already has an
+			// ID. Everything after that gets a new grid.
+			grid := reuse
+			isReuse := i == 0 && reuse != nil
+			if !isReuse {
+				grid = pool.NewGrid()
+			}
+
+			populateGridFromEvent(grid, event)
+
+			if err := grid.Save(r.Context()); err != nil {
+				publish()
+
+				// Backstop for a race with a concurrent grid creation that
+				// slipped past the pre-flight check above.
+				if errors.Is(err, model.ErrGridLimit) {
+					s.writeErrorResponse(w, http.StatusBadRequest, fmt.Errorf("%s. %d of %d grids were created before the limit was reached", err, len(grids), len(toCreate)))
+					return
+				}
+
+				s.writeErrorResponse(w, http.StatusInternalServerError, err)
+				return
+			}
+
+			if isReuse {
+				replaced++
+			}
+
+			grids = append(grids, grid.JSON())
+		}
+
+		publish()
+
+		s.writeJSONResponse(w, http.StatusOK, response{
+			Created:  len(grids),
+			Replaced: replaced,
+			Skipped:  skipped,
+			Grids:    grids,
+		})
+	}
+}
+
 func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 	type numberSetPayload struct {
 		HomeTeamNumbers []int `json:"homeTeamNumbers"`
@@ -1544,27 +1852,21 @@ func (s *Server) postPoolTokenGridIDEndpoint() http.HandlerFunc {
 			if data.Data.BDLEventID != nil {
 				event, err := s.model.SportsEventByIDWithTeams(r.Context(), *data.Data.BDLEventID)
 				if err == nil && event != nil {
-					// Set full team names only if not provided
-					if homeTeamName == "" && event.HomeTeam() != nil {
-						homeTeamName = event.HomeTeam().FullName
-					}
-					if awayTeamName == "" && event.AwayTeam() != nil {
-						awayTeamName = event.AwayTeam().FullName
-					}
+					teamInfo := applyEventTeamDefaults(gridTeamInfo{
+						homeTeamName:   homeTeamName,
+						homeTeamColor1: homeTeamColor1,
+						homeTeamColor2: homeTeamColor2,
+						awayTeamName:   awayTeamName,
+						awayTeamColor1: awayTeamColor1,
+						awayTeamColor2: awayTeamColor2,
+					}, event)
 
-					// Set colors only if not provided and team has them
-					if homeTeamColor1 == "" && event.HomeTeam() != nil && event.HomeTeam().Color != nil {
-						homeTeamColor1 = "#" + *event.HomeTeam().Color
-					}
-					if homeTeamColor2 == "" && event.HomeTeam() != nil && event.HomeTeam().AlternateColor != nil {
-						homeTeamColor2 = "#" + *event.HomeTeam().AlternateColor
-					}
-					if awayTeamColor1 == "" && event.AwayTeam() != nil && event.AwayTeam().Color != nil {
-						awayTeamColor1 = "#" + *event.AwayTeam().Color
-					}
-					if awayTeamColor2 == "" && event.AwayTeam() != nil && event.AwayTeam().AlternateColor != nil {
-						awayTeamColor2 = "#" + *event.AwayTeam().AlternateColor
-					}
+					homeTeamName = teamInfo.homeTeamName
+					homeTeamColor1 = teamInfo.homeTeamColor1
+					homeTeamColor2 = teamInfo.homeTeamColor2
+					awayTeamName = teamInfo.awayTeamName
+					awayTeamColor1 = teamInfo.awayTeamColor1
+					awayTeamColor2 = teamInfo.awayTeamColor2
 				}
 			}
 

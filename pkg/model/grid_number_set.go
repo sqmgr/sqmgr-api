@@ -195,6 +195,10 @@ func (m *Model) GridNumberSetsByGridID(ctx context.Context, gridID int64) (map[N
 		result[gns.setType] = gns
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("querying grid number sets: %w", err)
+	}
+
 	return result, nil
 }
 

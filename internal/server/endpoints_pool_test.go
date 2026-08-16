@@ -21,6 +21,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -2972,6 +2973,1282 @@ func TestGetPoolTokenEndpoint_SiteAdminGetsManagerVisibilityTrue(t *testing.T) {
 	g.Expect(result["isPoolManager"]).Should(gomega.BeFalse())
 	// Site admin should also receive canChangeNumberSetConfig
 	g.Expect(result).Should(gomega.HaveKey("canChangeNumberSetConfig"))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func setupTestServerForSeason(t *testing.T) (*Server, sqlmock.Sqlmock, *model.Model) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+
+	// team lookups happen while iterating a map, so the order isn't deterministic
+	mock.MatchExpectationsInOrder(false)
+
+	m := model.New(db)
+	s := &Server{
+		Router: mux.NewRouter(),
+		model:  m,
+		broker: NewPoolBroker(),
+	}
+
+	s.Router.Path("/pool/{token}/season").Methods(http.MethodPost).Handler(s.poolManagerHandler(s.postPoolTokenSeasonEndpoint()))
+
+	return s, mock, m
+}
+
+// seasonPoolForContext mocks the pool lookup and returns a pool owned by user 100
+func seasonPoolForContext(t *testing.T, g *gomega.WithT, s *Server, mock sqlmock.Sqlmock, poolToken string) *model.Pool {
+	t.Helper()
+
+	now := time.Now()
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	pool, err := s.model.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	return pool
+}
+
+// expectSeasonTeamQuery mocks a single sports_teams lookup
+func expectSeasonTeamQuery(mock sqlmock.Sqlmock, league model.SportsLeague, id, name, fullName, color, altColor string) {
+	now := time.Now()
+	mock.ExpectQuery("SELECT .+ FROM sports_teams WHERE id = \\$1 AND league = \\$2").
+		WithArgs(id, league).
+		WillReturnRows(sqlmock.NewRows(sportsTeamColumns()).
+			AddRow(id, string(league), name, fullName, "ABC", "AFC", "West", "Somewhere", color, altColor, now, now))
+}
+
+// expectSeasonTeamQueries mocks the three sports_teams lookups performed by
+// LoadTeamsForSportsEvents for the rows returned by seasonEventRows
+func expectSeasonTeamQueries(mock sqlmock.Sqlmock, league model.SportsLeague) {
+	expectSeasonTeamQuery(mock, league, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonTeamQuery(mock, league, "2", "Bills", "Buffalo Bills", "00338D", "C60C30")
+	expectSeasonTeamQuery(mock, league, "3", "Broncos", "Denver Broncos", "FB4F14", "002244")
+}
+
+// expectSeasonPlaceholderTeamQuery mocks a sports_teams lookup that returns one
+// of ESPN's undetermined playoff bracket slots. Those rows display as "TBD" and
+// carry no colors.
+func expectSeasonPlaceholderTeamQuery(mock sqlmock.Sqlmock, league model.SportsLeague, id string) {
+	now := time.Now()
+	mock.ExpectQuery("SELECT .+ FROM sports_teams WHERE id = \\$1 AND league = \\$2").
+		WithArgs(id, league).
+		WillReturnRows(sqlmock.NewRows(sportsTeamColumns()).
+			AddRow(id, string(league), "TBD", "TBD", "TBD", nil, nil, nil, nil, nil, now, now))
+}
+
+// expectSeasonPostseasonTeamQueries mocks the four sports_teams lookups
+// performed by LoadTeamsForSportsEvents for the rows returned by
+// seasonPostseasonEventRows. Each bracket slot is its own placeholder team.
+func expectSeasonPostseasonTeamQueries(mock sqlmock.Sqlmock, league model.SportsLeague) {
+	for _, id := range []string{"tbd-2", "tbd-3", "tbd-4", "tbd-5"} {
+		expectSeasonPlaceholderTeamQuery(mock, league, id)
+	}
+}
+
+// expectSeasonUpcomingEventsQuery mocks the upcoming-games-for-team query
+func expectSeasonUpcomingEventsQuery(mock sqlmock.Sqlmock, league model.SportsLeague, teamID string, rows *sqlmock.Rows) {
+	mock.ExpectQuery("SELECT .+ FROM sports_events WHERE league = \\$1 AND \\(home_team_id = \\$2 OR away_team_id = \\$2\\)").
+		WithArgs(league, teamID).
+		WillReturnRows(rows)
+}
+
+// expectSeasonPostseasonEventsQuery mocks the league-wide upcoming-postseason
+// query used for placeholder teams. The pattern asserts on the postseason
+// filter and takes only the league as an argument, so the expectation can't be
+// satisfied by the exact-team query.
+func expectSeasonPostseasonEventsQuery(mock sqlmock.Sqlmock, league model.SportsLeague, rows *sqlmock.Rows) {
+	mock.ExpectQuery("SELECT .+ FROM sports_events WHERE league = \\$1 AND postseason = TRUE AND status = 'scheduled'").
+		WithArgs(league).
+		WillReturnRows(rows)
+}
+
+// expectSeasonLinkedEventsQuery mocks Pool.LinkedSportsEventIDs
+func expectSeasonLinkedEventsQuery(mock sqlmock.Sqlmock, linkedIDs ...int64) {
+	rows := sqlmock.NewRows([]string{"sports_event_id"})
+	for _, id := range linkedIDs {
+		rows.AddRow(id)
+	}
+
+	mock.ExpectQuery("SELECT sports_event_id FROM grids WHERE pool_id = \\$1").
+		WithArgs(int64(1)).
+		WillReturnRows(rows)
+}
+
+// expectSeasonGridsCount mocks the pre-flight Pool.GridsCount check
+func expectSeasonGridsCount(mock sqlmock.Sqlmock, count int64) {
+	mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM grids WHERE pool_id = \\$1 AND state = 'active'").
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(count))
+}
+
+func gridNumberSetColumns() []string {
+	return []string{
+		"id", "grid_id", "set_type", "home_numbers", "away_numbers", "manual_draw", "created", "modified",
+	}
+}
+
+func gridAnnotationColumns() []string {
+	return []string{"id", "grid_id", "square_id", "annotation", "icon", "created", "modified"}
+}
+
+// seasonFirstGrid describes the rows the pool's first-grid lookup returns. The
+// zero value (plus a grid id) is exactly what new_grid() leaves behind, which
+// is pristine; each field turns on one kind of customization.
+type seasonFirstGrid struct {
+	gridID int64
+
+	// label, when non-nil, is a grid the user renamed
+	label interface{}
+
+	// homeTeamColor1, when non-nil, is a color the user picked. It lives in
+	// grid_settings rather than on the grid row
+	homeTeamColor1 interface{}
+
+	// numberSet adds a grid_number_sets row, which only exists once numbers
+	// have been drawn for the grid
+	numberSet bool
+}
+
+// expectSeasonFirstGridLoad mocks the lookup of the pool's first (lowest ord)
+// active grid along with the settings, number sets, and annotations that
+// Grid.IsPristine() inspects. The row mirrors what new_grid() produces, so the
+// grid comes back pristine unless label is non-nil.
+func expectSeasonFirstGridLoad(mock sqlmock.Sqlmock, gridID int64, label interface{}) {
+	expectSeasonFirstGridLoadFor(mock, seasonFirstGrid{gridID: gridID, label: label})
+}
+
+// expectSeasonFirstGridLoadFor is expectSeasonFirstGridLoad with control over
+// which of the four loads carries a customization
+func expectSeasonFirstGridLoadFor(mock sqlmock.Sqlmock, grid seasonFirstGrid) {
+	now := time.Now()
+	gridID := grid.gridID
+
+	mock.ExpectQuery("SELECT id, pool_id, ord, label, .+ FROM grids WHERE pool_id = \\$1 AND state = 'active' ORDER BY ord, id").
+		WithArgs(int64(1), int64(0), int64(1)).
+		WillReturnRows(sqlmock.NewRows(gridColumns()).
+			AddRow(gridID, int64(1), 0, grid.label, nil, nil, nil, nil, nil, false, "active", now, now, false, nil, nil))
+
+	mock.ExpectQuery("SELECT grid_id, home_team_color_1, .+ FROM grid_settings WHERE grid_id = \\$1").
+		WithArgs(gridID).
+		WillReturnRows(sqlmock.NewRows(gridSettingsColumns()).
+			AddRow(gridID, grid.homeTeamColor1, nil, nil, nil, nil, nil, nil, now))
+
+	numberSets := sqlmock.NewRows(gridNumberSetColumns())
+	if grid.numberSet {
+		numberSets.AddRow(int64(1), gridID, string(model.NumberSetTypeAll), nil, nil, false, now, now)
+	}
+
+	mock.ExpectQuery("SELECT id, grid_id, set_type, .+ FROM grid_number_sets WHERE grid_id = \\$1").
+		WithArgs(gridID).
+		WillReturnRows(numberSets)
+
+	mock.ExpectQuery("SELECT id, grid_id, square_id, annotation, icon, created, modified FROM grid_annotations WHERE grid_id = \\$1").
+		WithArgs(gridID).
+		WillReturnRows(sqlmock.NewRows(gridAnnotationColumns()))
+}
+
+// expectSeasonCustomizedFirstGridLoad mocks the same lookup for a grid the user
+// has already customized (it has a label), which must never be reused
+func expectSeasonCustomizedFirstGridLoad(mock sqlmock.Sqlmock) {
+	expectSeasonFirstGridLoad(mock, 7, "My Custom Label")
+}
+
+// seasonEventRows builds sports_events rows for the upcoming games query
+func seasonEventRows(league model.SportsLeague) *sqlmock.Rows {
+	now := time.Now()
+	future := now.Add(24 * time.Hour)
+
+	return sqlmock.NewRows(sportsEventColumns()).
+		AddRow(int64(5001), "401001", string(league), nil, "1", "2", future, 2025, 1, false, "Arrowhead",
+			"scheduled", nil, nil, nil, nil, nil,
+			nil, nil, nil, nil, nil,
+			nil, nil, nil, nil, nil,
+			now, now, now).
+		AddRow(int64(5002), "401002", string(league), "Chiefs at Broncos", "3", "1", future.Add(7*24*time.Hour), 2025, 2, false, "Mile High",
+			"scheduled", nil, nil, nil, nil, nil,
+			nil, nil, nil, nil, nil,
+			nil, nil, nil, nil, nil,
+			now, now, now)
+}
+
+// seasonSingleEventRows is seasonEventRows with only the first game, for the
+// case where there's exactly one game left in the season
+func seasonSingleEventRows(league model.SportsLeague) *sqlmock.Rows {
+	now := time.Now()
+	future := now.Add(24 * time.Hour)
+
+	return sqlmock.NewRows(sportsEventColumns()).
+		AddRow(int64(5001), "401001", string(league), nil, "1", "2", future, 2025, 1, false, "Arrowhead",
+			"scheduled", nil, nil, nil, nil, nil,
+			nil, nil, nil, nil, nil,
+			nil, nil, nil, nil, nil,
+			now, now, now)
+}
+
+// seasonPostseasonEventRows builds sports_events rows for the league-wide
+// postseason query. Every game is between undetermined bracket slots, and no
+// two games share a placeholder team id — which is exactly why an exact
+// team-id match can't find the whole postseason.
+func seasonPostseasonEventRows(league model.SportsLeague) *sqlmock.Rows {
+	now := time.Now()
+	future := now.Add(24 * time.Hour)
+
+	return sqlmock.NewRows(sportsEventColumns()).
+		AddRow(int64(6001), "401101", string(league), nil, "tbd-2", "tbd-3", future, 2025, 1, true, "TBD",
+			"scheduled", nil, nil, nil, nil, nil,
+			nil, nil, nil, nil, nil,
+			nil, nil, nil, nil, nil,
+			now, now, now).
+		AddRow(int64(6002), "401102", string(league), "AFC Championship", "tbd-4", "tbd-5", future.Add(7*24*time.Hour), 2025, 2, true, "TBD",
+			"scheduled", nil, nil, nil, nil, nil,
+			nil, nil, nil, nil, nil,
+			nil, nil, nil, nil, nil,
+			now, now, now)
+}
+
+// expectSeasonGridSave mocks a full grid.Save() for a brand new grid. The
+// UPDATE asserts on the values that the endpoint is responsible for deriving
+// from the linked event: the label, both team names, and the event link.
+//
+// new_grid() returns a row with every column at its default, so event_date and
+// sports_event_id are NULL here: the link to the event is established by the
+// UPDATE that follows, not by the insert.
+func expectSeasonGridSave(mock sqlmock.Sqlmock, gridID, eventID int64, ord int, label, homeTeamName, awayTeamName string) {
+	now := time.Now()
+
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT .+ FROM new_grid\\(\\$1, \\$2\\)").
+		WithArgs(int64(1), model.MaxGridsPerPool).
+		WillReturnRows(sqlmock.NewRows(gridColumns()).
+			AddRow(gridID, int64(1), ord, nil, nil, nil, nil, nil, nil, false, "active", now, now, false, nil, nil))
+	mock.ExpectExec("UPDATE grid_settings SET").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE grids SET").
+		WithArgs(
+			int64(ord),       // $1  ord
+			homeTeamName,     // $2  home_team_name
+			nil,              // $3  home_numbers
+			awayTeamName,     // $4  away_team_name
+			nil,              // $5  away_numbers
+			false,            // $6  manual_draw
+			sqlmock.AnyArg(), // $7  event_date
+			false,            // $8  rollover
+			"active",         // $9  state
+			label,            // $10 label
+			eventID,          // $11 sports_event_id
+			nil,              // $12 payout_config
+			gridID,           // $13 id
+		).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+}
+
+// expectSeasonGridReplace mocks a grid.Save() for a grid that already exists.
+// Unlike expectSeasonGridSave there is no new_grid() call: the existing row is
+// updated in place.
+func expectSeasonGridReplace(mock sqlmock.Sqlmock, gridID, eventID int64, ord int, label, homeTeamName, awayTeamName string) {
+	mock.ExpectBegin()
+	mock.ExpectExec("UPDATE grid_settings SET").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE grids SET").
+		WithArgs(
+			int64(ord),       // $1  ord
+			homeTeamName,     // $2  home_team_name
+			nil,              // $3  home_numbers
+			awayTeamName,     // $4  away_team_name
+			nil,              // $5  away_numbers
+			false,            // $6  manual_draw
+			sqlmock.AnyArg(), // $7  event_date
+			false,            // $8  rollover
+			"active",         // $9  state
+			label,            // $10 label
+			eventID,          // $11 sports_event_id
+			nil,              // $12 payout_config
+			gridID,           // $13 id
+		).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+}
+
+// expectSeasonHappyPathGridSaves mocks the two grid saves for seasonEventRows
+func expectSeasonHappyPathGridSaves(mock sqlmock.Sqlmock) {
+	expectSeasonGridSave(mock, 10, 5001, 0, "Buffalo Bills @ Kansas City Chiefs", "Kansas City Chiefs", "Buffalo Bills")
+	expectSeasonGridSave(mock, 11, 5002, 1, "Chiefs at Broncos", "Denver Broncos", "Kansas City Chiefs")
+}
+
+func seasonRequest(s *Server, user *model.User, pool *model.Pool, poolToken, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, "/pool/"+poolToken+"/season", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, pool)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+	return rec
+}
+
+// drainPoolEvents returns everything the broker published to ch so far. Publish
+// is synchronous and the channel is buffered, so anything published during the
+// request is already queued by the time the handler returns.
+func drainPoolEvents(ch chan PoolEvent) []PoolEvent {
+	events := make([]PoolEvent, 0, len(ch))
+	for {
+		select {
+		case e := <-ch:
+			events = append(events, e)
+		default:
+			return events
+		}
+	}
+}
+
+type seasonResponse struct {
+	Created  int                      `json:"created"`
+	Replaced int                      `json:"replaced"`
+	Skipped  int                      `json:"skipped"`
+	Grids    []map[string]interface{} `json:"grids"`
+}
+
+func TestPostPoolTokenSeason_CreatesGridsForUpcomingGames(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-1"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	sub := s.broker.Subscribe(poolToken)
+
+	// team validation lookup
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+
+	// upcoming games for the team
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNFL, "1", seasonEventRows(model.SportsLeagueNFL))
+
+	// LoadTeamsForSportsEvents
+	expectSeasonTeamQueries(mock, model.SportsLeagueNFL)
+
+	// no events are linked yet
+	expectSeasonLinkedEventsQuery(mock)
+
+	// the pool's first grid has been customized, so it isn't reused
+	expectSeasonCustomizedFirstGridLoad(mock)
+
+	// pre-flight capacity check: the pool has room for both grids
+	expectSeasonGridsCount(mock, 1)
+
+	expectSeasonHappyPathGridSaves(mock)
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var resp seasonResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	g.Expect(resp.Created).Should(gomega.Equal(2))
+	g.Expect(resp.Replaced).Should(gomega.Equal(0))
+	g.Expect(resp.Skipped).Should(gomega.Equal(0))
+	g.Expect(resp.Grids).Should(gomega.HaveLen(2))
+
+	// first grid: event had no name, so the label falls back to "Away @ Home"
+	g.Expect(resp.Grids[0]["label"]).Should(gomega.Equal("Buffalo Bills @ Kansas City Chiefs"))
+	g.Expect(resp.Grids[0]["homeTeamName"]).Should(gomega.Equal("Kansas City Chiefs"))
+	g.Expect(resp.Grids[0]["awayTeamName"]).Should(gomega.Equal("Buffalo Bills"))
+	g.Expect(resp.Grids[0]["bdlEventId"]).Should(gomega.BeEquivalentTo(5001))
+
+	settings, ok := resp.Grids[0]["settings"].(map[string]interface{})
+	g.Expect(ok).Should(gomega.BeTrue())
+	g.Expect(settings["homeTeamColor1"]).Should(gomega.Equal("#E31837"))
+	g.Expect(settings["homeTeamColor2"]).Should(gomega.Equal("#FFB612"))
+	g.Expect(settings["awayTeamColor1"]).Should(gomega.Equal("#00338D"))
+	g.Expect(settings["awayTeamColor2"]).Should(gomega.Equal("#C60C30"))
+
+	// the linked event is included in the response
+	event, ok := resp.Grids[0]["bdlEvent"].(map[string]interface{})
+	g.Expect(ok).Should(gomega.BeTrue())
+	g.Expect(event["id"]).Should(gomega.BeEquivalentTo(5001))
+
+	// second grid uses the event's name for the label
+	g.Expect(resp.Grids[1]["label"]).Should(gomega.Equal("Chiefs at Broncos"))
+	g.Expect(resp.Grids[1]["homeTeamName"]).Should(gomega.Equal("Denver Broncos"))
+	g.Expect(resp.Grids[1]["awayTeamName"]).Should(gomega.Equal("Kansas City Chiefs"))
+
+	g.Expect(drainPoolEvents(sub)).Should(gomega.Equal([]PoolEvent{{Type: EventGridUpdated}}))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPostPoolTokenSeason_CreatesGridsForNCAAF(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-ncaaf"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	sub := s.broker.Subscribe(poolToken)
+
+	expectSeasonTeamQuery(mock, model.SportsLeagueNCAAF, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNCAAF, "1", seasonEventRows(model.SportsLeagueNCAAF))
+	expectSeasonTeamQueries(mock, model.SportsLeagueNCAAF)
+	expectSeasonLinkedEventsQuery(mock)
+	expectSeasonCustomizedFirstGridLoad(mock)
+	expectSeasonGridsCount(mock, 0)
+	expectSeasonHappyPathGridSaves(mock)
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"ncaaf","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var resp seasonResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	g.Expect(resp.Created).Should(gomega.Equal(2))
+	g.Expect(resp.Replaced).Should(gomega.Equal(0))
+	g.Expect(resp.Skipped).Should(gomega.Equal(0))
+	g.Expect(resp.Grids).Should(gomega.HaveLen(2))
+	g.Expect(resp.Grids[0]["label"]).Should(gomega.Equal("Buffalo Bills @ Kansas City Chiefs"))
+	g.Expect(resp.Grids[1]["label"]).Should(gomega.Equal("Chiefs at Broncos"))
+
+	g.Expect(drainPoolEvents(sub)).Should(gomega.Equal([]PoolEvent{{Type: EventGridUpdated}}))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPostPoolTokenSeason_SkipsAlreadyLinkedGames(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-2"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNFL, "1", seasonEventRows(model.SportsLeagueNFL))
+	expectSeasonTeamQueries(mock, model.SportsLeagueNFL)
+
+	// the first event is already linked to an active grid
+	expectSeasonLinkedEventsQuery(mock, 5001)
+
+	expectSeasonCustomizedFirstGridLoad(mock)
+
+	expectSeasonGridsCount(mock, 1)
+
+	expectSeasonGridSave(mock, 11, 5002, 1, "Chiefs at Broncos", "Denver Broncos", "Kansas City Chiefs")
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var resp seasonResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	g.Expect(resp.Created).Should(gomega.Equal(1))
+	g.Expect(resp.Replaced).Should(gomega.Equal(0))
+	g.Expect(resp.Skipped).Should(gomega.Equal(1))
+	g.Expect(resp.Grids).Should(gomega.HaveLen(1))
+	g.Expect(resp.Grids[0]["bdlEventId"]).Should(gomega.BeEquivalentTo(5002))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+// TestPostPoolTokenSeason_AlreadyFullyLinkedIsNoOp verifies that re-running the
+// endpoint after every upcoming game is linked is a no-op: nothing is created,
+// no grid is saved, and no SSE event is published.
+func TestPostPoolTokenSeason_AlreadyFullyLinkedIsNoOp(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-idempotent"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	sub := s.broker.Subscribe(poolToken)
+
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNFL, "1", seasonEventRows(model.SportsLeagueNFL))
+	expectSeasonTeamQueries(mock, model.SportsLeagueNFL)
+
+	// both events are already linked
+	expectSeasonLinkedEventsQuery(mock, 5001, 5002)
+
+	expectSeasonGridsCount(mock, 2)
+
+	// note: no grid save expectations are registered. sqlmock fails the request
+	// if the handler issues an unexpected Begin/Query/Exec.
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var resp seasonResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	g.Expect(resp.Created).Should(gomega.Equal(0))
+	g.Expect(resp.Replaced).Should(gomega.Equal(0))
+	g.Expect(resp.Skipped).Should(gomega.Equal(2))
+	g.Expect(resp.Grids).Should(gomega.BeEmpty())
+
+	// nothing changed, so nothing is published
+	g.Expect(drainPoolEvents(sub)).Should(gomega.BeEmpty())
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPostPoolTokenSeason_NonManagerForbidden(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	// user 999 doesn't own the pool, so IsManagerOf falls through to the
+	// pools_users membership check
+	user := &model.User{Model: m, ID: 999, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-forbidden"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_manager").
+		WithArgs(int64(1), int64(999)).
+		WillReturnError(sql.ErrNoRows)
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusForbidden))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPostPoolTokenSeason_InvalidLeagueRejected(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-3"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nba","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusBadRequest))
+
+	var resp ErrorResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+	g.Expect(resp.Status).Should(gomega.Equal(statusError))
+	g.Expect(resp.ValidationErrors).Should(gomega.HaveKey("league"))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPostPoolTokenSeason_MissingTeamIDRejected(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-4"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"ncaaf","teamId":""}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusBadRequest))
+
+	var resp ErrorResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+	g.Expect(resp.ValidationErrors).Should(gomega.HaveKey("teamId"))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPostPoolTokenSeason_UnknownTeamRejected(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-5"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	mock.ExpectQuery("SELECT .+ FROM sports_teams WHERE id = \\$1 AND league = \\$2").
+		WithArgs("does-not-exist", model.SportsLeagueNFL).
+		WillReturnError(sql.ErrNoRows)
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"does-not-exist"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusBadRequest))
+
+	var resp ErrorResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+	g.Expect(resp.Error).Should(gomega.ContainSubstring("team"))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestPostPoolTokenSeason_NoUpcomingGamesRejected(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-6"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNFL, "1", sqlmock.NewRows(sportsEventColumns()))
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusBadRequest))
+
+	var resp ErrorResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	// the frontend pattern-matches on this message; don't change it
+	g.Expect(resp.Error).Should(gomega.ContainSubstring("no upcoming games"))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+// TestPostPoolTokenSeason_PreFlightGridLimitCreatesNothing verifies that when
+// the pool doesn't have room for the whole batch, the request is rejected
+// before a single grid is created.
+func TestPostPoolTokenSeason_PreFlightGridLimitCreatesNothing(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-7"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	sub := s.broker.Subscribe(poolToken)
+
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNFL, "1", seasonEventRows(model.SportsLeagueNFL))
+	expectSeasonTeamQueries(mock, model.SportsLeagueNFL)
+	expectSeasonLinkedEventsQuery(mock)
+
+	// the first grid is customized, so no grid can be reused and both games
+	// need a brand new grid
+	expectSeasonCustomizedFirstGridLoad(mock)
+
+	// room for one more grid, but two are needed
+	expectSeasonGridsCount(mock, model.MaxGridsPerPool-1)
+
+	// note: no grid save expectations. nothing may be created.
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusBadRequest))
+
+	var resp ErrorResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+	g.Expect(resp.Status).Should(gomega.Equal(statusError))
+	g.Expect(resp.Error).Should(gomega.ContainSubstring("adding 2 grids would exceed the limit"))
+
+	// the error response carries no created grids
+	g.Expect(rec.Body.String()).ShouldNot(gomega.ContainSubstring(`"grids"`))
+	g.Expect(rec.Body.String()).ShouldNot(gomega.ContainSubstring(`"created"`))
+
+	// nothing was created, so nothing is published
+	g.Expect(drainPoolEvents(sub)).Should(gomega.BeEmpty())
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+// TestPostPoolTokenSeason_InLoopGridLimitBackstop simulates a concurrent grid
+// creation racing past the pre-flight check: the count says there's room, but
+// new_grid() rejects the second insert.
+func TestPostPoolTokenSeason_InLoopGridLimitBackstop(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-8"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	sub := s.broker.Subscribe(poolToken)
+
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNFL, "1", seasonEventRows(model.SportsLeagueNFL))
+	expectSeasonTeamQueries(mock, model.SportsLeagueNFL)
+	expectSeasonLinkedEventsQuery(mock)
+	expectSeasonCustomizedFirstGridLoad(mock)
+
+	// the pre-flight check passes...
+	expectSeasonGridsCount(mock, 0)
+
+	// ...the first grid is created...
+	expectSeasonGridSave(mock, 10, 5001, 0, "Buffalo Bills @ Kansas City Chiefs", "Kansas City Chiefs", "Buffalo Bills")
+
+	// ...but the second one loses a race and hits the per-pool grid limit
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT .+ FROM new_grid\\(\\$1, \\$2\\)").
+		WithArgs(int64(1), model.MaxGridsPerPool).
+		WillReturnError(errors.New("pq: limit reached"))
+	mock.ExpectRollback()
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusBadRequest))
+
+	var resp ErrorResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	// the denominator is the number of grids the endpoint set out to create
+	g.Expect(resp.Error).Should(gomega.ContainSubstring("1 of 2 grids were created"))
+
+	// the error response carries no created grids
+	g.Expect(rec.Body.String()).ShouldNot(gomega.ContainSubstring(`"grids"`))
+
+	// but the partially applied change is still announced
+	g.Expect(drainPoolEvents(sub)).Should(gomega.Equal([]PoolEvent{{Type: EventGridUpdated}}))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+// TestPostPoolTokenSeason_MidLoopErrorStillPublishes verifies that a generic
+// (non-limit) failure part way through the batch still notifies subscribers
+// about the grids that did get created.
+func TestPostPoolTokenSeason_MidLoopErrorStillPublishes(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-9"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	sub := s.broker.Subscribe(poolToken)
+
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNFL, "1", seasonEventRows(model.SportsLeagueNFL))
+	expectSeasonTeamQueries(mock, model.SportsLeagueNFL)
+	expectSeasonLinkedEventsQuery(mock)
+	expectSeasonCustomizedFirstGridLoad(mock)
+	expectSeasonGridsCount(mock, 0)
+
+	// the first grid is created
+	expectSeasonGridSave(mock, 10, 5001, 0, "Buffalo Bills @ Kansas City Chiefs", "Kansas City Chiefs", "Buffalo Bills")
+
+	// the second grid fails for a reason unrelated to the grid limit
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT .+ FROM new_grid\\(\\$1, \\$2\\)").
+		WithArgs(int64(1), model.MaxGridsPerPool).
+		WillReturnError(errors.New("pq: connection reset by peer"))
+	mock.ExpectRollback()
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusInternalServerError))
+
+	// the first grid was committed, so subscribers must still be told
+	g.Expect(drainPoolEvents(sub)).Should(gomega.Equal([]PoolEvent{{Type: EventGridUpdated}}))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestApplyEventTeamDefaults(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	homeColor := "E31837"
+	homeAltColor := "FFB612"
+	awayColor := "00338D"
+	awayAltColor := "C60C30"
+
+	event := &model.SportsEvent{HomeTeamID: "1", AwayTeamID: "2"}
+	event.SetHomeTeam(&model.SportsTeam{ID: "1", FullName: "Kansas City Chiefs", Color: &homeColor, AlternateColor: &homeAltColor})
+	event.SetAwayTeam(&model.SportsTeam{ID: "2", FullName: "Buffalo Bills", Color: &awayColor, AlternateColor: &awayAltColor})
+
+	// empty values are populated from the event
+	info := applyEventTeamDefaults(gridTeamInfo{}, event)
+	g.Expect(info.homeTeamName).Should(gomega.Equal("Kansas City Chiefs"))
+	g.Expect(info.awayTeamName).Should(gomega.Equal("Buffalo Bills"))
+	g.Expect(info.homeTeamColor1).Should(gomega.Equal("#E31837"))
+	g.Expect(info.homeTeamColor2).Should(gomega.Equal("#FFB612"))
+	g.Expect(info.awayTeamColor1).Should(gomega.Equal("#00338D"))
+	g.Expect(info.awayTeamColor2).Should(gomega.Equal("#C60C30"))
+
+	// existing values are never overwritten
+	provided := gridTeamInfo{
+		homeTeamName:   "My Home Team",
+		homeTeamColor1: "#111111",
+		homeTeamColor2: "#222222",
+		awayTeamName:   "My Away Team",
+		awayTeamColor1: "#333333",
+		awayTeamColor2: "#444444",
+	}
+	g.Expect(applyEventTeamDefaults(provided, event)).Should(gomega.Equal(provided))
+
+	// a nil event leaves everything alone
+	g.Expect(applyEventTeamDefaults(gridTeamInfo{}, nil)).Should(gomega.Equal(gridTeamInfo{}))
+
+	// teams without colors only populate what's available
+	bare := &model.SportsEvent{HomeTeamID: "1", AwayTeamID: "2"}
+	bare.SetHomeTeam(&model.SportsTeam{ID: "1", FullName: "Kansas City Chiefs"})
+	info = applyEventTeamDefaults(gridTeamInfo{}, bare)
+	g.Expect(info.homeTeamName).Should(gomega.Equal("Kansas City Chiefs"))
+	g.Expect(info.homeTeamColor1).Should(gomega.Equal(""))
+	g.Expect(info.awayTeamName).Should(gomega.Equal(""))
+}
+
+// TestPostPoolTokenSeason_PristineFirstGridIsReplaced verifies that the
+// untouched default grid a pool is created with is reused for the first game of
+// the season rather than being left sitting empty in front of it.
+func TestPostPoolTokenSeason_PristineFirstGridIsReplaced(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-pristine"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	sub := s.broker.Subscribe(poolToken)
+
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNFL, "1", seasonEventRows(model.SportsLeagueNFL))
+	expectSeasonTeamQueries(mock, model.SportsLeagueNFL)
+	expectSeasonLinkedEventsQuery(mock)
+
+	// the pool's only grid is the untouched default one
+	expectSeasonFirstGridLoad(mock, 7, nil)
+
+	// only one grid is actually new, so the pre-flight check sees 1 + 1
+	expectSeasonGridsCount(mock, 1)
+
+	// the first game updates grid 7 in place: no new_grid() call
+	expectSeasonGridReplace(mock, 7, 5001, 0, "Buffalo Bills @ Kansas City Chiefs", "Kansas City Chiefs", "Buffalo Bills")
+
+	// the second game still gets a brand new grid
+	expectSeasonGridSave(mock, 11, 5002, 1, "Chiefs at Broncos", "Denver Broncos", "Kansas City Chiefs")
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var resp seasonResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	// the replaced grid counts as created: a grid for week 1 now exists
+	g.Expect(resp.Created).Should(gomega.Equal(2))
+	// ...but one of those grids already existed and was updated in place
+	g.Expect(resp.Replaced).Should(gomega.Equal(1))
+	g.Expect(resp.Skipped).Should(gomega.Equal(0))
+	g.Expect(resp.Grids).Should(gomega.HaveLen(2))
+
+	// the reused grid is first in the response
+	g.Expect(resp.Grids[0]["id"]).Should(gomega.BeEquivalentTo(7))
+	g.Expect(resp.Grids[0]["label"]).Should(gomega.Equal("Buffalo Bills @ Kansas City Chiefs"))
+	g.Expect(resp.Grids[0]["homeTeamName"]).Should(gomega.Equal("Kansas City Chiefs"))
+	g.Expect(resp.Grids[0]["awayTeamName"]).Should(gomega.Equal("Buffalo Bills"))
+	g.Expect(resp.Grids[0]["bdlEventId"]).Should(gomega.BeEquivalentTo(5001))
+
+	settings, ok := resp.Grids[0]["settings"].(map[string]interface{})
+	g.Expect(ok).Should(gomega.BeTrue())
+	g.Expect(settings["homeTeamColor1"]).Should(gomega.Equal("#E31837"))
+	g.Expect(settings["awayTeamColor1"]).Should(gomega.Equal("#00338D"))
+
+	g.Expect(resp.Grids[1]["id"]).Should(gomega.BeEquivalentTo(11))
+	g.Expect(resp.Grids[1]["bdlEventId"]).Should(gomega.BeEquivalentTo(5002))
+
+	g.Expect(drainPoolEvents(sub)).Should(gomega.Equal([]PoolEvent{{Type: EventGridUpdated}}))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+// TestPostPoolTokenSeason_CustomizedFirstGridIsNotReplaced verifies that a grid
+// the user has already touched is left alone and every game gets a new grid,
+// which is the behavior that predates the reuse.
+func TestPostPoolTokenSeason_CustomizedFirstGridIsNotReplaced(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-customized"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNFL, "1", seasonEventRows(model.SportsLeagueNFL))
+	expectSeasonTeamQueries(mock, model.SportsLeagueNFL)
+	expectSeasonLinkedEventsQuery(mock)
+
+	// the user gave the first grid a label
+	expectSeasonFirstGridLoad(mock, 7, "Super Bowl Party")
+
+	expectSeasonGridsCount(mock, 1)
+
+	// note: no expectSeasonGridReplace. Grid 7 must never be updated. sqlmock
+	// fails the request on an unexpected Begin/Query/Exec.
+	expectSeasonHappyPathGridSaves(mock)
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var resp seasonResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	g.Expect(resp.Created).Should(gomega.Equal(2))
+	g.Expect(resp.Replaced).Should(gomega.Equal(0))
+	g.Expect(resp.Grids).Should(gomega.HaveLen(2))
+	g.Expect(resp.Grids[0]["id"]).Should(gomega.BeEquivalentTo(10))
+	g.Expect(resp.Grids[1]["id"]).Should(gomega.BeEquivalentTo(11))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+// TestPostPoolTokenSeason_PristineFirstGridUntouchedWhenNothingToCreate
+// verifies that a pristine grid is not reused when every upcoming game is
+// already linked. The handler must not even look the grid up.
+func TestPostPoolTokenSeason_PristineFirstGridUntouchedWhenNothingToCreate(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-pristine-noop"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	sub := s.broker.Subscribe(poolToken)
+
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNFL, "1", seasonEventRows(model.SportsLeagueNFL))
+	expectSeasonTeamQueries(mock, model.SportsLeagueNFL)
+	expectSeasonLinkedEventsQuery(mock, 5001, 5002)
+	expectSeasonGridsCount(mock, 3)
+
+	// note: no expectSeasonFirstGridLoad and no grid save expectations. With
+	// nothing to create there's nothing to reuse, so the grid lookup is skipped
+	// entirely and no grid is written.
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var resp seasonResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	g.Expect(resp.Created).Should(gomega.Equal(0))
+	g.Expect(resp.Replaced).Should(gomega.Equal(0))
+	g.Expect(resp.Skipped).Should(gomega.Equal(2))
+	g.Expect(resp.Grids).Should(gomega.BeEmpty())
+
+	g.Expect(drainPoolEvents(sub)).Should(gomega.BeEmpty())
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+// TestPostPoolTokenSeason_PreFlightAccountsForReusedGrid verifies that the
+// capacity check counts only the grids that are actually new. Here the pool is
+// one short of the limit and there are two games, which would be rejected if
+// the reused grid were counted as new.
+func TestPostPoolTokenSeason_PreFlightAccountsForReusedGrid(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-preflight-reuse"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNFL, "1", seasonEventRows(model.SportsLeagueNFL))
+	expectSeasonTeamQueries(mock, model.SportsLeagueNFL)
+	expectSeasonLinkedEventsQuery(mock)
+	expectSeasonFirstGridLoad(mock, 7, nil)
+
+	// room for exactly one more grid, and exactly one is new
+	expectSeasonGridsCount(mock, model.MaxGridsPerPool-1)
+
+	expectSeasonGridReplace(mock, 7, 5001, 0, "Buffalo Bills @ Kansas City Chiefs", "Kansas City Chiefs", "Buffalo Bills")
+	expectSeasonGridSave(mock, 11, 5002, 1, "Chiefs at Broncos", "Denver Broncos", "Kansas City Chiefs")
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var resp seasonResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	g.Expect(resp.Created).Should(gomega.Equal(2))
+	// ...but one of those grids already existed and was updated in place
+	g.Expect(resp.Replaced).Should(gomega.Equal(1))
+	g.Expect(resp.Grids).Should(gomega.HaveLen(2))
+	g.Expect(resp.Grids[0]["id"]).Should(gomega.BeEquivalentTo(7))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+// TestPostPoolTokenSeason_PlaceholderTeamLinksWholePostseason verifies that a
+// "TBD" team is treated as the whole playoff bracket. ESPN gives every
+// undetermined bracket slot its own team row, so the frontend collapses them
+// into a single "Playoffs" option and submits an arbitrary one of the ids. The
+// handler must answer that with the league's entire remaining postseason
+// rather than the games that happen to reference the submitted id.
+func TestPostPoolTokenSeason_PlaceholderTeamLinksWholePostseason(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-tbd"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	sub := s.broker.Subscribe(poolToken)
+
+	// the submitted team is a placeholder
+	expectSeasonPlaceholderTeamQuery(mock, model.SportsLeagueNFL, "tbd-1")
+
+	// ...so the league-wide postseason query runs. Note that no exact-team
+	// query is registered: sqlmock fails the request if the handler runs one.
+	expectSeasonPostseasonEventsQuery(mock, model.SportsLeagueNFL, seasonPostseasonEventRows(model.SportsLeagueNFL))
+
+	expectSeasonPostseasonTeamQueries(mock, model.SportsLeagueNFL)
+
+	expectSeasonLinkedEventsQuery(mock)
+	expectSeasonCustomizedFirstGridLoad(mock)
+	expectSeasonGridsCount(mock, 1)
+
+	// the first game has no name from ESPN, so the label falls back to the
+	// team names, which are themselves still undetermined
+	expectSeasonGridSave(mock, 20, 6001, 0, "TBD @ TBD", "TBD", "TBD")
+	expectSeasonGridSave(mock, 21, 6002, 1, "AFC Championship", "TBD", "TBD")
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"tbd-1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var resp seasonResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	g.Expect(resp.Created).Should(gomega.Equal(2))
+	g.Expect(resp.Replaced).Should(gomega.Equal(0))
+	g.Expect(resp.Skipped).Should(gomega.Equal(0))
+	g.Expect(resp.Grids).Should(gomega.HaveLen(2))
+
+	g.Expect(resp.Grids[0]["label"]).Should(gomega.Equal("TBD @ TBD"))
+	g.Expect(resp.Grids[0]["bdlEventId"]).Should(gomega.BeEquivalentTo(6001))
+	g.Expect(resp.Grids[1]["label"]).Should(gomega.Equal("AFC Championship"))
+	g.Expect(resp.Grids[1]["bdlEventId"]).Should(gomega.BeEquivalentTo(6002))
+
+	g.Expect(drainPoolEvents(sub)).Should(gomega.Equal([]PoolEvent{{Type: EventGridUpdated}}))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+// TestPostPoolTokenSeason_PlaceholderTeamAlreadyFullyLinkedIsNoOp verifies that
+// re-running the endpoint for a placeholder team once the postseason is linked
+// creates nothing and publishes nothing.
+func TestPostPoolTokenSeason_PlaceholderTeamAlreadyFullyLinkedIsNoOp(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-tbd-idempotent"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	sub := s.broker.Subscribe(poolToken)
+
+	expectSeasonPlaceholderTeamQuery(mock, model.SportsLeagueNFL, "tbd-1")
+	expectSeasonPostseasonEventsQuery(mock, model.SportsLeagueNFL, seasonPostseasonEventRows(model.SportsLeagueNFL))
+	expectSeasonPostseasonTeamQueries(mock, model.SportsLeagueNFL)
+
+	// both postseason games are already linked
+	expectSeasonLinkedEventsQuery(mock, 6001, 6002)
+
+	expectSeasonGridsCount(mock, 2)
+
+	// note: no grid save expectations are registered
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"tbd-1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var resp seasonResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	g.Expect(resp.Created).Should(gomega.Equal(0))
+	g.Expect(resp.Replaced).Should(gomega.Equal(0))
+	g.Expect(resp.Skipped).Should(gomega.Equal(2))
+	g.Expect(resp.Grids).Should(gomega.BeEmpty())
+
+	g.Expect(drainPoolEvents(sub)).Should(gomega.BeEmpty())
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+// TestPostPoolTokenSeason_PlaceholderTeamNoUpcomingGamesRejected verifies the
+// placeholder branch returns the same message as the exact-team branch when
+// there's nothing to link. The frontend pattern-matches on it.
+func TestPostPoolTokenSeason_PlaceholderTeamNoUpcomingGamesRejected(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-tbd-empty"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	expectSeasonPlaceholderTeamQuery(mock, model.SportsLeagueNFL, "tbd-1")
+	expectSeasonPostseasonEventsQuery(mock, model.SportsLeagueNFL, sqlmock.NewRows(sportsEventColumns()))
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"tbd-1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusBadRequest))
+
+	var resp ErrorResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+	g.Expect(resp.Error).Should(gomega.ContainSubstring("no upcoming games"))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+// TestPostPoolTokenSeason_FirstGridWithCustomColorIsNotReplaced verifies that a
+// customization that lives in grid_settings rather than on the grid row is
+// enough to protect the grid. The color is only visible because
+// pristineFirstGrid loads the settings before asking, so this also covers that
+// load actually feeding the check.
+func TestPostPoolTokenSeason_FirstGridWithCustomColorIsNotReplaced(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-custom-color"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNFL, "1", seasonEventRows(model.SportsLeagueNFL))
+	expectSeasonTeamQueries(mock, model.SportsLeagueNFL)
+	expectSeasonLinkedEventsQuery(mock)
+
+	// the grid row itself looks untouched: the user picked a team color
+	expectSeasonFirstGridLoadFor(mock, seasonFirstGrid{gridID: 7, homeTeamColor1: "#123456"})
+
+	expectSeasonGridsCount(mock, 1)
+
+	// note: no expectSeasonGridReplace. Grid 7 must never be updated. sqlmock
+	// fails the request on an unexpected Begin/Query/Exec.
+	expectSeasonHappyPathGridSaves(mock)
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var resp seasonResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	g.Expect(resp.Created).Should(gomega.Equal(2))
+	g.Expect(resp.Replaced).Should(gomega.Equal(0))
+	g.Expect(resp.Grids).Should(gomega.HaveLen(2))
+	g.Expect(resp.Grids[0]["id"]).Should(gomega.BeEquivalentTo(10))
+	g.Expect(resp.Grids[1]["id"]).Should(gomega.BeEquivalentTo(11))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+// TestPostPoolTokenSeason_FirstGridWithNumberSetIsNotReplaced verifies the same
+// for a customization that lives in grid_number_sets: numbers have been drawn
+// for the grid, which pristineFirstGrid only sees because it loads the number
+// sets first.
+func TestPostPoolTokenSeason_FirstGridWithNumberSetIsNotReplaced(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-number-set"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNFL, "1", seasonEventRows(model.SportsLeagueNFL))
+	expectSeasonTeamQueries(mock, model.SportsLeagueNFL)
+	expectSeasonLinkedEventsQuery(mock)
+
+	// the grid row and its settings look untouched, but a number set exists
+	expectSeasonFirstGridLoadFor(mock, seasonFirstGrid{gridID: 7, numberSet: true})
+
+	expectSeasonGridsCount(mock, 1)
+
+	// note: no expectSeasonGridReplace. Grid 7 must never be updated.
+	expectSeasonHappyPathGridSaves(mock)
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var resp seasonResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	g.Expect(resp.Created).Should(gomega.Equal(2))
+	g.Expect(resp.Replaced).Should(gomega.Equal(0))
+	g.Expect(resp.Grids).Should(gomega.HaveLen(2))
+	g.Expect(resp.Grids[0]["id"]).Should(gomega.BeEquivalentTo(10))
+	g.Expect(resp.Grids[1]["id"]).Should(gomega.BeEquivalentTo(11))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+// TestPostPoolTokenSeason_SingleGameReusesGridWithoutCreating covers the case
+// where the reused grid is the only grid needed: one upcoming game and a
+// pristine first grid means nothing new is created at all. The pool is at the
+// grid limit to prove the pre-flight check doesn't count the reused grid.
+func TestPostPoolTokenSeason_SingleGameReusesGridWithoutCreating(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-single-game"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	sub := s.broker.Subscribe(poolToken)
+
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNFL, "1", seasonSingleEventRows(model.SportsLeagueNFL))
+
+	// only the two teams playing in the one game are loaded
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "2", "Bills", "Buffalo Bills", "00338D", "C60C30")
+
+	expectSeasonLinkedEventsQuery(mock)
+	expectSeasonFirstGridLoad(mock, 7, nil)
+
+	// the pool is already full, which is fine: no grid is being added
+	expectSeasonGridsCount(mock, model.MaxGridsPerPool)
+
+	expectSeasonGridReplace(mock, 7, 5001, 0, "Buffalo Bills @ Kansas City Chiefs", "Kansas City Chiefs", "Buffalo Bills")
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var resp seasonResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	// the one game has a grid, and that grid is the one that already existed
+	g.Expect(resp.Created).Should(gomega.Equal(1))
+	g.Expect(resp.Replaced).Should(gomega.Equal(1))
+	g.Expect(resp.Skipped).Should(gomega.Equal(0))
+	g.Expect(resp.Grids).Should(gomega.HaveLen(1))
+	g.Expect(resp.Grids[0]["id"]).Should(gomega.BeEquivalentTo(7))
+	g.Expect(resp.Grids[0]["label"]).Should(gomega.Equal("Buffalo Bills @ Kansas City Chiefs"))
+	g.Expect(resp.Grids[0]["bdlEventId"]).Should(gomega.BeEquivalentTo(5001))
+
+	g.Expect(drainPoolEvents(sub)).Should(gomega.Equal([]PoolEvent{{Type: EventGridUpdated}}))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+// TestPostPoolTokenSeason_PoolWithNoGridsCreatesEverything covers a pool whose
+// grids have all been deleted: there's no first grid to reuse, so every game
+// gets a brand new one and the settings/number set/annotation loads never run.
+func TestPostPoolTokenSeason_PoolWithNoGridsCreatesEverything(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForSeason(t)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	poolToken := "test-token-season-no-grids"
+	pool := seasonPoolForContext(t, g, s, mock, poolToken)
+
+	expectSeasonTeamQuery(mock, model.SportsLeagueNFL, "1", "Chiefs", "Kansas City Chiefs", "E31837", "FFB612")
+	expectSeasonUpcomingEventsQuery(mock, model.SportsLeagueNFL, "1", seasonEventRows(model.SportsLeagueNFL))
+	expectSeasonTeamQueries(mock, model.SportsLeagueNFL)
+	expectSeasonLinkedEventsQuery(mock)
+
+	// the pool has no active grids at all. Note that no settings, number set,
+	// or annotation expectations follow: with no grid to inspect, those loads
+	// must not run, and sqlmock fails the request if they do
+	mock.ExpectQuery("SELECT id, pool_id, ord, label, .+ FROM grids WHERE pool_id = \\$1 AND state = 'active' ORDER BY ord, id").
+		WithArgs(int64(1), int64(0), int64(1)).
+		WillReturnRows(sqlmock.NewRows(gridColumns()))
+
+	// both grids are new
+	expectSeasonGridsCount(mock, 0)
+
+	expectSeasonHappyPathGridSaves(mock)
+
+	rec := seasonRequest(s, user, pool, poolToken, `{"league":"nfl","teamId":"1"}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var resp seasonResponse
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &resp)).Should(gomega.Succeed())
+
+	g.Expect(resp.Created).Should(gomega.Equal(2))
+	g.Expect(resp.Replaced).Should(gomega.Equal(0))
+	g.Expect(resp.Skipped).Should(gomega.Equal(0))
+	g.Expect(resp.Grids).Should(gomega.HaveLen(2))
+	g.Expect(resp.Grids[0]["id"]).Should(gomega.BeEquivalentTo(10))
+	g.Expect(resp.Grids[1]["id"]).Should(gomega.BeEquivalentTo(11))
 
 	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
 }

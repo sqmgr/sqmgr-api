@@ -659,6 +659,10 @@ LIMIT $3
 		grids = append(grids, grid)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return grids, nil
 }
 
@@ -770,6 +774,41 @@ func (p *Pool) GridByID(ctx context.Context, id int64) (*Grid, error) {
 	      state = 'active'`
 	row := p.model.DB.QueryRowContext(ctx, query, id, p.id)
 	return p.model.gridByRow(row.Scan)
+}
+
+// LinkedSportsEventIDs returns the set of sports event IDs that are already
+// linked to an active grid within the pool
+func (p *Pool) LinkedSportsEventIDs(ctx context.Context) (map[int64]struct{}, error) {
+	const query = `
+	SELECT sports_event_id
+	FROM
+	     grids
+	WHERE
+	      pool_id = $1 AND
+	      sports_event_id IS NOT NULL AND
+	      state = 'active'`
+
+	rows, err := p.model.DB.QueryContext(ctx, query, p.id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ids := make(map[int64]struct{})
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+
+		ids[id] = struct{}{}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return ids, nil
 }
 
 // RemoveAllMembers will boot all members from the pool

@@ -129,6 +129,10 @@ WHERE
 		annotations[a.SquareID] = a
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return annotations, nil
 }
 

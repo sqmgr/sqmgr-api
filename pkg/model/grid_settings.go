@@ -79,6 +79,27 @@ func (g GridSettings) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// IsPristine reports whether the settings are indistinguishable from the row
+// new_grid() creates, which supplies only grid_id and leaves every other column
+// NULL.
+//
+// A nil receiver is never pristine. Callers gate destructive work on this
+// check, so an unknown state (the settings were never loaded, and could hold
+// anything) has to fail closed rather than claim the grid is untouched.
+func (g *GridSettings) IsPristine() bool {
+	if g == nil {
+		return false
+	}
+
+	return g.homeTeamColor1 == nil &&
+		g.homeTeamColor2 == nil &&
+		g.awayTeamColor1 == nil &&
+		g.awayTeamColor2 == nil &&
+		g.notes == nil &&
+		g.brandingImageURL == nil &&
+		g.brandingImageAlt == nil
+}
+
 // Save will save the settings
 func (g *GridSettings) Save(ctx context.Context, q Queryable) error {
 	_, err := q.ExecContext(ctx, `
