@@ -167,28 +167,6 @@ func (e *SportsEvent) JSON() *SportsEventJSON {
 	return json
 }
 
-// DisplayName returns a human friendly name for the event. It prefers the name
-// provided by the sports data source and otherwise falls back to an
-// "Away @ Home" label built from the loaded teams (or the team IDs if the teams
-// have not been loaded).
-func (e *SportsEvent) DisplayName() string {
-	if e.Name != nil && *e.Name != "" {
-		return *e.Name
-	}
-
-	away := e.AwayTeamID
-	if e.awayTeam != nil && e.awayTeam.FullName != "" {
-		away = e.awayTeam.FullName
-	}
-
-	home := e.HomeTeamID
-	if e.homeTeam != nil && e.homeTeam.FullName != "" {
-		home = e.homeTeam.FullName
-	}
-
-	return fmt.Sprintf("%s @ %s", away, home)
-}
-
 // HomeTeam returns the loaded home team
 func (e *SportsEvent) HomeTeam() *SportsTeam {
 	return e.homeTeam

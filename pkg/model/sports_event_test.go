@@ -984,27 +984,6 @@ func strPtr(s string) *string {
 	return &s
 }
 
-func TestSportsEventDisplayName(t *testing.T) {
-	g := gomega.NewGomegaWithT(t)
-
-	name := "Chiefs at Broncos"
-	withName := &SportsEvent{Name: &name, HomeTeamID: "3", AwayTeamID: "1"}
-	g.Expect(withName.DisplayName()).Should(gomega.Equal("Chiefs at Broncos"))
-
-	empty := ""
-	withEmptyName := &SportsEvent{Name: &empty, HomeTeamID: "3", AwayTeamID: "1"}
-	g.Expect(withEmptyName.DisplayName()).Should(gomega.Equal("1 @ 3"))
-
-	// no name and no loaded teams falls back to the team IDs
-	noName := &SportsEvent{HomeTeamID: "3", AwayTeamID: "1"}
-	g.Expect(noName.DisplayName()).Should(gomega.Equal("1 @ 3"))
-
-	// no name but loaded teams uses the full team names
-	noName.SetHomeTeam(&SportsTeam{ID: "3", FullName: "Denver Broncos"})
-	noName.SetAwayTeam(&SportsTeam{ID: "1", FullName: "Kansas City Chiefs"})
-	g.Expect(noName.DisplayName()).Should(gomega.Equal("Kansas City Chiefs @ Denver Broncos"))
-}
-
 func TestUpcomingSportsEventsForTeam(t *testing.T) {
 	if len(os.Getenv("INTEGRATION")) == 0 {
 		t.Skip("skipping. to run, use -integration flag")

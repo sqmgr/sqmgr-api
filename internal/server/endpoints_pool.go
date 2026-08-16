@@ -1302,8 +1302,14 @@ func applyEventTeamDefaults(info gridTeamInfo, event *model.SportsEvent) gridTea
 
 // populateGridFromEvent applies everything the link-to-season flow derives from
 // a sports event to the grid: the event link (which also keeps the loaded event
-// around so that it's included in the response), the event date, the label, and
-// the team names and colors.
+// around so that it's included in the response), the event date, and the team
+// names and colors.
+//
+// The label is deliberately left alone. It backs the optional "Event Name"
+// field in the UI, and linking a season shouldn't fill it in: an empty label
+// lets Grid.Name() fall back to the "Away vs. Home" name built from the team
+// names that are populated here. Leaving it unset also keeps a non-empty label
+// meaningful as a user-customization signal for Grid.IsPristine().
 //
 // It's used for both brand new grids and for a pristine grid that's being
 // reused, so it always starts from empty values rather than from whatever the
@@ -1311,7 +1317,6 @@ func applyEventTeamDefaults(info gridTeamInfo, event *model.SportsEvent) gridTea
 func populateGridFromEvent(grid *model.Grid, event *model.SportsEvent) {
 	grid.SetBDLEvent(event)
 	grid.SetEventDate(event.EventDate)
-	grid.SetLabel(event.DisplayName())
 
 	teamInfo := applyEventTeamDefaults(gridTeamInfo{}, event)
 	grid.SetHomeTeamName(teamInfo.homeTeamName)
