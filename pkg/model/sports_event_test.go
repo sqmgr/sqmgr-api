@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/onsi/gomega"
 )
 
@@ -974,6 +975,84 @@ func TestNotifySportsEventUpdated(t *testing.T) {
 	// Just verify it doesn't error — the notification goes to any listeners
 	err := m.NotifySportsEventUpdated(ctx, 12345)
 	g.Expect(err).Should(gomega.Succeed())
+}
+
+// sportsEventMockRows returns a single-row result set matching sportsEventColumns
+func sportsEventMockRows(now time.Time) *sqlmock.Rows {
+	return sqlmock.NewRows([]string{
+		"id", "espn_id", "league", "name", "home_team_id", "away_team_id", "event_date", "season", "week", "postseason", "venue",
+		"status", "status_detail", "period", "clock", "home_score", "away_score",
+		"home_q1", "home_q2", "home_q3", "home_q4", "home_ot",
+		"away_q1", "away_q2", "away_q3", "away_q4", "away_ot",
+		"created", "modified", "last_synced",
+	}).AddRow(
+		int64(1), "espn-1", "nba", nil, "home-1", "away-1", now, 2024, nil, false, nil,
+		"scheduled", nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil,
+		now, now, now,
+	)
+}
+
+func TestUpcomingSportsEventsComparesEventDateInUTC(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	db, mock, err := sqlmock.New()
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	defer db.Close()
+
+	m := New(db)
+
+	mock.ExpectQuery(`SELECT .+ FROM sports_events WHERE league = \$1 AND status = 'scheduled' AND event_date >= \(NOW\(\) AT TIME ZONE 'utc'\)`).
+		WithArgs("nba", 10).
+		WillReturnRows(sportsEventMockRows(time.Now()))
+
+	events, err := m.UpcomingSportsEvents(context.Background(), SportsLeagueNBA, 10)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	g.Expect(events).Should(gomega.HaveLen(1))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestEventsNeedingScoreUpdateComparesEventDateInUTC(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	db, mock, err := sqlmock.New()
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	defer db.Close()
+
+	m := New(db)
+
+	mock.ExpectQuery(`SELECT .+ FROM sports_events ` +
+		`WHERE \(status = 'in_progress' AND event_date >= \(NOW\(\) AT TIME ZONE 'utc'\) - INTERVAL '1 day'\) ` +
+		`OR \(status = 'scheduled' AND event_date BETWEEN \(NOW\(\) AT TIME ZONE 'utc'\) AND \(NOW\(\) AT TIME ZONE 'utc'\) \+ INTERVAL '2 hours'\) ` +
+		`OR \(status != 'final' AND event_date >= \(NOW\(\) AT TIME ZONE 'utc'\) - INTERVAL '1 day' AND event_date < \(NOW\(\) AT TIME ZONE 'utc'\)\)`).
+		WillReturnRows(sportsEventMockRows(time.Now()))
+
+	events, err := m.EventsNeedingScoreUpdate(context.Background())
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	g.Expect(events).Should(gomega.HaveLen(1))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestFinalizeStaleEventsComparesEventDateInUTC(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	db, mock, err := sqlmock.New()
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	defer db.Close()
+
+	m := New(db)
+
+	mock.ExpectExec(`UPDATE sports_events SET status = 'final', .+ WHERE status != 'final' AND event_date < \(NOW\(\) AT TIME ZONE 'utc'\) - INTERVAL '1 day'`).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	count, err := m.FinalizeStaleEvents(context.Background())
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	g.Expect(count).Should(gomega.Equal(int64(1)))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
 }
 
 func intPtr(i int) *int {
