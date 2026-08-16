@@ -434,7 +434,7 @@ func (m *Model) UpcomingSportsEvents(ctx context.Context, league SportsLeague, l
 	const query = `
 		SELECT ` + sportsEventColumns + `
 		FROM sports_events
-		WHERE league = $1 AND status = 'scheduled' AND event_date >= NOW()
+		WHERE league = $1 AND status = 'scheduled' AND event_date >= (NOW() AT TIME ZONE 'utc')
 		ORDER BY event_date ASC
 		LIMIT $2
 	`
@@ -526,9 +526,9 @@ func (m *Model) EventsNeedingScoreUpdate(ctx context.Context) ([]*SportsEvent, e
 	const query = `
 		SELECT ` + sportsEventColumns + `
 		FROM sports_events
-		WHERE (status = 'in_progress' AND event_date >= NOW() - INTERVAL '1 day')
-		   OR (status = 'scheduled' AND event_date BETWEEN NOW() AND NOW() + INTERVAL '2 hours')
-		   OR (status != 'final' AND event_date >= NOW() - INTERVAL '1 day' AND event_date < NOW())
+		WHERE (status = 'in_progress' AND event_date >= (NOW() AT TIME ZONE 'utc') - INTERVAL '1 day')
+		   OR (status = 'scheduled' AND event_date BETWEEN (NOW() AT TIME ZONE 'utc') AND (NOW() AT TIME ZONE 'utc') + INTERVAL '2 hours')
+		   OR (status != 'final' AND event_date >= (NOW() AT TIME ZONE 'utc') - INTERVAL '1 day' AND event_date < (NOW() AT TIME ZONE 'utc'))
 		ORDER BY event_date ASC
 	`
 	rows, err := m.DB.QueryContext(ctx, query)
@@ -659,7 +659,7 @@ func (m *Model) FinalizeStaleEvents(ctx context.Context) (int64, error) {
 		    clock = NULL,
 		    status_detail = NULL
 		WHERE status != 'final'
-		  AND event_date < NOW() - INTERVAL '1 day'
+		  AND event_date < (NOW() AT TIME ZONE 'utc') - INTERVAL '1 day'
 	`
 	result, err := m.DB.ExecContext(ctx, query)
 	if err != nil {
