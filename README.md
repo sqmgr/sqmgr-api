@@ -161,6 +161,7 @@ Method | Path | Description
 `POST` | `/pool/{token}/squares/bulk` | Bulk update squares _(manager)_
 `GET` | `/pool/{token}/invitetoken` | Get invite token _(manager)_
 `GET` | `/pool/{token}/log` | Get activity log _(manager)_
+`GET` | `/pool/{token}/members/emails` | List pool member email addresses _(manager)_
 `GET` | `/user/{id}/pool/{membership}` | Get user pools (membership: own/belong)
 `DELETE` | `/user/{id}/pool/{token}` | Leave or remove pool
 `POST` | `/user/{id}/guestjwt` | Issue a guest JWT for the user

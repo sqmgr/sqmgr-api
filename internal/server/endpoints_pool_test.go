@@ -315,6 +315,134 @@ func TestPoolManagerHandler_NonManagerGetsForbidden(t *testing.T) {
 	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
 }
 
+func setupTestServerForMemberEmails(t *testing.T) (*Server, sqlmock.Sqlmock, *model.Model) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+
+	m := model.New(db)
+	s := &Server{
+		Router:      mux.NewRouter(),
+		model:       m,
+		broker:      NewPoolBroker(),
+		auth0Client: auth0.NewClient(auth0.Config{}),
+	}
+
+	s.Router.Path("/pool/{token}/members/emails").Methods(http.MethodGet).Handler(s.poolManagerHandler(s.getPoolTokenMemberEmailsEndpoint()))
+
+	return s, mock, m
+}
+
+func TestGetPoolTokenMemberEmails(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForMemberEmails(t)
+
+	poolToken := "test-member-emails"
+	now := time.Now()
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := m.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	memberRows := sqlmock.NewRows([]string{"id", "store", "store_id", "is_site_admin", "email", "created"}).
+		AddRow(int64(100), model.UserStoreAuth0, "auth0|100", false, "zeta@example.com", now).
+		AddRow(int64(200), model.UserStoreAuth0, "auth0|200", false, "Alpha@example.com", now).
+		AddRow(int64(300), model.UserStoreSqMGR, "guest-300", false, nil, now).
+		AddRow(int64(400), model.UserStoreAuth0, "auth0|400", false, " alpha@example.com ", now).
+		AddRow(int64(500), model.UserStoreAuth0, "auth0|500", false, nil, now)
+
+	mock.ExpectQuery("SELECT .+ FROM users u").
+		WithArgs(int64(100), int64(1)).
+		WillReturnRows(memberRows)
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	req := httptest.NewRequest(http.MethodGet, "/pool/"+poolToken+"/members/emails", nil)
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var result struct {
+		Emails []string `json:"emails"`
+	}
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &result)).Should(gomega.Succeed())
+	g.Expect(result.Emails).Should(gomega.Equal([]string{"Alpha@example.com", "zeta@example.com"}))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestGetPoolTokenMemberEmails_NonManagerForbidden(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForMemberEmails(t)
+
+	poolToken := "test-member-emails-forbidden"
+	now := time.Now()
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := m.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	mock.ExpectQuery("SELECT true FROM pools_users WHERE pool_id = \\$1 AND user_id = \\$2 AND is_manager").
+		WithArgs(int64(1), int64(200)).
+		WillReturnRows(sqlmock.NewRows([]string{"bool"}))
+
+	user := &model.User{Model: m, ID: 200, Store: model.UserStoreAuth0}
+	req := httptest.NewRequest(http.MethodGet, "/pool/"+poolToken+"/members/emails", nil)
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusForbidden))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestGetPoolTokenMemberEmails_QueryError(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock, m := setupTestServerForMemberEmails(t)
+
+	poolToken := "test-member-emails-error"
+	now := time.Now()
+	poolRows := sqlmock.NewRows(poolColumns()).
+		AddRow(1, poolToken, int64(100), "Test Pool", "std100", "standard", "hash", true, false, nil, now, now, 0, false)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE token = \\$1").
+		WithArgs(poolToken).
+		WillReturnRows(poolRows)
+
+	poolForContext, err := m.PoolByToken(context.Background(), poolToken)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+	mock.ExpectQuery("SELECT .+ FROM users u").
+		WithArgs(int64(100), int64(1)).
+		WillReturnError(errors.New("database unavailable"))
+
+	user := &model.User{Model: m, ID: 100, Store: model.UserStoreAuth0}
+	req := httptest.NewRequest(http.MethodGet, "/pool/"+poolToken+"/members/emails", nil)
+	rec := httptest.NewRecorder()
+
+	ctx := context.WithValue(req.Context(), ctxUserKey, user)
+	ctx = context.WithValue(ctx, ctxPoolKey, poolForContext)
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusInternalServerError))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
 func TestGetPoolTokenEndpoint_MissingUserContext(t *testing.T) {
 	g := gomega.NewWithT(t)
 
