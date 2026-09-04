@@ -24,7 +24,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -145,6 +147,53 @@ func (s *Server) poolManagerHandler(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (s *Server) getPoolTokenMemberEmailsEndpoint() http.HandlerFunc {
+	type response struct {
+		Emails []string `json:"emails"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		pool, ok := poolFromContext(r.Context())
+		if !ok {
+			s.writeErrorResponse(w, http.StatusInternalServerError, nil)
+			return
+		}
+
+		users, err := pool.Users(r.Context())
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		emails := make([]string, 0, len(users))
+		seen := make(map[string]struct{}, len(users))
+		for _, user := range users {
+			s.ensureUserEmail(r.Context(), user)
+			if user.Email == nil {
+				continue
+			}
+
+			email := strings.TrimSpace(*user.Email)
+			if email == "" {
+				continue
+			}
+
+			key := strings.ToLower(email)
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			emails = append(emails, email)
+		}
+
+		sort.Slice(emails, func(i, j int) bool {
+			return strings.ToLower(emails[i]) < strings.ToLower(emails[j])
+		})
+
+		s.writeJSONResponse(w, http.StatusOK, response{Emails: emails})
+	}
 }
 
 func (s *Server) poolGridSquareManagerHandler(next http.Handler) http.Handler {

@@ -817,6 +817,47 @@ func (p *Pool) RemoveAllMembers(ctx context.Context) error {
 	return err
 }
 
+// Users returns the pool owner and all users who have joined the pool.
+func (p *Pool) Users(ctx context.Context) ([]*User, error) {
+	const query = `
+		SELECT
+			u.id,
+			u.store,
+			u.store_id,
+			u.is_site_admin,
+			u.email,
+			u.created
+		FROM users u
+		WHERE u.id = $1
+			OR EXISTS (
+				SELECT 1
+				FROM pools_users pu
+				WHERE pu.pool_id = $2 AND pu.user_id = u.id
+			)
+		ORDER BY u.id`
+
+	rows, err := p.model.DB.QueryContext(ctx, query, p.userID, p.id)
+	if err != nil {
+		return nil, fmt.Errorf("querying pool users: %w", err)
+	}
+	defer rows.Close()
+
+	users := make([]*User, 0)
+	for rows.Next() {
+		user := &User{Model: p.model}
+		if err := rows.Scan(&user.ID, &user.Store, &user.StoreID, &user.IsSiteAdmin, &user.Email, &user.Created); err != nil {
+			return nil, fmt.Errorf("scanning pool user row: %w", err)
+		}
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating pool user rows: %w", err)
+	}
+
+	return users, nil
+}
+
 const poolColumns = `
 pools.id,
 pools.token,
