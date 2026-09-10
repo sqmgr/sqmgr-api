@@ -20,6 +20,7 @@ package model
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -500,9 +501,68 @@ type AdminEventGrid struct {
 	Created      time.Time `json:"created"`
 }
 
+// AdminLinkedEventsFilter restricts which linked events GetAdminLinkedEvents and
+// GetAdminLinkedEventsCount return. A zero value for any field means that field
+// does not restrict the results.
+//
+// Start and End are calendar days; End is inclusive of the entire day it names.
+// Because sports_events.event_date is a zoneless TIMESTAMP holding UTC
+// wall-clock time, callers must supply Start and End as UTC midnight (as
+// time.Parse produces when the input carries no zone) so that the bound
+// values line up with the stored dates.
+type AdminLinkedEventsFilter struct {
+	League SportsLeague
+	Status SportsEventStatus
+	Start  time.Time
+	End    time.Time
+}
+
+// conditions returns the SQL conditions (without a leading WHERE or AND) that
+// apply the filter to the sports_events table aliased as "e", along with the
+// bind arguments they reference. Placeholders are numbered from $1, so callers
+// must append their own arguments after these.
+func (f AdminLinkedEventsFilter) conditions() ([]string, []interface{}) {
+	var conditions []string
+	var args []interface{}
+
+	if f.League != "" {
+		args = append(args, string(f.League))
+		conditions = append(conditions, fmt.Sprintf("e.league = $%d", len(args)))
+	}
+
+	if f.Status != "" {
+		args = append(args, string(f.Status))
+		conditions = append(conditions, fmt.Sprintf("e.status = $%d", len(args)))
+	}
+
+	if !f.Start.IsZero() {
+		args = append(args, f.Start)
+		conditions = append(conditions, fmt.Sprintf("e.event_date >= $%d", len(args)))
+	}
+
+	if !f.End.IsZero() {
+		// The end date is inclusive, so compare against the start of the
+		// following day.
+		args = append(args, f.End.AddDate(0, 0, 1))
+		conditions = append(conditions, fmt.Sprintf("e.event_date < $%d", len(args)))
+	}
+
+	return conditions, args
+}
+
+// whereClause renders the filter as a complete " WHERE ..." clause (with a
+// leading space) or an empty string when the filter is unrestricted.
+func (f AdminLinkedEventsFilter) whereClause() (string, []interface{}) {
+	conditions, args := f.conditions()
+	if len(conditions) == 0 {
+		return "", nil
+	}
+	return " WHERE " + strings.Join(conditions, " AND "), args
+}
+
 // GetAdminLinkedEvents returns sports events that have at least one active grid linked,
-// with the count of linked grids, sorted and paginated
-func (m *Model) GetAdminLinkedEvents(ctx context.Context, offset int64, limit int, sortBy string, sortDir string) ([]*AdminLinkedEvent, error) {
+// with the count of linked grids, filtered, sorted and paginated
+func (m *Model) GetAdminLinkedEvents(ctx context.Context, filter AdminLinkedEventsFilter, offset int64, limit int, sortBy string, sortDir string) ([]*AdminLinkedEvent, error) {
 	// Validate sort column
 	validSortColumns := map[string]string{
 		"eventDate": "e.event_date",
@@ -518,19 +578,24 @@ func (m *Model) GetAdminLinkedEvents(ctx context.Context, offset int64, limit in
 		orderDir = "ASC"
 	}
 
+	where, args := filter.whereClause()
+	offsetArg := len(args) + 1
+	limitArg := len(args) + 2
+	args = append(args, offset, limit)
+
 	query := `
 		SELECT
 			e.id, e.espn_id, e.league, e.name, e.home_team_id, e.away_team_id,
 			e.event_date, e.status, e.status_detail, e.home_score, e.away_score,
 			COUNT(g.id) AS grid_count
 		FROM sports_events e
-		INNER JOIN grids g ON g.sports_event_id = e.id AND g.state = 'active'
+		INNER JOIN grids g ON g.sports_event_id = e.id AND g.state = 'active'` + where + `
 		GROUP BY e.id
 		ORDER BY ` + orderColumn + ` ` + orderDir + `
-		OFFSET $1
-		LIMIT $2`
+		OFFSET $` + strconv.Itoa(offsetArg) + `
+		LIMIT $` + strconv.Itoa(limitArg)
 
-	rows, err := m.DB.QueryContext(ctx, query, offset, limit)
+	rows, err := m.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("querying linked events: %w", err)
 	}
@@ -583,14 +648,16 @@ func (m *Model) GetAdminLinkedEvents(ctx context.Context, offset int64, limit in
 	return events, nil
 }
 
-// GetAdminLinkedEventsCount returns the count of sports events with at least one active linked grid
-func (m *Model) GetAdminLinkedEventsCount(ctx context.Context) (int64, error) {
+// GetAdminLinkedEventsCount returns the count of sports events with at least one
+// active linked grid that match the filter
+func (m *Model) GetAdminLinkedEventsCount(ctx context.Context, filter AdminLinkedEventsFilter) (int64, error) {
+	where, args := filter.whereClause()
+
 	var count int64
 	row := m.DB.QueryRowContext(ctx, `
 		SELECT COUNT(DISTINCT e.id)
 		FROM sports_events e
-		INNER JOIN grids g ON g.sports_event_id = e.id AND g.state = 'active'
-	`)
+		INNER JOIN grids g ON g.sports_event_id = e.id AND g.state = 'active'`+where, args...)
 	if err := row.Scan(&count); err != nil {
 		return 0, fmt.Errorf("counting linked events: %w", err)
 	}

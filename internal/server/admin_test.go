@@ -232,6 +232,117 @@ func TestGetAdminStatsEndpoint_BadRequests(t *testing.T) {
 	}
 }
 
+// eventsRequest builds a GET /admin/events request with the given query string
+func eventsRequest(query string) *http.Request {
+	target := "/admin/events"
+	if query != "" {
+		target += "?" + query
+	}
+	return httptest.NewRequest(http.MethodGet, target, nil)
+}
+
+func TestParseAdminEventsFilter_Valid(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	// No parameters yields an unrestricted filter
+	for _, query := range []string{"", "league=&status=&start=&end="} {
+		filter, err := parseAdminEventsFilter(eventsRequest(query))
+		g.Expect(err).Should(gomega.Succeed(), "query %q", query)
+		g.Expect(filter).Should(gomega.Equal(model.AdminLinkedEventsFilter{}), "query %q", query)
+	}
+
+	// Every known league is accepted
+	for _, league := range model.ValidSportsLeagues() {
+		filter, err := parseAdminEventsFilter(eventsRequest("league=" + string(league.Key)))
+		g.Expect(err).Should(gomega.Succeed(), "league %q", league.Key)
+		g.Expect(filter.League).Should(gomega.Equal(league.Key), "league %q", league.Key)
+	}
+
+	// Every known status is accepted
+	for _, status := range []string{"scheduled", "in_progress", "final"} {
+		filter, err := parseAdminEventsFilter(eventsRequest("status=" + status))
+		g.Expect(err).Should(gomega.Succeed(), "status %q", status)
+		g.Expect(filter.Status).Should(gomega.Equal(model.SportsEventStatus(status)), "status %q", status)
+	}
+
+	// Dates are parsed as UTC midnight and may be supplied independently
+	filter, err := parseAdminEventsFilter(eventsRequest("start=2024-01-01"))
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(filter.Start).Should(gomega.Equal(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)))
+	g.Expect(filter.End.IsZero()).Should(gomega.BeTrue())
+
+	filter, err = parseAdminEventsFilter(eventsRequest("end=2024-01-31"))
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(filter.Start.IsZero()).Should(gomega.BeTrue())
+	g.Expect(filter.End).Should(gomega.Equal(time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC)))
+
+	// Same day for start and end is valid
+	filter, err = parseAdminEventsFilter(eventsRequest("start=2024-01-01&end=2024-01-01"))
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(filter.Start).Should(gomega.Equal(filter.End))
+
+	// All parameters together
+	filter, err = parseAdminEventsFilter(eventsRequest("league=nba&status=final&start=2024-01-01&end=2024-01-31"))
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(filter).Should(gomega.Equal(model.AdminLinkedEventsFilter{
+		League: model.SportsLeagueNBA,
+		Status: model.SportsEventStatusFinal,
+		Start:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		End:    time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC),
+	}))
+}
+
+func TestParseAdminEventsFilter_Errors(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	tests := map[string]string{
+		"unknown league":     "league=xfl",
+		"uppercase league":   "league=NFL",
+		"unknown status":     "status=postponed",
+		"uppercase status":   "status=FINAL",
+		"malformed start":    "start=01-01-2024",
+		"malformed end":      "end=not-a-date",
+		"impossible date":    "start=2024-13-45",
+		"timestamp start":    "start=2024-01-01T00:00:00Z",
+		"start after end":    "start=2024-02-01&end=2024-01-31",
+		"start after by 1":   "start=2024-01-02&end=2024-01-01",
+		"valid plus invalid": "league=nfl&status=final&start=2024-01-01&end=bogus",
+	}
+
+	for name, query := range tests {
+		_, err := parseAdminEventsFilter(eventsRequest(query))
+		g.Expect(err).Should(gomega.HaveOccurred(), name)
+	}
+}
+
+func TestGetAdminEventsEndpoint_BadRequests(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	s := &Server{
+		Router: mux.NewRouter(),
+		broker: NewPoolBroker(),
+	}
+	s.Router.Path("/admin/events").Methods(http.MethodGet).Handler(s.getAdminEventsEndpoint())
+
+	// parseAdminEventsFilter's own validation logic is covered by
+	// TestParseAdminEventsFilter_Errors; these cases just prove the 400
+	// wiring end-to-end through the actual HTTP handler.
+	queries := []string{
+		"league=xfl",
+		"status=postponed",
+		"start=2024-02-01&end=2024-01-31",
+	}
+
+	for _, query := range queries {
+		rec := httptest.NewRecorder()
+		s.Router.ServeHTTP(rec, eventsRequest(query))
+
+		// Validation happens before the model is consulted, so no DB is needed
+		g.Expect(rec.Code).Should(gomega.Equal(http.StatusBadRequest), query)
+		g.Expect(rec.Body.String()).ShouldNot(gomega.BeEmpty(), query)
+	}
+}
+
 func TestGetAdminUserEndpoint_InvalidID(t *testing.T) {
 	g := gomega.NewWithT(t)
 

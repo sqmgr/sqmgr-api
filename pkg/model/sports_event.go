@@ -38,6 +38,15 @@ const (
 	SportsEventStatusFinal SportsEventStatus = "final"
 )
 
+// IsValid returns true if the status is one of the known event statuses
+func (s SportsEventStatus) IsValid() bool {
+	switch s {
+	case SportsEventStatusScheduled, SportsEventStatusInProgress, SportsEventStatusFinal:
+		return true
+	}
+	return false
+}
+
 // SportsEvent represents a cached event/game from the sports API
 type SportsEvent struct {
 	model *Model

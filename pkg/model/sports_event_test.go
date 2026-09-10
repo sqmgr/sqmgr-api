@@ -1242,3 +1242,15 @@ func TestUpcomingPostseasonSportsEvents(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(events).Should(gomega.HaveLen(0))
 }
+
+func TestSportsEventStatusIsValid(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	for _, status := range []SportsEventStatus{SportsEventStatusScheduled, SportsEventStatusInProgress, SportsEventStatusFinal} {
+		g.Expect(status.IsValid()).Should(gomega.BeTrue(), string(status))
+	}
+
+	for _, status := range []SportsEventStatus{"", "bogus", "FINAL", "postponed"} {
+		g.Expect(status.IsValid()).Should(gomega.BeFalse(), string(status))
+	}
+}

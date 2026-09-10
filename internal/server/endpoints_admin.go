@@ -361,6 +361,54 @@ func (s *Server) getAdminUsersEndpoint() http.HandlerFunc {
 	}
 }
 
+// parseAdminEventsFilter builds a linked-events filter from the request's
+// league, status, start, and end parameters. Every parameter is optional; an
+// error is returned for values that are present but invalid and should be
+// surfaced as a 400.
+//
+// start and end are parsed as UTC midnight (time.Parse defaults to UTC when no
+// zone is present), matching the UTC wall-clock convention of the event_date
+// column. end is inclusive of the whole day it names.
+func parseAdminEventsFilter(r *http.Request) (model.AdminLinkedEventsFilter, error) {
+	var filter model.AdminLinkedEventsFilter
+
+	if league := r.FormValue("league"); league != "" {
+		if !model.IsValidSportsLeague(league) {
+			return filter, fmt.Errorf("invalid league %q", league)
+		}
+		filter.League = model.SportsLeague(league)
+	}
+
+	if status := r.FormValue("status"); status != "" {
+		if !model.SportsEventStatus(status).IsValid() {
+			return filter, fmt.Errorf("invalid status %q", status)
+		}
+		filter.Status = model.SportsEventStatus(status)
+	}
+
+	if startStr := r.FormValue("start"); startStr != "" {
+		start, err := time.Parse(statsDateFormat, startStr)
+		if err != nil {
+			return filter, fmt.Errorf("invalid start date %q; expected format YYYY-MM-DD", startStr)
+		}
+		filter.Start = start
+	}
+
+	if endStr := r.FormValue("end"); endStr != "" {
+		end, err := time.Parse(statsDateFormat, endStr)
+		if err != nil {
+			return filter, fmt.Errorf("invalid end date %q; expected format YYYY-MM-DD", endStr)
+		}
+		filter.End = end
+	}
+
+	if !filter.Start.IsZero() && !filter.End.IsZero() && filter.End.Before(filter.Start) {
+		return filter, errors.New("start date cannot be after end date")
+	}
+
+	return filter, nil
+}
+
 // getAdminEventsEndpoint returns paginated list of sports events with linked grids
 func (s *Server) getAdminEventsEndpoint() http.HandlerFunc {
 	type response struct {
@@ -385,13 +433,19 @@ func (s *Server) getAdminEventsEndpoint() http.HandlerFunc {
 		sortBy := r.FormValue("sortBy")
 		sortDir := r.FormValue("sortDir")
 
-		events, err := s.model.GetAdminLinkedEvents(r.Context(), offset, limit, sortBy, sortDir)
+		filter, err := parseAdminEventsFilter(r)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, err)
+			return
+		}
+
+		events, err := s.model.GetAdminLinkedEvents(r.Context(), filter, offset, limit, sortBy, sortDir)
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
 
-		total, err := s.model.GetAdminLinkedEventsCount(r.Context())
+		total, err := s.model.GetAdminLinkedEventsCount(r.Context(), filter)
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return

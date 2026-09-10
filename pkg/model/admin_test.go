@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/onsi/gomega"
 )
 
@@ -947,14 +948,14 @@ func TestGetAdminLinkedEvents(t *testing.T) {
 	ctx := context.Background()
 
 	// Get initial count
-	initialCount, err := m.GetAdminLinkedEventsCount(ctx)
+	initialCount, err := m.GetAdminLinkedEventsCount(ctx, AdminLinkedEventsFilter{})
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Create an event with a linked grid
 	event, _, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNFL, time.Now().Add(24*time.Hour), nil, nil)
 
 	// Verify it appears in results
-	events, err := m.GetAdminLinkedEvents(ctx, 0, 100, "", "")
+	events, err := m.GetAdminLinkedEvents(ctx, AdminLinkedEventsFilter{}, 0, 100, "", "")
 	g.Expect(err).Should(gomega.Succeed())
 
 	var found *AdminLinkedEvent
@@ -971,7 +972,7 @@ func TestGetAdminLinkedEvents(t *testing.T) {
 	g.Expect(found.AwayTeam).ShouldNot(gomega.BeNil())
 
 	// Verify count increased
-	newCount, err := m.GetAdminLinkedEventsCount(ctx)
+	newCount, err := m.GetAdminLinkedEventsCount(ctx, AdminLinkedEventsFilter{})
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(newCount).Should(gomega.Equal(initialCount + 1))
 }
@@ -987,7 +988,7 @@ func TestGetAdminLinkedEventsWithScores(t *testing.T) {
 	awayScore := 17
 	event, _, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNFL, time.Now(), &homeScore, &awayScore)
 
-	events, err := m.GetAdminLinkedEvents(ctx, 0, 100, "", "")
+	events, err := m.GetAdminLinkedEvents(ctx, AdminLinkedEventsFilter{}, 0, 100, "", "")
 	g.Expect(err).Should(gomega.Succeed())
 
 	var found *AdminLinkedEvent
@@ -1024,7 +1025,7 @@ func TestGetAdminLinkedEventsSorting(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Sort by eventDate ascending - event1 (earlier) should come first
-	events, err := m.GetAdminLinkedEvents(ctx, 0, 100, "eventDate", "asc")
+	events, err := m.GetAdminLinkedEvents(ctx, AdminLinkedEventsFilter{}, 0, 100, "eventDate", "asc")
 	g.Expect(err).Should(gomega.Succeed())
 
 	var idx1, idx2 int
@@ -1039,7 +1040,7 @@ func TestGetAdminLinkedEventsSorting(t *testing.T) {
 	g.Expect(idx1).Should(gomega.BeNumerically("<", idx2))
 
 	// Sort by gridCount descending - event2 (2 grids) should come first
-	events, err = m.GetAdminLinkedEvents(ctx, 0, 100, "gridCount", "desc")
+	events, err = m.GetAdminLinkedEvents(ctx, AdminLinkedEventsFilter{}, 0, 100, "gridCount", "desc")
 	g.Expect(err).Should(gomega.Succeed())
 
 	for i, e := range events {
@@ -1092,7 +1093,7 @@ func TestGetAdminLinkedEventsExcludesUnlinked(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Verify it does NOT appear in linked events
-	events, err := m.GetAdminLinkedEvents(ctx, 0, 1000, "", "")
+	events, err := m.GetAdminLinkedEvents(ctx, AdminLinkedEventsFilter{}, 0, 1000, "", "")
 	g.Expect(err).Should(gomega.Succeed())
 
 	for _, e := range events {
@@ -1159,4 +1160,218 @@ func TestGetAdminEventGridsEmpty(t *testing.T) {
 	grids, err := m.GetAdminEventGrids(ctx, 999999999, 0, 100)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(grids).Should(gomega.HaveLen(0))
+}
+
+func TestAdminLinkedEventsFilterConditions(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	// An unrestricted filter produces no conditions and no WHERE clause
+	conditions, args := AdminLinkedEventsFilter{}.conditions()
+	g.Expect(conditions).Should(gomega.BeEmpty())
+	g.Expect(args).Should(gomega.BeEmpty())
+
+	where, args := AdminLinkedEventsFilter{}.whereClause()
+	g.Expect(where).Should(gomega.BeEmpty())
+	g.Expect(args).Should(gomega.BeEmpty())
+
+	// Each field contributes exactly one condition, numbered from $1
+	conditions, args = AdminLinkedEventsFilter{League: SportsLeagueNFL}.conditions()
+	g.Expect(conditions).Should(gomega.Equal([]string{"e.league = $1"}))
+	g.Expect(args).Should(gomega.Equal([]interface{}{"nfl"}))
+
+	conditions, args = AdminLinkedEventsFilter{Status: SportsEventStatusFinal}.conditions()
+	g.Expect(conditions).Should(gomega.Equal([]string{"e.status = $1"}))
+	g.Expect(args).Should(gomega.Equal([]interface{}{"final"}))
+
+	start := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	conditions, args = AdminLinkedEventsFilter{Start: start}.conditions()
+	g.Expect(conditions).Should(gomega.Equal([]string{"e.event_date >= $1"}))
+	g.Expect(args).Should(gomega.Equal([]interface{}{start}))
+
+	// The end date is inclusive, so the bound is the start of the next day
+	end := time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC)
+	conditions, args = AdminLinkedEventsFilter{End: end}.conditions()
+	g.Expect(conditions).Should(gomega.Equal([]string{"e.event_date < $1"}))
+	g.Expect(args).Should(gomega.Equal([]interface{}{time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)}))
+
+	// All fields together are numbered sequentially and joined with AND
+	full := AdminLinkedEventsFilter{
+		League: SportsLeagueNBA,
+		Status: SportsEventStatusScheduled,
+		Start:  start,
+		End:    end,
+	}
+	where, args = full.whereClause()
+	g.Expect(where).Should(gomega.Equal(" WHERE e.league = $1 AND e.status = $2 AND e.event_date >= $3 AND e.event_date < $4"))
+	g.Expect(args).Should(gomega.Equal([]interface{}{
+		"nba", "scheduled", start, time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
+	}))
+
+	// Skipped fields do not leave gaps in the placeholder numbering
+	where, args = AdminLinkedEventsFilter{Status: SportsEventStatusInProgress, End: end}.whereClause()
+	g.Expect(where).Should(gomega.Equal(" WHERE e.status = $1 AND e.event_date < $2"))
+	g.Expect(args).Should(gomega.HaveLen(2))
+}
+
+func TestGetAdminLinkedEventsAppliesFilter(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	db, mock, err := sqlmock.New()
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	defer db.Close()
+
+	m := New(db)
+
+	columns := []string{
+		"id", "espn_id", "league", "name", "home_team_id", "away_team_id",
+		"event_date", "status", "status_detail", "home_score", "away_score", "grid_count",
+	}
+
+	start := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC)
+
+	// With every filter set, the conditions precede GROUP BY and the
+	// pagination placeholders are renumbered after the filter arguments.
+	mock.ExpectQuery(`SELECT .+ FROM sports_events e INNER JOIN grids g ON g.sports_event_id = e.id AND g.state = 'active' `+
+		`WHERE e.league = \$1 AND e.status = \$2 AND e.event_date >= \$3 AND e.event_date < \$4 `+
+		`GROUP BY e.id ORDER BY grid_count ASC OFFSET \$5 LIMIT \$6`).
+		WithArgs("nfl", "final", start, end.AddDate(0, 0, 1), int64(50), 25).
+		WillReturnRows(sqlmock.NewRows(columns))
+
+	filter := AdminLinkedEventsFilter{League: SportsLeagueNFL, Status: SportsEventStatusFinal, Start: start, End: end}
+	events, err := m.GetAdminLinkedEvents(context.Background(), filter, 50, 25, "gridCount", "asc")
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	g.Expect(events).Should(gomega.BeEmpty())
+
+	// With no filter there is no WHERE clause and pagination starts at $1
+	mock.ExpectQuery(`SELECT .+ FROM sports_events e INNER JOIN grids g ON g.sports_event_id = e.id AND g.state = 'active' `+
+		`GROUP BY e.id ORDER BY e.event_date DESC OFFSET \$1 LIMIT \$2`).
+		WithArgs(int64(0), 25).
+		WillReturnRows(sqlmock.NewRows(columns))
+
+	events, err = m.GetAdminLinkedEvents(context.Background(), AdminLinkedEventsFilter{}, 0, 25, "", "")
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	g.Expect(events).Should(gomega.BeEmpty())
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestGetAdminLinkedEventsCountAppliesFilter(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	db, mock, err := sqlmock.New()
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	defer db.Close()
+
+	m := New(db)
+
+	mock.ExpectQuery(`SELECT COUNT\(DISTINCT e.id\) FROM sports_events e INNER JOIN grids g ON g.sports_event_id = e.id AND g.state = 'active' `+
+		`WHERE e.league = \$1 AND e.status = \$2`).
+		WithArgs("ncaab", "in_progress").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(int64(7)))
+
+	count, err := m.GetAdminLinkedEventsCount(context.Background(), AdminLinkedEventsFilter{
+		League: SportsLeagueNCAAB,
+		Status: SportsEventStatusInProgress,
+	})
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	g.Expect(count).Should(gomega.Equal(int64(7)))
+
+	mock.ExpectQuery(`SELECT COUNT\(DISTINCT e.id\) FROM sports_events e INNER JOIN grids g ON g.sports_event_id = e.id AND g.state = 'active'$`).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(int64(3)))
+
+	count, err = m.GetAdminLinkedEventsCount(context.Background(), AdminLinkedEventsFilter{})
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	g.Expect(count).Should(gomega.Equal(int64(3)))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestGetAdminLinkedEventsFiltering(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	// Use a far-future date window so that events from other tests, which
+	// cluster around time.Now(), cannot leak into the date-bounded queries.
+	// The window is offset by a per-run number of days so that repeated runs
+	// against the same database do not see each other's rows either.
+	dayOffset := int(time.Now().UnixNano() % 1_000_000)
+	windowStart := time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, dayOffset)
+	day1 := windowStart.Add(12 * time.Hour)
+	day2 := day1.AddDate(0, 0, 1)
+	day3 := day1.AddDate(0, 0, 2)
+	windowEnd := windowStart.AddDate(0, 0, 2)
+
+	score := 10
+	wnbaScheduled, _, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueWNBA, day1, nil, nil)
+	wnbaFinal, _, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueWNBA, day2, &score, &score)
+	ncaafScheduled, _, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNCAAF, day3, nil, nil)
+
+	idsOf := func(events []*AdminLinkedEvent) []int64 {
+		ids := make([]int64, 0, len(events))
+		for _, e := range events {
+			ids = append(ids, e.ID)
+		}
+		return ids
+	}
+
+	// Date window alone returns all three, and the count agrees
+	window := AdminLinkedEventsFilter{Start: windowStart, End: windowEnd}
+	events, err := m.GetAdminLinkedEvents(ctx, window, 0, 100, "eventDate", "asc")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(idsOf(events)).Should(gomega.Equal([]int64{wnbaScheduled.ID, wnbaFinal.ID, ncaafScheduled.ID}))
+
+	count, err := m.GetAdminLinkedEventsCount(ctx, window)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(3)))
+
+	// The end date is inclusive of the whole day, so ending on day 2 keeps
+	// the noon game on day 2 but drops day 3
+	events, err = m.GetAdminLinkedEvents(ctx, AdminLinkedEventsFilter{Start: windowStart, End: windowStart.AddDate(0, 0, 1)}, 0, 100, "eventDate", "asc")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(idsOf(events)).Should(gomega.Equal([]int64{wnbaScheduled.ID, wnbaFinal.ID}))
+
+	// A start date alone excludes everything before it
+	events, err = m.GetAdminLinkedEvents(ctx, AdminLinkedEventsFilter{Start: windowStart.AddDate(0, 0, 1), End: windowEnd}, 0, 100, "eventDate", "asc")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(idsOf(events)).Should(gomega.Equal([]int64{wnbaFinal.ID, ncaafScheduled.ID}))
+
+	// League filter
+	byLeague := AdminLinkedEventsFilter{League: SportsLeagueWNBA, Start: windowStart, End: windowEnd}
+	events, err = m.GetAdminLinkedEvents(ctx, byLeague, 0, 100, "eventDate", "asc")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(idsOf(events)).Should(gomega.Equal([]int64{wnbaScheduled.ID, wnbaFinal.ID}))
+
+	count, err = m.GetAdminLinkedEventsCount(ctx, byLeague)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(2)))
+
+	// Status filter
+	byStatus := AdminLinkedEventsFilter{Status: SportsEventStatusFinal, Start: windowStart, End: windowEnd}
+	events, err = m.GetAdminLinkedEvents(ctx, byStatus, 0, 100, "eventDate", "asc")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(idsOf(events)).Should(gomega.Equal([]int64{wnbaFinal.ID}))
+
+	count, err = m.GetAdminLinkedEventsCount(ctx, byStatus)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(1)))
+
+	// Combining league and status narrows further
+	combined := AdminLinkedEventsFilter{League: SportsLeagueWNBA, Status: SportsEventStatusScheduled, Start: windowStart, End: windowEnd}
+	events, err = m.GetAdminLinkedEvents(ctx, combined, 0, 100, "eventDate", "asc")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(idsOf(events)).Should(gomega.Equal([]int64{wnbaScheduled.ID}))
+
+	// A combination that matches nothing returns an empty page and zero count
+	none := AdminLinkedEventsFilter{League: SportsLeagueNCAAF, Status: SportsEventStatusFinal, Start: windowStart, End: windowEnd}
+	events, err = m.GetAdminLinkedEvents(ctx, none, 0, 100, "", "")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(events).Should(gomega.BeEmpty())
+
+	count, err = m.GetAdminLinkedEventsCount(ctx, none)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.BeZero())
 }
