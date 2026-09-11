@@ -568,3 +568,67 @@ func TestPoolLinkedSportsEventIDs(t *testing.T) {
 	g.Expect(ids).Should(gomega.HaveKey(activeEvent.ID))
 	g.Expect(ids).ShouldNot(gomega.HaveKey(deletedEvent.ID))
 }
+
+func TestPoolUsers(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	owner, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	member, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(member.SetEmail(ctx, "member@example.com")).Should(gomega.Succeed())
+	guest, err := m.GetUser(ctx, IssuerSqMGR, randString())
+	g.Expect(err).Should(gomega.Succeed())
+	coManager, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	outsider, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	pool, err := m.NewPool(ctx, owner.ID, "Test Pool Users", GridTypeStd100, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+	otherPool, err := m.NewPool(ctx, outsider.ID, "Test Pool Users Other", GridTypeStd100, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+
+	g.Expect(member.JoinPool(ctx, pool)).Should(gomega.Succeed())
+	g.Expect(guest.JoinPool(ctx, pool)).Should(gomega.Succeed())
+	g.Expect(coManager.JoinPool(ctx, pool)).Should(gomega.Succeed())
+	g.Expect(coManager.SetManagerOf(ctx, pool, true)).Should(gomega.Succeed())
+	g.Expect(member.JoinPool(ctx, otherPool)).Should(gomega.Succeed())
+
+	users, err := pool.Users(ctx)
+	g.Expect(err).Should(gomega.Succeed())
+
+	ids := make([]int64, len(users))
+	for i, u := range users {
+		ids[i] = u.ID
+		g.Expect(u.Model).Should(gomega.Equal(m))
+	}
+	// owner has no pools_users row but is included; outsider is excluded; ordered by id
+	g.Expect(ids).Should(gomega.Equal([]int64{owner.ID, member.ID, guest.ID, coManager.ID}))
+	g.Expect(users[1].Email).ShouldNot(gomega.BeNil())
+	g.Expect(*users[1].Email).Should(gomega.Equal("member@example.com"))
+	g.Expect(users[2].Store).Should(gomega.Equal(UserStoreSqMGR))
+}
+
+func TestPoolUsers_OwnerOnly(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	owner, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	pool, err := m.NewPool(ctx, owner.ID, "Test Pool Users Owner Only", GridTypeStd100, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+
+	users, err := pool.Users(ctx)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(users).Should(gomega.HaveLen(1))
+	g.Expect(users[0].ID).Should(gomega.Equal(owner.ID))
+}

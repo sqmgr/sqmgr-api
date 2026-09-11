@@ -27,6 +27,7 @@ Verify you get a response by querying [localhost:8000](http://localhost:8000).
 sqmgr-api/
 ├── cmd/
 │   ├── sqmgr-api/                 # Main API server
+│   ├── sqmgr-email-backfill/      # One-time Auth0 email backfill
 │   ├── sqmgr-guest-user-cleanup/  # Guest user cleanup utility
 │   └── sqmgr-sports-sync/         # ESPN teams/schedule/scores sync
 ├── internal/
@@ -111,6 +112,15 @@ Flag | Description | Default
 Flag | Description | Default
 --- | --- | ---
 `-dry-run` | Only output what would be deleted | `false`
+
+`sqmgr-email-backfill` (stores Auth0 emails for users who haven't logged in since emails began being saved at login;
+requires the `auth0_mgmt_*` settings and is safe to re-run):
+
+Flag | Description | Default
+--- | --- | ---
+`-dry-run` | Only output which users would be updated | `false`
+`-rate` | Maximum Auth0 Management API requests per second | `2`
+`-batch-size` | Number of users to load from the database at a time | `100`
 
 ### Environment Variables
 
@@ -217,8 +227,8 @@ Build the Docker image:
 docker build --build-arg VERSION=1.0.0 -t sqmgr-api .
 ```
 
-The image exposes port 8000 and includes the `sqmgr-api`, `sqmgr-guest-user-cleanup`, and
-`sqmgr-sports-sync` binaries.
+The image exposes port 8000 and includes the `sqmgr-api`, `sqmgr-email-backfill`, `sqmgr-guest-user-cleanup`,
+and `sqmgr-sports-sync` binaries.
 
 ## CI/CD
 
