@@ -186,3 +186,56 @@ func TestUserEmailNullable(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(reloadedUser.Email).Should(gomega.BeNil())
 }
+
+func TestAuth0UsersWithoutEmail(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	noEmail, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	blankEmail, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	_, err = m.DB.ExecContext(ctx, "UPDATE users SET email = '' WHERE id = $1", blankEmail.ID)
+	g.Expect(err).Should(gomega.Succeed())
+	withEmail, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(withEmail.SetEmail(ctx, "has@example.com")).Should(gomega.Succeed())
+	guest, err := m.GetUser(ctx, IssuerSqMGR, randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	// other tests share this database, so only assert on the users created here
+	afterID := noEmail.ID - 1
+	users, err := m.Auth0UsersWithoutEmail(ctx, afterID, 1000)
+	g.Expect(err).Should(gomega.Succeed())
+
+	found := make(map[int64]bool)
+	var prevID int64
+	for _, u := range users {
+		g.Expect(u.ID).Should(gomega.BeNumerically(">", afterID))
+		g.Expect(u.ID).Should(gomega.BeNumerically(">", prevID))
+		g.Expect(u.Store).Should(gomega.Equal(UserStoreAuth0))
+		if u.Email != nil {
+			g.Expect(*u.Email).Should(gomega.BeEmpty())
+		}
+		prevID = u.ID
+		found[u.ID] = true
+	}
+	g.Expect(found).Should(gomega.HaveKey(noEmail.ID))
+	g.Expect(found).Should(gomega.HaveKey(blankEmail.ID))
+	g.Expect(found).ShouldNot(gomega.HaveKey(withEmail.ID))
+	g.Expect(found).ShouldNot(gomega.HaveKey(guest.ID))
+
+	// keyset pagination: limit caps the page and afterID skips earlier users
+	page, err := m.Auth0UsersWithoutEmail(ctx, afterID, 1)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(page).Should(gomega.HaveLen(1))
+	g.Expect(page[0].ID).Should(gomega.Equal(noEmail.ID))
+
+	next, err := m.Auth0UsersWithoutEmail(ctx, noEmail.ID, 1)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(next).Should(gomega.HaveLen(1))
+	g.Expect(next[0].ID).Should(gomega.BeNumerically(">", noEmail.ID))
+}

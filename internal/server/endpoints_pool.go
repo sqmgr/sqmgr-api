@@ -149,9 +149,14 @@ func (s *Server) poolManagerHandler(next http.Handler) http.Handler {
 	})
 }
 
+// getPoolTokenMemberEmailsEndpoint returns the stored email addresses of the
+// pool's members. It reads only from the database: emails are saved at login
+// and backfilled by sqmgr-email-backfill, so no Auth0 calls are made here.
+// Missing counts members without an email (guests and unbackfilled users).
 func (s *Server) getPoolTokenMemberEmailsEndpoint() http.HandlerFunc {
 	type response struct {
-		Emails []string `json:"emails"`
+		Emails  []string `json:"emails"`
+		Missing int      `json:"missing"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -169,14 +174,16 @@ func (s *Server) getPoolTokenMemberEmailsEndpoint() http.HandlerFunc {
 
 		emails := make([]string, 0, len(users))
 		seen := make(map[string]struct{}, len(users))
+		missing := 0
 		for _, user := range users {
-			s.ensureUserEmail(r.Context(), user)
 			if user.Email == nil {
+				missing++
 				continue
 			}
 
 			email := strings.TrimSpace(*user.Email)
 			if email == "" {
+				missing++
 				continue
 			}
 
@@ -192,7 +199,7 @@ func (s *Server) getPoolTokenMemberEmailsEndpoint() http.HandlerFunc {
 			return strings.ToLower(emails[i]) < strings.ToLower(emails[j])
 		})
 
-		s.writeJSONResponse(w, http.StatusOK, response{Emails: emails})
+		s.writeJSONResponse(w, http.StatusOK, response{Emails: emails, Missing: missing})
 	}
 }
 

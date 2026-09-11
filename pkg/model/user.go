@@ -225,6 +225,38 @@ func (u *User) PoolsCreatedWithin(ctx context.Context, within time.Duration) (in
 	return count, nil
 }
 
+// Auth0UsersWithoutEmail returns up to limit Auth0 users with no stored email
+// whose ID is greater than afterID, ordered by ID, for keyset pagination.
+func (m *Model) Auth0UsersWithoutEmail(ctx context.Context, afterID int64, limit int) ([]*User, error) {
+	const query = `
+		SELECT id, store, store_id, is_site_admin, email, created
+		FROM users
+		WHERE store = $1 AND (email IS NULL OR email = '') AND id > $2
+		ORDER BY id
+		LIMIT $3`
+
+	rows, err := m.DB.QueryContext(ctx, query, UserStoreAuth0, afterID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("querying users without email: %w", err)
+	}
+	defer rows.Close()
+
+	users := make([]*User, 0, limit)
+	for rows.Next() {
+		user := &User{Model: m}
+		if err := rows.Scan(&user.ID, &user.Store, &user.StoreID, &user.IsSiteAdmin, &user.Email, &user.Created); err != nil {
+			return nil, fmt.Errorf("scanning user without email: %w", err)
+		}
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating users without email: %w", err)
+	}
+
+	return users, nil
+}
+
 // SetEmail updates the user's email in the database
 func (u *User) SetEmail(ctx context.Context, email string) error {
 	_, err := u.DB.ExecContext(ctx, "UPDATE users SET email = $1 WHERE id = $2", email, u.ID)

@@ -819,6 +819,9 @@ func (p *Pool) RemoveAllMembers(ctx context.Context) error {
 
 // Users returns the pool owner and all users who have joined the pool.
 func (p *Pool) Users(ctx context.Context) ([]*User, error) {
+	// The owner has no pools_users row (JoinPool is a no-op for them), so it is
+	// unioned in. Driving the lookup from pools_users keeps this an index scan
+	// sized to the pool; an "id = $1 OR EXISTS (...)" filter scans all users.
 	const query = `
 		SELECT
 			u.id,
@@ -828,12 +831,11 @@ func (p *Pool) Users(ctx context.Context) ([]*User, error) {
 			u.email,
 			u.created
 		FROM users u
-		WHERE u.id = $1
-			OR EXISTS (
-				SELECT 1
-				FROM pools_users pu
-				WHERE pu.pool_id = $2 AND pu.user_id = u.id
-			)
+		WHERE u.id IN (
+			SELECT pu.user_id FROM pools_users pu WHERE pu.pool_id = $2
+			UNION ALL
+			SELECT $1::bigint
+		)
 		ORDER BY u.id`
 
 	rows, err := p.model.DB.QueryContext(ctx, query, p.userID, p.id)
