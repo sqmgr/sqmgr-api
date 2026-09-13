@@ -1127,6 +1127,23 @@ func TestGetAdminEventGrids(t *testing.T) {
 	err = grid2.Save(ctx)
 	g.Expect(err).Should(gomega.Succeed())
 
+	// Claim two squares in the second pool so the claimed count is non-zero
+	squares, err := pool2.Squares()
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(len(squares)).Should(gomega.Equal(100))
+	claimed := 0
+	for _, sq := range squares {
+		if claimed == 2 {
+			break
+		}
+		sq.claimant = "Test Claimant"
+		sq.State = PoolSquareStateClaimed
+		sq.SetUserID(user2.ID)
+		err = sq.Save(ctx, m.DB, true, PoolSquareLog{Note: "Test claim", RemoteAddr: "127.0.0.1"})
+		g.Expect(err).Should(gomega.Succeed())
+		claimed++
+	}
+
 	// Get grids for this event
 	eventGrids, err := m.GetAdminEventGrids(ctx, event.ID, 0, 100)
 	g.Expect(err).Should(gomega.Succeed())
@@ -1142,6 +1159,15 @@ func TestGetAdminEventGrids(t *testing.T) {
 		g.Expect(eg.CreatorID).Should(gomega.BeNumerically(">", 0))
 		g.Expect(eg.GridState).Should(gomega.Equal("active"))
 		poolTokens[eg.PoolToken] = true
+
+		switch eg.PoolToken {
+		case pool1.Token():
+			g.Expect(eg.ClaimedSquares).Should(gomega.Equal(int64(0)))
+			g.Expect(eg.TotalSquares).Should(gomega.Equal(int64(pool1.NumberOfSquares())))
+		case pool2.Token():
+			g.Expect(eg.ClaimedSquares).Should(gomega.Equal(int64(2)))
+			g.Expect(eg.TotalSquares).Should(gomega.Equal(int64(100)))
+		}
 	}
 
 	// Verify grids come from both pools

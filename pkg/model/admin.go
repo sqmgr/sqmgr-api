@@ -499,6 +499,10 @@ type AdminEventGrid struct {
 	CreatorID    int64     `json:"creatorId"`
 	CreatorEmail *string   `json:"creatorEmail"`
 	Created      time.Time `json:"created"`
+	// ClaimedSquares is the number of squares in the grid's pool that are not unclaimed.
+	ClaimedSquares int64 `json:"claimedSquares"`
+	// TotalSquares is the number of squares in the grid's pool.
+	TotalSquares int64 `json:"totalSquares"`
 }
 
 // AdminLinkedEventsFilter restricts which linked events GetAdminLinkedEvents and
@@ -669,7 +673,9 @@ func (m *Model) GetAdminEventGrids(ctx context.Context, eventID int64, offset in
 	const query = `
 		SELECT
 			g.id, g.label, g.home_team_name, g.away_team_name, g.state,
-			p.token, p.name, p.user_id, u.email, g.created
+			p.token, p.name, p.user_id, u.email, g.created,
+			(SELECT COUNT(*) FROM pool_squares ps WHERE ps.pool_id = p.id AND ps.state != 'unclaimed') AS claimed_squares,
+			(SELECT COUNT(*) FROM pool_squares ps WHERE ps.pool_id = p.id) AS total_squares
 		FROM grids g
 		INNER JOIN pools p ON p.id = g.pool_id
 		LEFT JOIN users u ON u.id = p.user_id
@@ -691,6 +697,7 @@ func (m *Model) GetAdminEventGrids(ctx context.Context, eventID int64, offset in
 		if err := rows.Scan(
 			&grid.GridID, &label, &homeTeamName, &awayTeamName, &grid.GridState,
 			&grid.PoolToken, &grid.PoolName, &grid.CreatorID, &grid.CreatorEmail, &grid.Created,
+			&grid.ClaimedSquares, &grid.TotalSquares,
 		); err != nil {
 			return nil, fmt.Errorf("scanning event grid row: %w", err)
 		}
