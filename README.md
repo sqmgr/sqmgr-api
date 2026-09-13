@@ -86,6 +86,8 @@ Key | Description | Default
 `auth0_mgmt_client_id` | Auth0 Management API client ID | _(empty)_
 `auth0_mgmt_client_secret` | Auth0 Management API client secret | _(empty)_
 `cors_allowed_origins` | Comma-separated list of allowed CORS origins | `https://sqmgr.com,https://www.sqmgr.com,https://beta.sqmgr.com,http://localhost:8080`
+`public_url` | Externally reachable base URL of this API (OAuth issuer and MCP resource identifier) | `https://api.sqmgr.com`
+`frontend_url` | Base URL of the web app, which hosts the OAuth authorization page | `https://sqmgr.com`
 
 ### Command-line Flags
 
@@ -190,6 +192,74 @@ Method | Path | Description
 `POST` | `/admin/pool/{token}/join` | Join a pool as an admin
 `GET` | `/admin/events` | List sporting events
 `GET` | `/admin/events/{id}/grids` | List grids tied to an event
+`POST` | `/admin/mcp` | Read-only analytics [MCP](https://modelcontextprotocol.io) server (see below)
+
+### Admin Analytics MCP Server
+
+`/admin/mcp` exposes a read-only [Model Context Protocol](https://modelcontextprotocol.io) server over
+streamable HTTP so a site admin can ask an MCP client (Claude Desktop, Claude Code, etc.) questions about how the
+site is being used. Only site admins can use it.
+
+**Connecting Claude Desktop:** Settings → Connectors → Add custom connector, name it and enter
+`https://api.sqmgr.com/admin/mcp`. Claude opens a browser tab at `https://sqmgr.com/oauth/authorize`; log in as
+usual, click **Approve**, and the connector is ready. Claude Code works the same way:
+
+```bash
+claude mcp add --transport http sqmgr-admin https://api.sqmgr.com/admin/mcp
+```
+
+Behind the scenes the API is a small OAuth 2.1 authorization server (see below), so no tokens are copied by hand
+and access is refreshed automatically for 30 days per approval. Sending a site admin's regular API JWT as
+`Authorization: Bearer <jwt>` also works for scripted use.
+
+The server is stateless (each POST is independent; `GET`/`DELETE` return `405`) and returns plain JSON responses.
+Every tool runs inside a PostgreSQL `READ ONLY` transaction with a 30 second statement timeout, so nothing exposed
+here can modify data. All tools are annotated `readOnlyHint`. The ad hoc query tool additionally blocks a list of
+side-effect functions, but what it can *read* is bounded only by the database role in `dsn`, so that role should
+not be a superuser in production.
+
+Tool | Description
+--- | ---
+`get_site_stats` | Site-wide totals (pools, users, guests, grids, claimed squares, memberships), optionally within a date range
+`get_time_series` | Count a metric (`pools_created`, `users_registered`, `guest_users_created`, `squares_claimed`, `grids_created`, `pool_members_joined`) per day/week/month/year, zero-filled for charting
+`get_pool_fill_rates` | Share of pools that are fully / partially / never claimed, plus average, median, and a fill-percentage histogram
+`get_pool_breakdown` | Group pools (or grids/squares) by grid type, number set config, archived, password required, owner account type, league, or square state
+`get_engagement_summary` | New users, distinct/repeat/returning pool creators, claims by registered vs. guest vs. anonymous users, averages per pool
+`list_pools` | Search and page pools with owner email, member/grid counts, and fill percentage; filter by date, grid type, archived, fill range
+`get_pool` | Full details for one pool: settings, owner, squares by state, active invites, grids and their linked sports events
+`list_pool_squares` | Claimed squares in a pool with claimant name and, for registered users, their email address
+`list_pool_members` | Owner, managers, and members of a pool with email, join date, and squares claimed
+`list_pool_activity` | The pool's square change log (claims, unclaims, payment changes), newest first
+`list_users` | Search and page registered, guest, or all users with pools owned/joined and squares claimed
+`get_user` | One user by ID or email with counts and the pools they own and belong to
+`get_top_pool_creators` | Users ranked by pools created in a date range
+`list_popular_events` | Sports events ranked by linked grids, optionally by league and date
+`list_sports_sync_runs` | Recent sports sync job runs and errors
+`describe_schema` | Tables, columns, and enum types, for writing ad hoc queries
+`run_sql_query` | A single ad hoc `SELECT` (wrapped as a subquery, row-capped, `password_hash` and escaped identifiers rejected) for anything the other tools do not cover
+
+Dates accept `YYYY-MM-DD` (UTC calendar days; an end date includes the whole day) or RFC3339 timestamps (end
+exclusive). Omit both for all time.
+
+### OAuth Endpoints
+
+These implement the authorization flow MCP clients expect (OAuth 2.1 with PKCE, dynamic client registration, and
+discovery metadata). Clients are public; there are no client secrets.
+
+Method | Path | Description
+--- | --- | ---
+`GET` | `/.well-known/oauth-authorization-server` | Authorization server metadata (RFC 8414)
+`GET` | `/.well-known/oauth-protected-resource[/admin/mcp]` | Protected resource metadata for the MCP endpoint (RFC 9728)
+`POST` | `/oauth/register` | Dynamic client registration (RFC 7591); `redirect_uris` must be `https` or `http://localhost`
+`POST` | `/oauth/token` | Exchange an authorization code (with `code_verifier`) or a refresh token for tokens
+`GET` | `/oauth/client/{id}` | Client name and redirect URIs, used by the authorization page _(authenticated)_
+`POST` | `/oauth/authorize` | Approve or deny a request; returns the redirect URL carrying the code _(site admin)_
+
+The authorization page itself is `https://sqmgr.com/oauth/authorize` in the web app, which logs the user in with
+Auth0, confirms they are a site admin, and calls `POST /oauth/authorize`. Access tokens are JWTs signed with the
+SqMGR key with the MCP endpoint URL as their audience and expire after 1 hour; refresh tokens are single-use,
+rotate on every refresh, and expire after 30 days. Authorization codes are single-use and expire after 10
+minutes. A grant stops working as soon as the user is no longer a site admin.
 
 ## Authentication
 

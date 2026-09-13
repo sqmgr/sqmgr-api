@@ -34,6 +34,8 @@ type config struct {
 	auth0MgmtClientID  string
 	auth0MgmtClientSec string
 	corsAllowedOrigins []string
+	publicURL          string
+	frontendURL        string
 }
 
 var instance *config
@@ -86,6 +88,20 @@ func CORSAllowedOrigins() []string {
 	return instance.corsAllowedOrigins
 }
 
+// PublicURL returns the externally reachable base URL of this API, with no
+// trailing slash. It is used as the OAuth issuer and MCP resource identifier.
+func PublicURL() string {
+	mustHaveInstance()
+	return instance.publicURL
+}
+
+// FrontendURL returns the base URL of the SqMGR web app, with no trailing
+// slash. The OAuth authorization page lives there.
+func FrontendURL() string {
+	mustHaveInstance()
+	return instance.frontendURL
+}
+
 func mustHaveInstance() {
 	if instance == nil {
 		panic("config: must call Load() first")
@@ -106,10 +122,14 @@ func Load() error {
 	_ = viper.BindEnv("auth0_mgmt_client_id")
 	_ = viper.BindEnv("auth0_mgmt_client_secret")
 	_ = viper.BindEnv("cors_allowed_origins")
+	_ = viper.BindEnv("public_url")
+	_ = viper.BindEnv("frontend_url")
 
 	viper.SetDefault("dsn", "host=localhost port=5432 user=postgres sslmode=disable")
 	viper.SetDefault("auth0_jwks_url", "https://sqmgr.auth0.com/.well-known/jwks.json")
 	viper.SetDefault("cors_allowed_origins", "https://sqmgr.com,https://www.sqmgr.com,https://beta.sqmgr.com,http://localhost:8080")
+	viper.SetDefault("public_url", "https://api.sqmgr.com")
+	viper.SetDefault("frontend_url", "https://sqmgr.com")
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, isNotFoundError := err.(viper.ConfigFileNotFoundError); !isNotFoundError {
@@ -136,6 +156,8 @@ func Load() error {
 		auth0MgmtClientID:  viper.GetString("auth0_mgmt_client_id"),
 		auth0MgmtClientSec: viper.GetString("auth0_mgmt_client_secret"),
 		corsAllowedOrigins: corsOrigins,
+		publicURL:          strings.TrimRight(viper.GetString("public_url"), "/"),
+		frontendURL:        strings.TrimRight(viper.GetString("frontend_url"), "/"),
 	}
 
 	return nil

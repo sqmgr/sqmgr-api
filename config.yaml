@@ -1,2 +1,6 @@
 jwt_public_key: .keys/public.pem
 jwt_private_key: .keys/private.pem
+# Local development URLs used by the OAuth server that fronts the admin MCP
+# endpoint. Production sets SQMGR_CONF_PUBLIC_URL / SQMGR_CONF_FRONTEND_URL.
+public_url: http://localhost:8000
+frontend_url: http://localhost:8080

@@ -41,6 +41,13 @@ func (s *Server) setupRoutes() {
 	s.Router.Path("/pool/{token:[A-Za-z0-9_-]+}/events").Methods(http.MethodGet).Handler(s.getPoolTokenEventsEndpoint())
 	s.Router.Path("/user/guest").Methods(http.MethodPost).Handler(s.postUserGuestEndpoint())
 
+	// OAuth 2.1 discovery, registration, and token endpoints for MCP clients (public)
+	s.Router.Path("/.well-known/oauth-authorization-server").Methods(http.MethodGet).Handler(s.getOAuthAuthorizationServerMetadata())
+	s.Router.Path("/.well-known/oauth-protected-resource").Methods(http.MethodGet).Handler(s.getOAuthProtectedResourceMetadata())
+	s.Router.Path("/.well-known/oauth-protected-resource/admin/mcp").Methods(http.MethodGet).Handler(s.getOAuthProtectedResourceMetadata())
+	s.Router.Path("/oauth/register").Methods(http.MethodPost).Handler(s.postOAuthRegisterEndpoint())
+	s.Router.Path("/oauth/token").Methods(http.MethodPost).Handler(s.postOAuthTokenEndpoint())
+
 	// Sports API routes (public, no auth required)
 	s.Router.Path("/sports/leagues").Methods(http.MethodGet).Handler(s.getSportsLeaguesEndpoint())
 	s.Router.Path("/sports/events").Methods(http.MethodGet).Handler(s.getSportsEventsEndpoint())
@@ -60,6 +67,7 @@ func (s *Server) setupRoutes() {
 	authRouter.Path("/pool/{token:[A-Za-z0-9_-]+}/member").Methods(http.MethodPost).Handler(s.postPoolTokenMemberEndpoint())
 	authRouter.Path("/user/self").Methods(http.MethodGet).Handler(s.getUserSelfEndpoint())
 	authRouter.Path("/user/self/stats").Methods(http.MethodGet).Handler(s.getUserSelfStatsEndpoint())
+	authRouter.Path("/oauth/client/{id:[A-Za-z0-9]+}").Methods(http.MethodGet).Handler(s.getOAuthClientEndpoint())
 
 	authPoolRouter := authRouter.NewRoute().Subrouter()
 	authPoolRouter.Use(s.poolHandler)
@@ -106,6 +114,15 @@ func (s *Server) setupRoutes() {
 	adminRouter.Path("/admin/user/{id:[0-9]+}/pools").Methods(http.MethodGet).Handler(s.getAdminUserPoolsEndpoint())
 	adminRouter.Path("/admin/events").Methods(http.MethodGet).Handler(s.getAdminEventsEndpoint())
 	adminRouter.Path("/admin/events/{id:[0-9]+}/grids").Methods(http.MethodGet).Handler(s.getAdminEventGridsEndpoint())
+	adminRouter.Path("/oauth/authorize").Methods(http.MethodPost).Handler(s.postOAuthAuthorizeEndpoint())
+
+	// Read-only analytics MCP server (streamable HTTP). It accepts the access
+	// tokens issued by the OAuth endpoints above as well as regular API JWTs,
+	// and requires site admin privileges. Stateless, so only POST is meaningful.
+	mcpRouter := s.NewRoute().Subrouter()
+	mcpRouter.Use(s.mcpAuthHandler)
+	mcpRouter.Use(s.adminHandler)
+	mcpRouter.Path("/admin/mcp").Methods(http.MethodPost, http.MethodGet, http.MethodDelete).Handler(s.mcpHandler())
 
 	pathTemplates := make(map[string]bool)
 

@@ -22,6 +22,7 @@ import (
 	"database/sql"
 
 	"github.com/gorilla/mux"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sirupsen/logrus"
 	"github.com/sqmgr/sqmgr-api/internal/config"
 	"github.com/sqmgr/sqmgr-api/internal/keylocker"
@@ -42,6 +43,7 @@ type Server struct {
 	auth0Client     *auth0.Client
 	broker          *PoolBroker
 	pgListener      *PGListener
+	mcpServer       *mcp.Server
 }
 
 // New returns a new server object
@@ -78,6 +80,7 @@ func New(version string, db *sql.DB) *Server {
 		auth0Client:     auth0Client,
 		broker:          NewPoolBroker(),
 	}
+	s.mcpServer = s.newMCPServer()
 
 	s.setupRoutes()
 

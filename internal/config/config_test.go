@@ -44,3 +44,17 @@ func TestCORSAllowedOrigins_PanicWithoutLoad(t *testing.T) {
 	instance = nil
 	g.Expect(func() { CORSAllowedOrigins() }).To(gomega.Panic())
 }
+
+func TestPublicAndFrontendURL(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	instance = &config{publicURL: "http://localhost:8000", frontendURL: "http://localhost:8080"}
+	defer func() { instance = nil }()
+
+	g.Expect(PublicURL()).To(gomega.Equal("http://localhost:8000"))
+	g.Expect(FrontendURL()).To(gomega.Equal("http://localhost:8080"))
+
+	instance = nil
+	g.Expect(func() { PublicURL() }).To(gomega.Panic())
+	g.Expect(func() { FrontendURL() }).To(gomega.Panic())
+}
