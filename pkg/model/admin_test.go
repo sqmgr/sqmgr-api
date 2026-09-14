@@ -611,6 +611,114 @@ func TestGetPoolsByUserIDCount(t *testing.T) {
 	g.Expect(totalCount).Should(gomega.Equal(int64(2)))
 }
 
+func TestGetJoinedPoolsByUserID(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	owner, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	// A pool the user owns must not show up as a joined pool
+	ownedPool, err := m.NewPool(ctx, user.ID, "Joined Pools Owned "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(user.JoinPool(ctx, ownedPool)).Should(gomega.Succeed())
+
+	// Pools owned by someone else that the user joins
+	joinedActive, err := m.NewPool(ctx, owner.ID, "Joined Pools Active "+randString(), GridTypeStd25, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(user.JoinPool(ctx, joinedActive)).Should(gomega.Succeed())
+
+	joinedArchived, err := m.NewPool(ctx, owner.ID, "Joined Pools Archived "+randString(), GridTypeStd50, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+	joinedArchived.SetArchived(true)
+	g.Expect(joinedArchived.Save(ctx)).Should(gomega.Succeed())
+	g.Expect(user.JoinPool(ctx, joinedArchived)).Should(gomega.Succeed())
+
+	// A pool owned by someone else that the user has not joined
+	_, err = m.NewPool(ctx, owner.ID, "Joined Pools Not Joined "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+
+	activePools, err := m.GetJoinedPoolsByUserID(ctx, user.ID, false, 0, 100)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(activePools).Should(gomega.HaveLen(1))
+	g.Expect(activePools[0].Token).Should(gomega.Equal(joinedActive.Token()))
+	g.Expect(activePools[0].Archived).Should(gomega.BeFalse())
+	g.Expect(activePools[0].OwnerID).Should(gomega.Equal(owner.ID))
+	g.Expect(activePools[0].OwnerStore).Should(gomega.Equal("auth0"))
+	g.Expect(activePools[0].MemberCount).Should(gomega.Equal(int64(1)))
+
+	allPools, err := m.GetJoinedPoolsByUserID(ctx, user.ID, true, 0, 100)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(allPools).Should(gomega.HaveLen(2))
+
+	tokens := []string{allPools[0].Token, allPools[1].Token}
+	g.Expect(tokens).Should(gomega.ConsistOf(joinedActive.Token(), joinedArchived.Token()))
+	g.Expect(tokens).ShouldNot(gomega.ContainElement(ownedPool.Token()))
+
+	// Pagination
+	firstPage, err := m.GetJoinedPoolsByUserID(ctx, user.ID, true, 0, 1)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(firstPage).Should(gomega.HaveLen(1))
+
+	secondPage, err := m.GetJoinedPoolsByUserID(ctx, user.ID, true, 1, 1)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(secondPage).Should(gomega.HaveLen(1))
+	g.Expect(secondPage[0].Token).ShouldNot(gomega.Equal(firstPage[0].Token))
+
+	// A user with no memberships gets an empty (non-nil) list
+	nonePools, err := m.GetJoinedPoolsByUserID(ctx, owner.ID, true, 0, 100)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(nonePools).ShouldNot(gomega.BeNil())
+	g.Expect(nonePools).Should(gomega.BeEmpty())
+}
+
+func TestGetJoinedPoolsByUserIDCount(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	user, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	owner, err := m.GetUser(ctx, IssuerAuth0, "auth0|"+randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	initialCount, err := m.GetJoinedPoolsByUserIDCount(ctx, user.ID, true)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(initialCount).Should(gomega.Equal(int64(0)))
+
+	// Owned pool is excluded even though the owner is in pools_users
+	ownedPool, err := m.NewPool(ctx, user.ID, "Joined Count Owned "+randString(), GridTypeStd100, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(user.JoinPool(ctx, ownedPool)).Should(gomega.Succeed())
+
+	joinedActive, err := m.NewPool(ctx, owner.ID, "Joined Count Active "+randString(), GridTypeStd25, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(user.JoinPool(ctx, joinedActive)).Should(gomega.Succeed())
+
+	joinedArchived, err := m.NewPool(ctx, owner.ID, "Joined Count Archived "+randString(), GridTypeStd50, "password", NumberSetConfigStandard)
+	g.Expect(err).Should(gomega.Succeed())
+	joinedArchived.SetArchived(true)
+	g.Expect(joinedArchived.Save(ctx)).Should(gomega.Succeed())
+	g.Expect(user.JoinPool(ctx, joinedArchived)).Should(gomega.Succeed())
+
+	activeCount, err := m.GetJoinedPoolsByUserIDCount(ctx, user.ID, false)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(activeCount).Should(gomega.Equal(int64(1)))
+
+	totalCount, err := m.GetJoinedPoolsByUserIDCount(ctx, user.ID, true)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(totalCount).Should(gomega.Equal(int64(2)))
+}
+
 func TestGetAllUsers(t *testing.T) {
 	ensureIntegration(t)
 

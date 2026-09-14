@@ -256,8 +256,46 @@ func (s *Server) getAdminUserEndpoint() http.HandlerFunc {
 	}
 }
 
+// adminUserPoolsFetcher loads a page of pools for a user along with the total count
+type adminUserPoolsFetcher func(ctx context.Context, userID int64, includeArchived bool, offset int64, limit int) ([]*model.AdminPool, int64, error)
+
 // getAdminUserPoolsEndpoint returns paginated pools created by a specific user
 func (s *Server) getAdminUserPoolsEndpoint() http.HandlerFunc {
+	return s.adminUserPoolsHandler(func(ctx context.Context, userID int64, includeArchived bool, offset int64, limit int) ([]*model.AdminPool, int64, error) {
+		pools, err := s.model.GetPoolsByUserID(ctx, userID, includeArchived, offset, limit)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		total, err := s.model.GetPoolsByUserIDCount(ctx, userID, includeArchived)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		return pools, total, nil
+	})
+}
+
+// getAdminUserJoinedPoolsEndpoint returns paginated pools a specific user has joined but does not own
+func (s *Server) getAdminUserJoinedPoolsEndpoint() http.HandlerFunc {
+	return s.adminUserPoolsHandler(func(ctx context.Context, userID int64, includeArchived bool, offset int64, limit int) ([]*model.AdminPool, int64, error) {
+		pools, err := s.model.GetJoinedPoolsByUserID(ctx, userID, includeArchived, offset, limit)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		total, err := s.model.GetJoinedPoolsByUserIDCount(ctx, userID, includeArchived)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		return pools, total, nil
+	})
+}
+
+// adminUserPoolsHandler handles the shared validation, pagination, and response
+// shape for the per-user pool list endpoints
+func (s *Server) adminUserPoolsHandler(fetch adminUserPoolsFetcher) http.HandlerFunc {
 	type response struct {
 		Pools []*model.AdminPool `json:"pools"`
 		Total int64              `json:"total"`
@@ -297,13 +335,7 @@ func (s *Server) getAdminUserPoolsEndpoint() http.HandlerFunc {
 
 		includeArchived := r.FormValue("includeArchived") == "true"
 
-		pools, err := s.model.GetPoolsByUserID(r.Context(), id, includeArchived, offset, limit)
-		if err != nil {
-			s.writeErrorResponse(w, http.StatusInternalServerError, err)
-			return
-		}
-
-		total, err := s.model.GetPoolsByUserIDCount(r.Context(), id, includeArchived)
+		pools, total, err := fetch(r.Context(), id, includeArchived, offset, limit)
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return

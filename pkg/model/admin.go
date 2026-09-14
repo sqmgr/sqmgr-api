@@ -362,6 +362,65 @@ func (m *Model) GetPoolsByUserIDCount(ctx context.Context, userID int64, include
 	return count, nil
 }
 
+// GetJoinedPoolsByUserID returns pools a specific user is a member of but does not own,
+// ordered by most recently joined
+func (m *Model) GetJoinedPoolsByUserID(ctx context.Context, userID int64, includeArchived bool, offset int64, limit int) ([]*AdminPool, error) {
+	baseQuery := `
+		SELECT
+			p.token,
+			p.name,
+			p.grid_type,
+			p.number_set_config,
+			p.archived,
+			p.user_id,
+			u.email,
+			u.store,
+			(SELECT COUNT(*) FROM pools_users pu2 WHERE pu2.pool_id = p.id) as member_count,
+			(SELECT COUNT(*) FROM grids g WHERE g.pool_id = p.id AND g.state = 'active') as grid_count,
+			(SELECT COUNT(*) FROM pool_squares ps WHERE ps.pool_id = p.id AND ps.state != 'unclaimed') as claimed_count,
+			p.created
+		FROM pools_users pu
+		JOIN pools p ON p.id = pu.pool_id
+		LEFT JOIN users u ON u.id = p.user_id
+		WHERE pu.user_id = $1 AND p.user_id != $1 %s
+		ORDER BY pu.created DESC, p.id DESC
+		OFFSET $2
+		LIMIT $3`
+
+	archivedFilter := "AND p.archived = false"
+	if includeArchived {
+		archivedFilter = ""
+	}
+
+	query := fmt.Sprintf(baseQuery, archivedFilter)
+	rowsResult, err := m.DB.QueryContext(ctx, query, userID, offset, limit)
+	if err != nil {
+		return nil, fmt.Errorf("querying user joined pools: %w", err)
+	}
+	defer rowsResult.Close()
+
+	return scanAdminPools(rowsResult)
+}
+
+// GetJoinedPoolsByUserIDCount returns the count of pools a specific user is a member of but does not own
+func (m *Model) GetJoinedPoolsByUserIDCount(ctx context.Context, userID int64, includeArchived bool) (int64, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM pools_users pu
+		JOIN pools p ON p.id = pu.pool_id
+		WHERE pu.user_id = $1 AND p.user_id != $1`
+	if !includeArchived {
+		query += " AND p.archived = false"
+	}
+
+	var count int64
+	if err := m.DB.QueryRowContext(ctx, query, userID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("counting user joined pools: %w", err)
+	}
+
+	return count, nil
+}
+
 // AdminUser represents a user in the admin list
 type AdminUser struct {
 	ID          int64     `json:"id"`

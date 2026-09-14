@@ -389,6 +389,29 @@ func TestGetAdminUserPoolsEndpoint_InvalidID(t *testing.T) {
 	g.Expect(rec.Code).Should(gomega.Equal(http.StatusNotFound))
 }
 
+func TestGetAdminUserJoinedPoolsEndpoint_InvalidID(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	s := &Server{
+		Router: mux.NewRouter(),
+		broker: NewPoolBroker(),
+	}
+
+	s.Router.Path("/admin/user/{id:[0-9]+}/joined-pools").Methods(http.MethodGet).Handler(s.getAdminUserJoinedPoolsEndpoint())
+
+	// Test with non-numeric ID (should not match route)
+	req := httptest.NewRequest(http.MethodGet, "/admin/user/abc/joined-pools", nil)
+	rec := httptest.NewRecorder()
+
+	adminUser := &model.User{IsSiteAdmin: true}
+	ctx := context.WithValue(req.Context(), ctxUserKey, adminUser)
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	// Route doesn't match, returns 404
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusNotFound))
+}
+
 func TestPostAdminPoolJoinEndpoint_MissingUserContext(t *testing.T) {
 	g := gomega.NewWithT(t)
 
