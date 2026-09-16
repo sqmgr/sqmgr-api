@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -98,19 +99,19 @@ func (s *Server) getUserSelfStatsEndpoint() http.HandlerFunc {
 			return
 		}
 
-		poolsCreatedTotal, err := s.model.PoolsOwnedByUserIDCount(r.Context(), user.ID, true)
+		poolsCreatedTotal, err := s.model.PoolsOwnedByUserIDCount(r.Context(), user.ID, true, "")
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
 
-		poolsCreatedActive, err := s.model.PoolsOwnedByUserIDCount(r.Context(), user.ID, false)
+		poolsCreatedActive, err := s.model.PoolsOwnedByUserIDCount(r.Context(), user.ID, false, "")
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
 
-		poolsJoined, err := s.model.PoolsJoinedByUserIDCount(r.Context(), user.ID)
+		poolsJoined, err := s.model.PoolsJoinedByUserIDCount(r.Context(), user.ID, "")
 		if err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
@@ -158,29 +159,30 @@ func (s *Server) getUserIDPoolMembershipEndpoint() http.HandlerFunc {
 		}
 
 		includeArchived := r.FormValue("includeArchived") == "true"
+		search := strings.TrimSpace(r.FormValue("search"))
 
-		var getPools func(context.Context, int64, bool, int64, int) ([]*model.Pool, error)
-		var getPoolsCount func(context.Context, int64, bool) (int64, error)
+		var getPools func(context.Context, int64, bool, string, int64, int) ([]*model.Pool, error)
+		var getPoolsCount func(context.Context, int64, bool, string) (int64, error)
 		if membership == "own" {
 			getPools = s.model.PoolsOwnedByUserID
 			getPoolsCount = s.model.PoolsOwnedByUserIDCount
 		} else {
-			getPools = func(ctx context.Context, userID int64, includeArchived bool, offset int64, limit int) ([]*model.Pool, error) {
-				return s.model.PoolsJoinedByUserID(ctx, userID, offset, limit)
+			getPools = func(ctx context.Context, userID int64, includeArchived bool, search string, offset int64, limit int) ([]*model.Pool, error) {
+				return s.model.PoolsJoinedByUserID(ctx, userID, search, offset, limit)
 			}
 
-			getPoolsCount = func(ctx context.Context, userID int64, includeArchived bool) (int64, error) {
-				return s.model.PoolsJoinedByUserIDCount(ctx, userID)
+			getPoolsCount = func(ctx context.Context, userID int64, includeArchived bool, search string) (int64, error) {
+				return s.model.PoolsJoinedByUserIDCount(ctx, userID, search)
 			}
 		}
 
-		pools, err := getPools(r.Context(), userID, includeArchived, offset, limit)
+		pools, err := getPools(r.Context(), userID, includeArchived, search, offset, limit)
 		if err != nil {
 			s.writeJSONResponse(w, http.StatusInternalServerError, err)
 			return
 		}
 
-		total, err := getPoolsCount(r.Context(), userID, includeArchived)
+		total, err := getPoolsCount(r.Context(), userID, includeArchived, search)
 		if err != nil {
 			s.writeJSONResponse(w, http.StatusInternalServerError, err)
 			return
@@ -290,7 +292,7 @@ func (s *Server) postUserIDGuestJWT() http.HandlerFunc {
 			return
 		}
 
-		pools, err := s.model.PoolsJoinedByUserID(r.Context(), guestUser.ID, 0, 25)
+		pools, err := s.model.PoolsJoinedByUserID(r.Context(), guestUser.ID, "", 0, 25)
 		if err != nil {
 			s.writeJSONResponse(w, http.StatusInternalServerError, err)
 			return

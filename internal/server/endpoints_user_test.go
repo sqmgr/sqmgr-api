@@ -419,3 +419,157 @@ func TestGetUserSelfStatsEndpoint_AllPoolsArchived(t *testing.T) {
 
 	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
 }
+
+func setupTestServerForPoolMembership(t *testing.T) (*Server, sqlmock.Sqlmock) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+
+	s := &Server{
+		Router: mux.NewRouter(),
+		model:  model.New(db),
+		broker: NewPoolBroker(),
+	}
+
+	s.Router.Path("/user/{id:[0-9]+}/pool/{membership:(?:own|belong)}").Methods(http.MethodGet).Handler(s.getUserIDPoolMembershipEndpoint())
+
+	return s, mock
+}
+
+func poolMembershipRows() *sqlmock.Rows {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	return sqlmock.NewRows([]string{
+		"id", "token", "user_id", "name", "grid_type", "number_set_config", "password_hash",
+		"password_required", "open_access_on_lock", "locks", "created", "modified", "check_id", "archived",
+	}).AddRow(int64(1), "tok-1", int64(123), "Super Bowl Squares", "std100", "standard", "hash", true, false, nil, now, now, int64(0), false)
+}
+
+func TestGetUserIDPoolMembershipEndpoint_OwnWithSearch(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock := setupTestServerForPoolMembership(t)
+
+	// search is trimmed and passed as an ILIKE pattern after user_id, offset and limit
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE user_id = \\$1 AND archived = 'f' AND pools.name ILIKE \\$4 ORDER BY pools.id DESC OFFSET \\$2 LIMIT \\$3").
+		WithArgs(int64(123), int64(0), 10, "%super%").
+		WillReturnRows(poolMembershipRows())
+
+	mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM pools WHERE user_id = \\$1 AND archived = 'f' AND pools.name ILIKE \\$2").
+		WithArgs(int64(123), "%super%").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	req := httptest.NewRequest(http.MethodGet, "/user/123/pool/own?search=%20super%20", nil)
+	rec := httptest.NewRecorder()
+	ctx := context.WithValue(req.Context(), ctxUserIDKey, int64(123))
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var result struct {
+		Pools []struct {
+			Name string `json:"name"`
+		} `json:"pools"`
+		Total int64 `json:"total"`
+	}
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &result)).Should(gomega.Succeed())
+	g.Expect(result.Total).Should(gomega.Equal(int64(1)))
+	g.Expect(result.Pools).Should(gomega.HaveLen(1))
+	g.Expect(result.Pools[0].Name).Should(gomega.Equal("Super Bowl Squares"))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestGetUserIDPoolMembershipEndpoint_OwnIncludeArchivedWithSearch(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock := setupTestServerForPoolMembership(t)
+
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE user_id = \\$1 AND pools.name ILIKE \\$4 ORDER BY pools.id DESC OFFSET \\$2 LIMIT \\$3").
+		WithArgs(int64(123), int64(10), 10, "%bowl%").
+		WillReturnRows(poolMembershipRows())
+
+	mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM pools WHERE user_id = \\$1 AND pools.name ILIKE \\$2").
+		WithArgs(int64(123), "%bowl%").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(11))
+
+	req := httptest.NewRequest(http.MethodGet, "/user/123/pool/own?search=bowl&includeArchived=true&offset=10", nil)
+	rec := httptest.NewRecorder()
+	ctx := context.WithValue(req.Context(), ctxUserIDKey, int64(123))
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestGetUserIDPoolMembershipEndpoint_OwnWithoutSearch(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock := setupTestServerForPoolMembership(t)
+
+	// a blank search must not add an ILIKE clause or an extra argument
+	mock.ExpectQuery("SELECT .+ FROM pools WHERE user_id = \\$1 AND archived = 'f' ORDER BY pools.id DESC OFFSET \\$2 LIMIT \\$3").
+		WithArgs(int64(123), int64(0), 10).
+		WillReturnRows(poolMembershipRows())
+
+	mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM pools WHERE user_id = \\$1 AND archived = 'f'$").
+		WithArgs(int64(123)).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	req := httptest.NewRequest(http.MethodGet, "/user/123/pool/own?search=%20%20", nil)
+	rec := httptest.NewRecorder()
+	ctx := context.WithValue(req.Context(), ctxUserIDKey, int64(123))
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestGetUserIDPoolMembershipEndpoint_BelongWithSearch(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock := setupTestServerForPoolMembership(t)
+
+	mock.ExpectQuery("SELECT .+ FROM pools LEFT JOIN pools_users ON pools.id = pools_users.pool_id WHERE pools_users.user_id = \\$1 AND pools.name ILIKE \\$4 ORDER BY pools.id DESC OFFSET \\$2 LIMIT \\$3").
+		WithArgs(int64(123), int64(0), 10, "%squares%").
+		WillReturnRows(poolMembershipRows())
+
+	mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM pools LEFT JOIN pools_users ON pools.id = pools_users.pool_id WHERE pools_users.user_id = \\$1 AND pools.name ILIKE \\$2").
+		WithArgs(int64(123), "%squares%").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	req := httptest.NewRequest(http.MethodGet, "/user/123/pool/belong?search=squares", nil)
+	rec := httptest.NewRecorder()
+	ctx := context.WithValue(req.Context(), ctxUserIDKey, int64(123))
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+
+	var result struct {
+		Total int64 `json:"total"`
+	}
+	g.Expect(json.Unmarshal(rec.Body.Bytes(), &result)).Should(gomega.Succeed())
+	g.Expect(result.Total).Should(gomega.Equal(int64(1)))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func TestGetUserIDPoolMembershipEndpoint_BelongWithoutSearch(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock := setupTestServerForPoolMembership(t)
+
+	mock.ExpectQuery("SELECT .+ FROM pools LEFT JOIN pools_users ON pools.id = pools_users.pool_id WHERE pools_users.user_id = \\$1 ORDER BY pools.id DESC OFFSET \\$2 LIMIT \\$3").
+		WithArgs(int64(123), int64(0), 10).
+		WillReturnRows(poolMembershipRows())
+
+	mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM pools LEFT JOIN pools_users ON pools.id = pools_users.pool_id WHERE pools_users.user_id = \\$1$").
+		WithArgs(int64(123)).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	req := httptest.NewRequest(http.MethodGet, "/user/123/pool/belong", nil)
+	rec := httptest.NewRecorder()
+	ctx := context.WithValue(req.Context(), ctxUserIDKey, int64(123))
+
+	s.Router.ServeHTTP(rec, req.WithContext(ctx))
+
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}

@@ -43,7 +43,7 @@ func TestJoinGrid(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	g.Expect(u.JoinPool(context.Background(), pool)).Should(gomega.Succeed())
-	count, err := u.PoolsJoinedByUserIDCount(context.Background(), u.ID)
+	count, err := u.PoolsJoinedByUserIDCount(context.Background(), u.ID, "")
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(0))) // verify you can't join a pool you own
 

@@ -21,6 +21,7 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -156,24 +157,24 @@ func TestGridCollections(t *testing.T) {
 	user2, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
 	g.Expect(err).Should(gomega.Succeed())
 
-	collection, err := m.PoolsJoinedByUserID(context.Background(), user.ID, 0, 10)
+	collection, err := m.PoolsJoinedByUserID(context.Background(), user.ID, "", 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(0))
 
-	collection, err = m.PoolsJoinedByUserID(context.Background(), user2.ID, 0, 10)
+	collection, err = m.PoolsJoinedByUserID(context.Background(), user2.ID, "", 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(0))
 
 	g.Expect(user2.JoinPool(context.Background(), pool)).Should(gomega.Succeed())
-	collection, err = m.PoolsJoinedByUserID(context.Background(), user2.ID, 0, 10)
+	collection, err = m.PoolsJoinedByUserID(context.Background(), user2.ID, "", 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(1))
 
-	collection, err = m.PoolsOwnedByUserID(context.Background(), user.ID, false, 0, 10)
+	collection, err = m.PoolsOwnedByUserID(context.Background(), user.ID, false, "", 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(1))
 
-	collection, err = m.PoolsOwnedByUserID(context.Background(), user2.ID, false, 0, 10)
+	collection, err = m.PoolsOwnedByUserID(context.Background(), user2.ID, false, "", 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(collection)).Should(gomega.Equal(0))
 }
@@ -201,19 +202,19 @@ func TestGridCollectionPagination(t *testing.T) {
 		}
 	}
 
-	count, err := m.PoolsOwnedByUserIDCount(context.Background(), user1.ID, false)
+	count, err := m.PoolsOwnedByUserIDCount(context.Background(), user1.ID, false, "")
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(30)))
 
-	count, err = m.PoolsOwnedByUserIDCount(context.Background(), user2.ID, false)
+	count, err = m.PoolsOwnedByUserIDCount(context.Background(), user2.ID, false, "")
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(0)))
 
-	count, err = m.PoolsJoinedByUserIDCount(context.Background(), user1.ID)
+	count, err = m.PoolsJoinedByUserIDCount(context.Background(), user1.ID, "")
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(0)))
 
-	count, err = m.PoolsJoinedByUserIDCount(context.Background(), user2.ID)
+	count, err = m.PoolsJoinedByUserIDCount(context.Background(), user2.ID, "")
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(20)))
 
@@ -358,11 +359,11 @@ func TestArchiving(t *testing.T) {
 		g.Expect(pool).ShouldNot(gomega.BeNil())
 	}
 
-	pools, err := user.PoolsOwnedByUserID(context.Background(), user.ID, false, 0, 10)
+	pools, err := user.PoolsOwnedByUserID(context.Background(), user.ID, false, "", 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(pools)).Should(gomega.Equal(3))
 
-	count, err := user.PoolsOwnedByUserIDCount(context.Background(), user.ID, false)
+	count, err := user.PoolsOwnedByUserIDCount(context.Background(), user.ID, false, "")
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(3)))
 
@@ -373,21 +374,21 @@ func TestArchiving(t *testing.T) {
 
 	//
 
-	pools, err = user.PoolsOwnedByUserID(context.Background(), user.ID, false, 0, 10)
+	pools, err = user.PoolsOwnedByUserID(context.Background(), user.ID, false, "", 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(pools)).Should(gomega.Equal(2))
 
-	count, err = user.PoolsOwnedByUserIDCount(context.Background(), user.ID, false)
+	count, err = user.PoolsOwnedByUserIDCount(context.Background(), user.ID, false, "")
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(2)))
 
 	//
 
-	pools, err = user.PoolsOwnedByUserID(context.Background(), user.ID, true, 0, 10)
+	pools, err = user.PoolsOwnedByUserID(context.Background(), user.ID, true, "", 0, 10)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(len(pools)).Should(gomega.Equal(3))
 
-	count, err = user.PoolsOwnedByUserIDCount(context.Background(), user.ID, true)
+	count, err = user.PoolsOwnedByUserIDCount(context.Background(), user.ID, true, "")
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(count).Should(gomega.Equal(int64(3)))
 }
@@ -631,4 +632,106 @@ func TestPoolUsers_OwnerOnly(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(users).Should(gomega.HaveLen(1))
 	g.Expect(users[0].ID).Should(gomega.Equal(owner.ID))
+}
+
+func TestPoolCollectionsSearch(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+
+	owner, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	member, err := m.GetUser(context.Background(), IssuerSqMGR, randString())
+	g.Expect(err).Should(gomega.Succeed())
+
+	// a unique marker keeps this test isolated from pools created by other tests
+	marker := randString()
+	names := []string{
+		"Super Bowl " + marker,
+		"SUPER Sunday " + marker,
+		"Playoff Party " + marker,
+	}
+
+	for _, name := range names {
+		pool, err := m.NewPool(context.Background(), owner.ID, name, GridTypeStd100, "search-password", NumberSetConfigStandard)
+		g.Expect(err).Should(gomega.Succeed())
+		g.Expect(member.JoinPool(context.Background(), pool)).Should(gomega.Succeed())
+	}
+
+	// archive one of the matching pools so the archived filter can be checked alongside search
+	owned, err := m.PoolsOwnedByUserID(context.Background(), owner.ID, false, "super sunday "+marker, 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(owned).Should(gomega.HaveLen(1))
+	owned[0].SetArchived(true)
+	g.Expect(owned[0].Save(context.Background())).Should(gomega.Succeed())
+
+	// owned: empty search returns everything
+	owned, err = m.PoolsOwnedByUserID(context.Background(), owner.ID, true, "", 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(owned).Should(gomega.HaveLen(3))
+
+	count, err := m.PoolsOwnedByUserIDCount(context.Background(), owner.ID, true, "")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(3)))
+
+	// owned: search is a case-insensitive substring match
+	owned, err = m.PoolsOwnedByUserID(context.Background(), owner.ID, true, "sUpEr", 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(owned).Should(gomega.HaveLen(2))
+	for _, p := range owned {
+		g.Expect(strings.ToLower(p.Name())).Should(gomega.ContainSubstring("super"))
+	}
+
+	count, err = m.PoolsOwnedByUserIDCount(context.Background(), owner.ID, true, "sUpEr")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(2)))
+
+	// owned: search combines with the archived filter
+	owned, err = m.PoolsOwnedByUserID(context.Background(), owner.ID, false, "super", 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(owned).Should(gomega.HaveLen(1))
+	g.Expect(owned[0].Name()).Should(gomega.Equal("Super Bowl " + marker))
+
+	count, err = m.PoolsOwnedByUserIDCount(context.Background(), owner.ID, false, "super")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(1)))
+
+	// owned: no match
+	owned, err = m.PoolsOwnedByUserID(context.Background(), owner.ID, true, "no-such-pool-"+marker, 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(owned).Should(gomega.BeEmpty())
+
+	count, err = m.PoolsOwnedByUserIDCount(context.Background(), owner.ID, true, "no-such-pool-"+marker)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(0)))
+
+	// joined: empty search returns everything
+	joined, err := m.PoolsJoinedByUserID(context.Background(), member.ID, "", 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(joined).Should(gomega.HaveLen(3))
+
+	count, err = m.PoolsJoinedByUserIDCount(context.Background(), member.ID, "")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(3)))
+
+	// joined: case-insensitive substring match
+	joined, err = m.PoolsJoinedByUserID(context.Background(), member.ID, "PLAYOFF", 0, 10)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(joined).Should(gomega.HaveLen(1))
+	g.Expect(joined[0].Name()).Should(gomega.Equal("Playoff Party " + marker))
+
+	count, err = m.PoolsJoinedByUserIDCount(context.Background(), member.ID, "PLAYOFF")
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(1)))
+
+	// joined: pagination still applies with a search
+	joined, err = m.PoolsJoinedByUserID(context.Background(), member.ID, marker, 1, 1)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(joined).Should(gomega.HaveLen(1))
+
+	count, err = m.PoolsJoinedByUserIDCount(context.Background(), member.ID, marker)
+	g.Expect(err).Should(gomega.Succeed())
+	g.Expect(count).Should(gomega.Equal(int64(3)))
 }

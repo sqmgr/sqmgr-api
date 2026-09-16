@@ -258,33 +258,55 @@ func (m *Model) poolByRow(scan scanFunc) (*Pool, error) {
 	return &pool, nil
 }
 
-// PoolsJoinedByUserID will return a collection of pools that the user joined
-func (m *Model) PoolsJoinedByUserID(ctx context.Context, userID int64, offset int64, limit int) ([]*Pool, error) {
-	const query = `
+// poolNameFilter returns a SQL fragment that restricts pools to those whose
+// name contains search (case-insensitive). The pattern is appended to args so
+// the placeholder number always matches its position. An empty search returns
+// an empty fragment and leaves args untouched.
+func poolNameFilter(search string, args []interface{}) (string, []interface{}) {
+	if search == "" {
+		return "", args
+	}
+
+	args = append(args, "%"+search+"%")
+	return fmt.Sprintf(" AND pools.name ILIKE $%d", len(args)), args
+}
+
+// PoolsJoinedByUserID will return a collection of pools that the user joined. If search
+// is not empty, only pools whose name contains it (case-insensitive) are returned.
+func (m *Model) PoolsJoinedByUserID(ctx context.Context, userID int64, search string, offset int64, limit int) ([]*Pool, error) {
+	const baseQuery = `
 		SELECT ` + poolColumns + `
 		FROM pools
 		LEFT JOIN pools_users ON pools.id = pools_users.pool_id
-		WHERE pools_users.user_id = $1
+		WHERE pools_users.user_id = $1%s
 		ORDER BY pools.id DESC
 		OFFSET $2
 		LIMIT $3`
 
-	return m.poolsByRows(m.DB.QueryContext(ctx, query, userID, offset, limit))
+	filter, args := poolNameFilter(search, []interface{}{userID, offset, limit})
+	query := fmt.Sprintf(baseQuery, filter)
+
+	return m.poolsByRows(m.DB.QueryContext(ctx, query, args...))
 }
 
-// PoolsJoinedByUserIDCount will return a how many pools the user joined
-func (m *Model) PoolsJoinedByUserIDCount(ctx context.Context, userID int64) (int64, error) {
-	const query = `
+// PoolsJoinedByUserIDCount will return a how many pools the user joined. If search
+// is not empty, only pools whose name contains it (case-insensitive) are counted.
+func (m *Model) PoolsJoinedByUserIDCount(ctx context.Context, userID int64, search string) (int64, error) {
+	query := `
 		SELECT COUNT(*)
 		FROM pools
 		LEFT JOIN pools_users ON pools.id = pools_users.pool_id
 		WHERE pools_users.user_id = $1`
 
-	return m.poolsCount(m.DB.QueryRowContext(ctx, query, userID))
+	filter, args := poolNameFilter(search, []interface{}{userID})
+	query += filter
+
+	return m.poolsCount(m.DB.QueryRowContext(ctx, query, args...))
 }
 
-// PoolsOwnedByUserID will return a collection of pools that were created by the user
-func (m *Model) PoolsOwnedByUserID(ctx context.Context, userID int64, includeArchived bool, offset int64, limit int) ([]*Pool, error) {
+// PoolsOwnedByUserID will return a collection of pools that were created by the user. If
+// search is not empty, only pools whose name contains it (case-insensitive) are returned.
+func (m *Model) PoolsOwnedByUserID(ctx context.Context, userID int64, includeArchived bool, search string, offset int64, limit int) ([]*Pool, error) {
 	const baseQuery = `
 		SELECT ` + poolColumns + `
 		FROM pools
@@ -293,18 +315,20 @@ func (m *Model) PoolsOwnedByUserID(ctx context.Context, userID int64, includeArc
 		OFFSET $2
 		LIMIT $3`
 
-	var query string
-	if includeArchived {
-		query = fmt.Sprintf(baseQuery, "")
-	} else {
-		query = fmt.Sprintf(baseQuery, " AND archived = 'f'")
+	conditions := ""
+	if !includeArchived {
+		conditions = " AND archived = 'f'"
 	}
 
-	return m.poolsByRows(m.DB.QueryContext(ctx, query, userID, offset, limit))
+	filter, args := poolNameFilter(search, []interface{}{userID, offset, limit})
+	query := fmt.Sprintf(baseQuery, conditions+filter)
+
+	return m.poolsByRows(m.DB.QueryContext(ctx, query, args...))
 }
 
-// PoolsOwnedByUserIDCount will return how many pools were created by the user
-func (m *Model) PoolsOwnedByUserIDCount(ctx context.Context, userID int64, includeArchived bool) (int64, error) {
+// PoolsOwnedByUserIDCount will return how many pools were created by the user. If search
+// is not empty, only pools whose name contains it (case-insensitive) are counted.
+func (m *Model) PoolsOwnedByUserIDCount(ctx context.Context, userID int64, includeArchived bool, search string) (int64, error) {
 	query := `
 		SELECT COUNT(*)
 		FROM pools
@@ -314,7 +338,10 @@ func (m *Model) PoolsOwnedByUserIDCount(ctx context.Context, userID int64, inclu
 		query += " AND archived = 'f'"
 	}
 
-	return m.poolsCount(m.DB.QueryRowContext(ctx, query, userID))
+	filter, args := poolNameFilter(search, []interface{}{userID})
+	query += filter
+
+	return m.poolsCount(m.DB.QueryRowContext(ctx, query, args...))
 }
 
 func (m *Model) poolsByRows(rows *sql.Rows, err error) ([]*Pool, error) {
