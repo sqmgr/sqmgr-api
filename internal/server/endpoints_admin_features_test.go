@@ -139,36 +139,75 @@ func TestAdminPoolsEndpoint_BadRequest(t *testing.T) {
 func TestEventOverridePayloadToOverride(t *testing.T) {
 	g := gomega.NewWithT(t)
 	n := func(i int) *int { return &i }
+	parse := func(body string) eventOverridePayload {
+		var p eventOverridePayload
+		g.Expect(json.Unmarshal([]byte(body), &p)).Should(gomega.Succeed(), body)
+		return p
+	}
 
-	o, err := eventOverridePayload{
-		Status: "final", HomeScore: n(24), AwayScore: n(17),
-		HomeQuarters: []*int{n(7), n(10), nil, n(7)}, AwayQuarters: []*int{n(3), n(7), n(7), n(0)},
-		HomeOT: n(0),
-	}.toOverride()
-	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	current := &model.SportsEvent{
+		HomeScore: n(14), AwayScore: n(7),
+		HomeQ1: n(7), HomeQ2: n(7), HomeOT: n(3),
+		AwayQ1: n(0), AwayQ2: n(7), AwayOT: n(0),
+	}
+
+	p := parse(`{"status":"final","homeScore":24,"awayScore":17,` +
+		`"homeQuarters":[7,10,null,7],"awayQuarters":[3,7,7,0],"homeOT":0,"awayOT":null}`)
+	g.Expect(p.validate()).Should(gomega.Succeed())
+	o := p.toOverride(current)
 	g.Expect(o.Status).Should(gomega.Equal(model.SportsEventStatusFinal))
-	g.Expect(*o.HomeScore).Should(gomega.Equal(24))
-	g.Expect(*o.HomeQ2).Should(gomega.Equal(10))
+	g.Expect(o.HomeScore).Should(gomega.Equal(n(24)))
+	g.Expect(o.HomeQ2).Should(gomega.Equal(n(10)))
+	// a null quarter clears it
 	g.Expect(o.HomeQ3).Should(gomega.BeNil())
-	g.Expect(*o.AwayQ4).Should(gomega.Equal(0))
-	g.Expect(*o.HomeOT).Should(gomega.Equal(0))
+	g.Expect(o.AwayQ4).Should(gomega.Equal(n(0)))
+	g.Expect(o.HomeOT).Should(gomega.Equal(n(0)))
+	// an explicit null clears a score the event currently has
 	g.Expect(o.AwayOT).Should(gomega.BeNil())
 
-	// Quarters may be omitted entirely
-	o, err = eventOverridePayload{Status: "in_progress"}.toOverride()
-	g.Expect(err).ShouldNot(gomega.HaveOccurred())
-	g.Expect(o.HomeQ1).Should(gomega.BeNil())
+	// Anything omitted keeps the event's current value
+	p = parse(`{"status":"in_progress"}`)
+	g.Expect(p.validate()).Should(gomega.Succeed())
+	o = p.toOverride(current)
+	g.Expect(o.HomeScore).Should(gomega.Equal(n(14)))
+	g.Expect(o.AwayScore).Should(gomega.Equal(n(7)))
+	g.Expect([]*int{o.HomeQ1, o.HomeQ2, o.HomeQ3, o.HomeQ4, o.HomeOT}).Should(gomega.Equal([]*int{n(7), n(7), nil, nil, n(3)}))
+	g.Expect([]*int{o.AwayQ1, o.AwayQ2, o.AwayQ3, o.AwayQ4, o.AwayOT}).Should(gomega.Equal([]*int{n(0), n(7), nil, nil, n(0)}))
 
-	for name, p := range map[string]eventOverridePayload{
-		"bad status":       {Status: "postponed"},
-		"negative score":   {Status: "final", HomeScore: n(-1)},
-		"negative ot":      {Status: "final", AwayOT: n(-3)},
-		"short quarters":   {Status: "final", HomeQuarters: []*int{n(1), n(2)}},
-		"negative quarter": {Status: "final", AwayQuarters: []*int{n(1), n(-2), n(3), n(4)}},
+	// Each team's quarters are kept or replaced independently
+	o = parse(`{"status":"final","awayQuarters":[null,null,null,null]}`).toOverride(current)
+	g.Expect([]*int{o.HomeQ1, o.HomeQ2}).Should(gomega.Equal([]*int{n(7), n(7)}))
+	g.Expect([]*int{o.AwayQ1, o.AwayQ2, o.AwayQ3, o.AwayQ4}).Should(gomega.Equal([]*int{nil, nil, nil, nil}))
+
+	for name, body := range map[string]string{
+		"bad status":       `{"status":"postponed"}`,
+		"negative score":   `{"status":"final","homeScore":-1}`,
+		"negative ot":      `{"status":"final","awayOT":-3}`,
+		"short quarters":   `{"status":"final","homeQuarters":[1,2]}`,
+		"negative quarter": `{"status":"final","awayQuarters":[1,-2,3,4]}`,
 	} {
-		_, err := p.toOverride()
-		g.Expect(err).Should(gomega.HaveOccurred(), name)
+		g.Expect(parse(body).validate()).ShouldNot(gomega.Succeed(), name)
 	}
+
+	// A score that is not an integer fails to decode
+	var bad eventOverridePayload
+	g.Expect(json.Unmarshal([]byte(`{"status":"final","homeOT":"three"}`), &bad)).ShouldNot(gomega.Succeed())
+}
+
+func TestEventScoreDetails(t *testing.T) {
+	g := gomega.NewWithT(t)
+	n := func(i int) *int { return &i }
+
+	data, err := json.Marshal(eventScoreDetails(&model.SportsEvent{
+		Status: model.SportsEventStatusFinal, HomeScore: n(24), AwayScore: n(17),
+		HomeQ1: n(7), AwayQ4: n(0), HomeOT: n(3),
+	}))
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	g.Expect(string(data)).Should(gomega.MatchJSON(`{
+		"status": "final", "homeScore": 24, "awayScore": 17,
+		"homeQuarters": [7, null, null, null], "awayQuarters": [null, null, null, 0],
+		"homeOT": 3, "awayOT": null
+	}`))
 }
 
 func TestSyncRunner(t *testing.T) {
@@ -432,8 +471,8 @@ func adminTestEventRows(id int64, override bool) *sqlmock.Rows {
 	return sqlmock.NewRows(sportsEventColumns()).AddRow(
 		id, "401", "nfl", "Big Game", "home", "away", now, 2026, nil, false, nil,
 		"in_progress", nil, 2, "5:00", 14, 7,
-		nil, nil, nil, nil, nil,
-		nil, nil, nil, nil, nil,
+		7, 7, nil, nil, nil,
+		0, 7, nil, nil, nil,
 		now, now, now, override,
 	)
 }
@@ -481,9 +520,11 @@ func TestPostAdminEventOverrideEndpoint(t *testing.T) {
 	s.Router.ServeHTTP(rec, jsonRequest(http.MethodPost, "/admin/events/6/override", `{"status":"cancelled"}`))
 	g.Expect(rec.Code).Should(gomega.Equal(http.StatusBadRequest))
 
+	// The payload omits the quarter and overtime scores, so the event's
+	// existing ones are written back rather than being cleared.
 	expectAdminEventLoad(mock, 6, false)
 	mock.ExpectExec(`UPDATE sports_events SET status = \$1`).
-		WithArgs("final", 24, 17, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, int64(6), true, false).
+		WithArgs("final", 24, 17, 7, 7, nil, nil, nil, 0, 7, nil, nil, nil, int64(6), true, false).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`SELECT pg_notify`).WithArgs("6").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectQuery(`INSERT INTO admin_audit_log`).
@@ -499,7 +540,23 @@ func TestPostAdminEventOverrideEndpoint(t *testing.T) {
 	g.Expect(body.ManualOverride).Should(gomega.BeTrue())
 	g.Expect(body.Status).Should(gomega.Equal(model.SportsEventStatusFinal))
 	g.Expect(*body.HomeScore).Should(gomega.Equal(24))
+	g.Expect(*body.HomeQ2).Should(gomega.Equal(7))
 	g.Expect(body.HomeTeam.FullName).Should(gomega.Equal("Home Team"))
+
+	// Explicit nulls clear scores, and only the team whose quarters are sent is changed
+	expectAdminEventLoad(mock, 6, false)
+	mock.ExpectExec(`UPDATE sports_events SET status = \$1`).
+		WithArgs("final", 24, 17, nil, nil, nil, nil, nil, 0, 7, nil, nil, nil, int64(6), true, false).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`SELECT pg_notify`).WithArgs("6").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery(`INSERT INTO admin_audit_log`).
+		WithArgs(int64(7), "event.override", "event", "6", "Big Game", sqlmock.AnyArg(), nil).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+
+	rec = httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, jsonRequest(http.MethodPost, "/admin/events/6/override",
+		`{"status":"final","homeScore":24,"awayScore":17,"homeQuarters":[null,null,null,null],"homeOT":null}`))
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusOK))
 
 	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
 }

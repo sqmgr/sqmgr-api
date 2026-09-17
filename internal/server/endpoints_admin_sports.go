@@ -19,6 +19,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -297,51 +298,101 @@ func (s *Server) postAdminEventRefreshEndpoint() http.HandlerFunc {
 	}
 }
 
-// eventOverridePayload is the body of a manual score correction
-type eventOverridePayload struct {
-	Status       string `json:"status"`
-	HomeScore    *int   `json:"homeScore"`
-	AwayScore    *int   `json:"awayScore"`
-	HomeQuarters []*int `json:"homeQuarters"`
-	AwayQuarters []*int `json:"awayQuarters"`
-	HomeOT       *int   `json:"homeOT"`
-	AwayOT       *int   `json:"awayOT"`
-	Reason       string `json:"reason"`
+// optionalInt is a JSON integer that records whether it was present in the
+// payload, so that an omitted field ("leave it alone") can be told apart from
+// an explicit null ("clear it").
+type optionalInt struct {
+	Set   bool
+	Value *int
 }
 
-// toOverride validates the payload and converts it to a model override.
-func (p eventOverridePayload) toOverride() (model.SportsEventOverride, error) {
-	o := model.SportsEventOverride{Status: model.SportsEventStatus(p.Status)}
-	if !o.Status.IsValid() {
-		return o, fmt.Errorf("invalid status %q", p.Status)
+// UnmarshalJSON implements json.Unmarshaler. It is only called for fields
+// that appear in the payload, including those set to null.
+func (o *optionalInt) UnmarshalJSON(data []byte) error {
+	o.Set = true
+	o.Value = nil
+	return json.Unmarshal(data, &o.Value)
+}
+
+// resolve returns the payload's value, or current if the field was omitted
+func (o optionalInt) resolve(current *int) *int {
+	if !o.Set {
+		return current
+	}
+	return o.Value
+}
+
+// eventOverridePayload is the body of a manual score correction. Any score
+// that is omitted keeps the event's current value; a null clears it. Quarter
+// scores are all-or-nothing per team: either omitted, or exactly 4 entries
+// where a null entry clears that quarter.
+type eventOverridePayload struct {
+	Status       string      `json:"status"`
+	HomeScore    optionalInt `json:"homeScore"`
+	AwayScore    optionalInt `json:"awayScore"`
+	HomeQuarters []*int      `json:"homeQuarters"`
+	AwayQuarters []*int      `json:"awayQuarters"`
+	HomeOT       optionalInt `json:"homeOT"`
+	AwayOT       optionalInt `json:"awayOT"`
+	Reason       string      `json:"reason"`
+}
+
+// validate checks the payload without needing the event it applies to
+func (p eventOverridePayload) validate() error {
+	if status := model.SportsEventStatus(p.Status); !status.IsValid() {
+		return fmt.Errorf("invalid status %q", p.Status)
 	}
 
-	for _, score := range []*int{p.HomeScore, p.AwayScore, p.HomeOT, p.AwayOT} {
-		if score != nil && *score < 0 {
-			return o, errors.New("scores cannot be negative")
+	for _, score := range []optionalInt{p.HomeScore, p.AwayScore, p.HomeOT, p.AwayOT} {
+		if score.Value != nil && *score.Value < 0 {
+			return errors.New("scores cannot be negative")
 		}
 	}
 	for _, quarters := range [][]*int{p.HomeQuarters, p.AwayQuarters} {
 		if len(quarters) != 0 && len(quarters) != 4 {
-			return o, errors.New("quarter scores must have exactly 4 entries")
+			return errors.New("quarter scores must have exactly 4 entries")
 		}
 		for _, q := range quarters {
 			if q != nil && *q < 0 {
-				return o, errors.New("scores cannot be negative")
+				return errors.New("scores cannot be negative")
 			}
 		}
 	}
 
-	o.HomeScore, o.AwayScore = p.HomeScore, p.AwayScore
-	o.HomeOT, o.AwayOT = p.HomeOT, p.AwayOT
+	return nil
+}
+
+// toOverride converts a validated payload to a model override, carrying over
+// the current event's value for every score the payload omits.
+func (p eventOverridePayload) toOverride(current *model.SportsEvent) model.SportsEventOverride {
+	o := model.SportsEventOverride{Status: model.SportsEventStatus(p.Status)}
+
+	o.HomeScore, o.AwayScore = p.HomeScore.resolve(current.HomeScore), p.AwayScore.resolve(current.AwayScore)
+	o.HomeOT, o.AwayOT = p.HomeOT.resolve(current.HomeOT), p.AwayOT.resolve(current.AwayOT)
+
+	o.HomeQ1, o.HomeQ2, o.HomeQ3, o.HomeQ4 = current.HomeQ1, current.HomeQ2, current.HomeQ3, current.HomeQ4
 	if len(p.HomeQuarters) == 4 {
 		o.HomeQ1, o.HomeQ2, o.HomeQ3, o.HomeQ4 = p.HomeQuarters[0], p.HomeQuarters[1], p.HomeQuarters[2], p.HomeQuarters[3]
 	}
+	o.AwayQ1, o.AwayQ2, o.AwayQ3, o.AwayQ4 = current.AwayQ1, current.AwayQ2, current.AwayQ3, current.AwayQ4
 	if len(p.AwayQuarters) == 4 {
 		o.AwayQ1, o.AwayQ2, o.AwayQ3, o.AwayQ4 = p.AwayQuarters[0], p.AwayQuarters[1], p.AwayQuarters[2], p.AwayQuarters[3]
 	}
 
-	return o, nil
+	return o
+}
+
+// eventScoreDetails snapshots an event's status and scores for the audit log
+func eventScoreDetails(event *model.SportsEvent) map[string]interface{} {
+	return map[string]interface{}{
+		"status":       event.Status,
+		"homeScore":    event.HomeScore,
+		"awayScore":    event.AwayScore,
+		"homeQuarters": []*int{event.HomeQ1, event.HomeQ2, event.HomeQ3, event.HomeQ4},
+		"awayQuarters": []*int{event.AwayQ1, event.AwayQ2, event.AwayQ3, event.AwayQ4},
+		"homeOT":       event.HomeOT,
+		"awayOT":       event.AwayOT,
+	}
 }
 
 // postAdminEventOverrideEndpoint applies a manual status and score correction
@@ -358,8 +409,8 @@ func (s *Server) postAdminEventOverrideEndpoint() http.HandlerFunc {
 			return
 		}
 
-		override, err := req.toOverride()
-		if err != nil {
+		// Reject a malformed payload before touching the database
+		if err := req.validate(); err != nil {
 			s.writeErrorResponse(w, http.StatusBadRequest, err)
 			return
 		}
@@ -369,11 +420,8 @@ func (s *Server) postAdminEventOverrideEndpoint() http.HandlerFunc {
 			return
 		}
 
-		previous := map[string]interface{}{
-			"status":    event.Status,
-			"homeScore": event.HomeScore,
-			"awayScore": event.AwayScore,
-		}
+		override := req.toOverride(event)
+		previous := eventScoreDetails(event)
 
 		if err := event.ApplyOverride(r.Context(), override); err != nil {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
@@ -388,11 +436,7 @@ func (s *Server) postAdminEventOverrideEndpoint() http.HandlerFunc {
 			Reason:      req.Reason,
 			Details: map[string]interface{}{
 				"previous": previous,
-				"new": map[string]interface{}{
-					"status":    event.Status,
-					"homeScore": event.HomeScore,
-					"awayScore": event.AwayScore,
-				},
+				"new":      eventScoreDetails(event),
 			},
 		})
 

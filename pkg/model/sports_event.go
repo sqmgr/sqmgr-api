@@ -1018,7 +1018,8 @@ func (m *Model) LoadTeamsForEvents(ctx context.Context, events []*BDLEvent) erro
 }
 
 // SportsEventOverride is a manual correction to an event's status and scores.
-// A nil score leaves that column NULL.
+// Every score is written as given, so a nil score clears that column; callers
+// that want to keep an existing score must carry it over themselves.
 type SportsEventOverride struct {
 	Status    SportsEventStatus
 	HomeScore *int
