@@ -39,6 +39,8 @@ const (
 	adminPoolActionResetPassword     = "resetPassword"
 	adminPoolActionTransferOwnership = "transferOwnership"
 	adminPoolActionRevokeInvites     = "revokeInvites"
+	adminPoolActionAddManager        = "addManager"
+	adminPoolActionRemoveManager     = "removeManager"
 )
 
 // adminPoolAnalytics runs fn against the analytics layer for the pool named in
@@ -156,6 +158,27 @@ func (s *Server) getAdminPoolSquaresEndpoint() http.HandlerFunc {
 	}
 }
 
+// adminPoolActionUser loads the user a pool action applies to, writing the
+// error response itself when the ID is missing or unknown.
+func (s *Server) adminPoolActionUser(w http.ResponseWriter, r *http.Request, userID int64) (*model.User, bool) {
+	if userID <= 0 {
+		s.writeErrorResponse(w, http.StatusBadRequest, errors.New("userId is required"))
+		return nil, false
+	}
+
+	user, err := s.model.GetUserByID(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			s.writeErrorResponse(w, http.StatusNotFound, fmt.Errorf("user %d not found", userID))
+			return nil, false
+		}
+		s.writeErrorResponse(w, http.StatusInternalServerError, err)
+		return nil, false
+	}
+
+	return user, true
+}
+
 // postAdminPoolActionEndpoint performs an administrative change to a pool and
 // records it in the audit log
 func (s *Server) postAdminPoolActionEndpoint() http.HandlerFunc {
@@ -238,17 +261,8 @@ func (s *Server) postAdminPoolActionEndpoint() http.HandlerFunc {
 
 		case adminPoolActionTransferOwnership:
 			rec.Action = model.AdminAuditPoolTransferOwnership
-			if req.UserID <= 0 {
-				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("userId is required"))
-				return
-			}
-			newOwner, lookupErr := s.model.GetUserByID(r.Context(), req.UserID)
-			if lookupErr != nil {
-				if errors.Is(lookupErr, sql.ErrNoRows) {
-					s.writeErrorResponse(w, http.StatusNotFound, fmt.Errorf("user %d not found", req.UserID))
-					return
-				}
-				s.writeErrorResponse(w, http.StatusInternalServerError, lookupErr)
+			newOwner, ok := s.adminPoolActionUser(w, r, req.UserID)
+			if !ok {
 				return
 			}
 			if newOwner.ID == pool.UserID() {
@@ -258,6 +272,42 @@ func (s *Server) postAdminPoolActionEndpoint() http.HandlerFunc {
 			rec.Details["previousOwnerId"] = pool.UserID()
 			rec.Details["newOwnerId"] = newOwner.ID
 			err = pool.TransferOwnership(r.Context(), newOwner.ID)
+
+		case adminPoolActionAddManager, adminPoolActionRemoveManager:
+			rec.Action = model.AdminAuditPoolAddManager
+			if req.Action == adminPoolActionRemoveManager {
+				rec.Action = model.AdminAuditPoolRemoveManager
+			}
+			manager, ok := s.adminPoolActionUser(w, r, req.UserID)
+			if !ok {
+				return
+			}
+			if manager.ID == pool.UserID() {
+				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("the pool owner is always a manager"))
+				return
+			}
+			// Guest accounts are transient, so they cannot be given a lasting role
+			if req.Action == adminPoolActionAddManager && manager.Store != model.UserStoreAuth0 {
+				s.writeErrorResponse(w, http.StatusBadRequest, errors.New("only registered users can be pool managers"))
+				return
+			}
+			rec.Details["userId"] = manager.ID
+			rec.Details["userEmail"] = manager.Email
+
+			var changed bool
+			if req.Action == adminPoolActionAddManager {
+				changed, err = manager.AddManagerOf(r.Context(), pool)
+			} else {
+				changed, err = manager.RemoveManagerOf(r.Context(), pool)
+			}
+			if err == nil && !changed {
+				msg := "that user is already a manager of the pool"
+				if req.Action == adminPoolActionRemoveManager {
+					msg = "that user is not a manager of the pool"
+				}
+				s.writeErrorResponse(w, http.StatusConflict, errors.New(msg))
+				return
+			}
 
 		case adminPoolActionRevokeInvites:
 			rec.Action = model.AdminAuditPoolRevokeInvites

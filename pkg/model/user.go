@@ -180,6 +180,46 @@ WHERE
 	return nil
 }
 
+// AddManagerOf makes the user a manager of the pool, joining them to it first
+// if they are not already a member. It reports whether anything changed, which
+// is false when the user already manages the pool.
+func (u *User) AddManagerOf(ctx context.Context, p *Pool) (bool, error) {
+	result, err := u.DB.ExecContext(ctx, `
+INSERT INTO pools_users (pool_id, user_id, is_manager)
+VALUES ($1, $2, true)
+ON CONFLICT (user_id, pool_id) DO UPDATE
+SET is_manager = true, modified = (NOW() AT TIME ZONE 'UTC')
+WHERE NOT pools_users.is_manager`, p.ID(), u.ID)
+	if err != nil {
+		return false, fmt.Errorf("adding pool manager: %w", err)
+	}
+
+	return rowsChanged(result, "adding pool manager")
+}
+
+// RemoveManagerOf takes away the user's manager role in the pool, leaving them
+// as a regular member. It reports whether anything changed, which is false
+// when the user was not a manager.
+func (u *User) RemoveManagerOf(ctx context.Context, p *Pool) (bool, error) {
+	result, err := u.DB.ExecContext(ctx, `
+UPDATE pools_users
+SET is_manager = false, modified = (NOW() AT TIME ZONE 'UTC')
+WHERE pool_id = $1 AND user_id = $2 AND is_manager`, p.ID(), u.ID)
+	if err != nil {
+		return false, fmt.Errorf("removing pool manager: %w", err)
+	}
+
+	return rowsChanged(result, "removing pool manager")
+}
+
+func rowsChanged(result sql.Result, action string) (bool, error) {
+	n, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", action, err)
+	}
+	return n > 0, nil
+}
+
 // HasManagerVisibility returns true if the user should see manager-level details
 // for a pool. This includes pool managers and site admins. Site admins get
 // read-only visibility but not write authority over pools they don't own;

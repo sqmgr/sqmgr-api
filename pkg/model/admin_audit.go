@@ -38,6 +38,8 @@ const (
 	AdminAuditPoolResetPassword     AdminAuditAction = "pool.resetPassword"
 	AdminAuditPoolTransferOwnership AdminAuditAction = "pool.transferOwnership"
 	AdminAuditPoolRevokeInvites     AdminAuditAction = "pool.revokeInvites"
+	AdminAuditPoolAddManager        AdminAuditAction = "pool.addManager"
+	AdminAuditPoolRemoveManager     AdminAuditAction = "pool.removeManager"
 	AdminAuditEventRefresh          AdminAuditAction = "event.refresh"
 	AdminAuditEventOverride         AdminAuditAction = "event.override"
 	AdminAuditEventClearOverride    AdminAuditAction = "event.clearOverride"
@@ -64,6 +66,8 @@ var adminAuditActions = map[AdminAuditAction]bool{
 	AdminAuditPoolResetPassword:     true,
 	AdminAuditPoolTransferOwnership: true,
 	AdminAuditPoolRevokeInvites:     true,
+	AdminAuditPoolAddManager:        true,
+	AdminAuditPoolRemoveManager:     true,
 	AdminAuditEventRefresh:          true,
 	AdminAuditEventOverride:         true,
 	AdminAuditEventClearOverride:    true,

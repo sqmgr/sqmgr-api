@@ -20,6 +20,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -462,6 +463,91 @@ func TestPostAdminPoolActionEndpoint_RevokeInvites(t *testing.T) {
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, jsonRequest(http.MethodPost, "/admin/pool/tok/action", `{"action":"revokeInvites"}`))
 	g.Expect(rec.Code).Should(gomega.Equal(http.StatusNoContent))
+
+	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
+}
+
+func adminTestUserRow(id int64, store string, email interface{}) *sqlmock.Rows {
+	return sqlmock.NewRows([]string{"id", "store", "store_id", "is_site_admin", "email", "created"}).
+		AddRow(id, store, store+"|x", false, email, time.Now())
+}
+
+func TestPostAdminPoolActionEndpoint_Managers(t *testing.T) {
+	g := gomega.NewWithT(t)
+	s, mock := newAdminTestServer(t)
+
+	post := func(body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		s.Router.ServeHTTP(rec, jsonRequest(http.MethodPost, "/admin/pool/tok/action", body))
+		return rec
+	}
+	expectPool := func() {
+		mock.ExpectQuery(`FROM pools WHERE token = \$1`).WithArgs("tok").WillReturnRows(adminTestPoolRow("tok"))
+	}
+	expectUser := func(id int64, store string) {
+		mock.ExpectQuery(`FROM users WHERE id = \$1`).WithArgs(id).WillReturnRows(adminTestUserRow(id, store, "pat@example.com"))
+	}
+
+	// Add: the user is looked up, upserted as a manager, and the change audited
+	expectPool()
+	expectUser(2, "auth0")
+	mock.ExpectExec(`INSERT INTO pools_users \(pool_id, user_id, is_manager\)`).WithArgs(int64(10), int64(2)).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`INSERT INTO admin_audit_log`).
+		WithArgs(int64(7), "pool.addManager", "pool", "tok", "Test Pool", `{"userEmail":"pat@example.com","userId":2}`, "owner asked").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+	g.Expect(post(`{"action":"addManager","userId":2,"reason":"owner asked"}`).Code).Should(gomega.Equal(http.StatusNoContent))
+
+	// Remove
+	expectPool()
+	expectUser(2, "auth0")
+	mock.ExpectExec(`UPDATE pools_users SET is_manager = false`).WithArgs(int64(10), int64(2)).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`INSERT INTO admin_audit_log`).
+		WithArgs(int64(7), "pool.removeManager", "pool", "tok", "Test Pool", `{"userEmail":"pat@example.com","userId":2}`, nil).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
+	g.Expect(post(`{"action":"removeManager","userId":2}`).Code).Should(gomega.Equal(http.StatusNoContent))
+
+	// Nothing to change is a conflict and is not audited
+	expectPool()
+	expectUser(2, "auth0")
+	mock.ExpectExec(`INSERT INTO pools_users`).WithArgs(int64(10), int64(2)).WillReturnResult(sqlmock.NewResult(0, 0))
+	rec := post(`{"action":"addManager","userId":2}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusConflict))
+	g.Expect(rec.Body.String()).Should(gomega.ContainSubstring("already a manager"))
+
+	expectPool()
+	expectUser(2, "auth0")
+	mock.ExpectExec(`UPDATE pools_users`).WithArgs(int64(10), int64(2)).WillReturnResult(sqlmock.NewResult(0, 0))
+	rec = post(`{"action":"removeManager","userId":2}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusConflict))
+	g.Expect(rec.Body.String()).Should(gomega.ContainSubstring("not a manager"))
+
+	// Missing and unknown users
+	expectPool()
+	g.Expect(post(`{"action":"addManager"}`).Code).Should(gomega.Equal(http.StatusBadRequest))
+
+	expectPool()
+	mock.ExpectQuery(`FROM users WHERE id = \$1`).WithArgs(int64(99)).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	g.Expect(post(`{"action":"addManager","userId":99}`).Code).Should(gomega.Equal(http.StatusNotFound))
+
+	// The owner (user 1) is always a manager, so neither action applies
+	for _, action := range []string{"addManager", "removeManager"} {
+		expectPool()
+		expectUser(1, "auth0")
+		g.Expect(post(`{"action":"`+action+`","userId":1}`).Code).Should(gomega.Equal(http.StatusBadRequest), action)
+	}
+
+	// Guests cannot be made managers
+	expectPool()
+	expectUser(3, "sqmgr")
+	rec = post(`{"action":"addManager","userId":3}`)
+	g.Expect(rec.Code).Should(gomega.Equal(http.StatusBadRequest))
+	g.Expect(rec.Body.String()).Should(gomega.ContainSubstring("registered users"))
+
+	// Database failures surface as a 500
+	expectPool()
+	expectUser(2, "auth0")
+	mock.ExpectExec(`INSERT INTO pools_users`).WillReturnError(errors.New("boom"))
+	g.Expect(post(`{"action":"addManager","userId":2}`).Code).Should(gomega.Equal(http.StatusInternalServerError))
 
 	g.Expect(mock.ExpectationsWereMet()).Should(gomega.Succeed())
 }
