@@ -481,6 +481,16 @@ type AdminLinkedEvent struct {
 	StatusDetail string            `json:"statusDetail,omitempty"`
 	HomeScore    *int              `json:"homeScore,omitempty"`
 	AwayScore    *int              `json:"awayScore,omitempty"`
+	HomeQ1       *int              `json:"homeQ1,omitempty"`
+	HomeQ2       *int              `json:"homeQ2,omitempty"`
+	HomeQ3       *int              `json:"homeQ3,omitempty"`
+	HomeQ4       *int              `json:"homeQ4,omitempty"`
+	HomeOT       *int              `json:"homeOT,omitempty"`
+	AwayQ1       *int              `json:"awayQ1,omitempty"`
+	AwayQ2       *int              `json:"awayQ2,omitempty"`
+	AwayQ3       *int              `json:"awayQ3,omitempty"`
+	AwayQ4       *int              `json:"awayQ4,omitempty"`
+	AwayOT       *int              `json:"awayOT,omitempty"`
 	HomeTeam     *SportsTeamJSON   `json:"homeTeam,omitempty"`
 	AwayTeam     *SportsTeamJSON   `json:"awayTeam,omitempty"`
 	GridCount    int64             `json:"gridCount"`
@@ -592,6 +602,8 @@ func (m *Model) GetAdminLinkedEvents(ctx context.Context, filter AdminLinkedEven
 		SELECT
 			e.id, e.espn_id, e.league, e.name, e.home_team_id, e.away_team_id,
 			e.event_date, e.status, e.status_detail, e.home_score, e.away_score,
+			e.home_q1, e.home_q2, e.home_q3, e.home_q4, e.home_ot,
+			e.away_q1, e.away_q2, e.away_q3, e.away_q4, e.away_ot,
 			e.manual_override, e.last_synced,
 			COUNT(g.id) AS grid_count
 		FROM sports_events e
@@ -617,6 +629,8 @@ func (m *Model) GetAdminLinkedEvents(ctx context.Context, filter AdminLinkedEven
 		if err := rows.Scan(
 			&ale.ID, &ale.ESPNID, &ale.League, &name, &ale.HomeTeamID, &ale.AwayTeamID,
 			&ale.EventDate, &ale.Status, &statusDetail, &ale.HomeScore, &ale.AwayScore,
+			&ale.HomeQ1, &ale.HomeQ2, &ale.HomeQ3, &ale.HomeQ4, &ale.HomeOT,
+			&ale.AwayQ1, &ale.AwayQ2, &ale.AwayQ3, &ale.AwayQ4, &ale.AwayOT,
 			&ale.ManualOverride, &ale.LastSynced,
 			&ale.GridCount,
 		); err != nil {

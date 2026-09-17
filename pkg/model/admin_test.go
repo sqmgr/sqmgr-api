@@ -19,6 +19,7 @@ package model
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -820,6 +821,28 @@ func createTestEventWithGrid(t *testing.T, m *Model, ctx context.Context, league
 	return event, pool, grid
 }
 
+// uniqueLinkedEventDay returns the start of a far-future UTC day for a test's
+// events, along with a filter matching only that day. Events from other tests
+// cluster around time.Now() and a long-lived integration database accumulates
+// them, so an unfiltered, paginated listing cannot be relied on to contain the
+// rows a test just created. The day is offset by a per-call number of days so
+// that repeated runs against the same database do not see each other's rows.
+func uniqueLinkedEventDay() (time.Time, AdminLinkedEventsFilter) {
+	dayOffset := int(time.Now().UnixNano() % 1_000_000)
+	day := time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, dayOffset)
+	return day, AdminLinkedEventsFilter{Start: day, End: day}
+}
+
+// linkedEventIndex returns the position of the event in the listing, or -1
+func linkedEventIndex(events []*AdminLinkedEvent, id int64) int {
+	for i, e := range events {
+		if e.ID == id {
+			return i
+		}
+	}
+	return -1
+}
+
 func TestGetAdminLinkedEvents(t *testing.T) {
 	ensureIntegration(t)
 
@@ -827,32 +850,29 @@ func TestGetAdminLinkedEvents(t *testing.T) {
 	m := New(getDB())
 	ctx := context.Background()
 
+	day, filter := uniqueLinkedEventDay()
+
 	// Get initial count
-	initialCount, err := m.GetAdminLinkedEventsCount(ctx, AdminLinkedEventsFilter{})
+	initialCount, err := m.GetAdminLinkedEventsCount(ctx, filter)
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Create an event with a linked grid
-	event, _, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNFL, time.Now().Add(24*time.Hour), nil, nil)
+	event, _, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNFL, day.Add(12*time.Hour), nil, nil)
 
 	// Verify it appears in results
-	events, err := m.GetAdminLinkedEvents(ctx, AdminLinkedEventsFilter{}, 0, 100, "", "")
+	events, err := m.GetAdminLinkedEvents(ctx, filter, 0, 100, "", "")
 	g.Expect(err).Should(gomega.Succeed())
 
-	var found *AdminLinkedEvent
-	for _, e := range events {
-		if e.ID == event.ID {
-			found = e
-			break
-		}
-	}
-	g.Expect(found).ShouldNot(gomega.BeNil())
+	idx := linkedEventIndex(events, event.ID)
+	g.Expect(idx).Should(gomega.BeNumerically(">=", 0))
+	found := events[idx]
 	g.Expect(found.GridCount).Should(gomega.Equal(int64(1)))
 	g.Expect(found.League).Should(gomega.Equal(SportsLeagueNFL))
 	g.Expect(found.HomeTeam).ShouldNot(gomega.BeNil())
 	g.Expect(found.AwayTeam).ShouldNot(gomega.BeNil())
 
 	// Verify count increased
-	newCount, err := m.GetAdminLinkedEventsCount(ctx, AdminLinkedEventsFilter{})
+	newCount, err := m.GetAdminLinkedEventsCount(ctx, filter)
 	g.Expect(err).Should(gomega.Succeed())
 	g.Expect(newCount).Should(gomega.Equal(initialCount + 1))
 }
@@ -866,23 +886,72 @@ func TestGetAdminLinkedEventsWithScores(t *testing.T) {
 
 	homeScore := 24
 	awayScore := 17
-	event, _, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNFL, time.Now(), &homeScore, &awayScore)
+	day, filter := uniqueLinkedEventDay()
+	event, _, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNFL, day.Add(12*time.Hour), &homeScore, &awayScore)
 
-	events, err := m.GetAdminLinkedEvents(ctx, AdminLinkedEventsFilter{}, 0, 100, "", "")
+	events, err := m.GetAdminLinkedEvents(ctx, filter, 0, 100, "", "")
 	g.Expect(err).Should(gomega.Succeed())
 
-	var found *AdminLinkedEvent
-	for _, e := range events {
-		if e.ID == event.ID {
-			found = e
-			break
-		}
-	}
-	g.Expect(found).ShouldNot(gomega.BeNil())
+	idx := linkedEventIndex(events, event.ID)
+	g.Expect(idx).Should(gomega.BeNumerically(">=", 0))
+	found := events[idx]
 	g.Expect(found.HomeScore).ShouldNot(gomega.BeNil())
 	g.Expect(*found.HomeScore).Should(gomega.Equal(24))
 	g.Expect(found.AwayScore).ShouldNot(gomega.BeNil())
 	g.Expect(*found.AwayScore).Should(gomega.Equal(17))
+}
+
+func TestGetAdminLinkedEventsWithPeriodScores(t *testing.T) {
+	ensureIntegration(t)
+
+	g := gomega.NewWithT(t)
+	m := New(getDB())
+	ctx := context.Background()
+
+	day, filter := uniqueLinkedEventDay()
+	event, _, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNFL, day.Add(12*time.Hour), nil, nil)
+
+	intPtr := func(i int) *int { return &i }
+	err := event.ApplyOverride(ctx, SportsEventOverride{
+		Status:    SportsEventStatusFinal,
+		HomeScore: intPtr(30), AwayScore: intPtr(27),
+		HomeQ1: intPtr(7), HomeQ2: intPtr(3), HomeQ3: intPtr(10), HomeQ4: intPtr(7), HomeOT: intPtr(3),
+		AwayQ1: intPtr(0), AwayQ2: intPtr(14), AwayQ3: intPtr(6), AwayQ4: intPtr(7), AwayOT: intPtr(0),
+	})
+	g.Expect(err).Should(gomega.Succeed())
+
+	events, err := m.GetAdminLinkedEvents(ctx, filter, 0, 100, "", "")
+	g.Expect(err).Should(gomega.Succeed())
+
+	idx := linkedEventIndex(events, event.ID)
+	g.Expect(idx).Should(gomega.BeNumerically(">=", 0))
+	found := events[idx]
+
+	// The override form is seeded from this list, so every period score must
+	// come back or saving the form would blank them out.
+	g.Expect([]*int{found.HomeQ1, found.HomeQ2, found.HomeQ3, found.HomeQ4, found.HomeOT}).
+		Should(gomega.Equal([]*int{intPtr(7), intPtr(3), intPtr(10), intPtr(7), intPtr(3)}))
+	g.Expect([]*int{found.AwayQ1, found.AwayQ2, found.AwayQ3, found.AwayQ4, found.AwayOT}).
+		Should(gomega.Equal([]*int{intPtr(0), intPtr(14), intPtr(6), intPtr(7), intPtr(0)}))
+}
+
+func TestAdminLinkedEventJSONPeriodScores(t *testing.T) {
+	g := gomega.NewWithT(t)
+
+	zero, seven := 0, 7
+	data, err := json.Marshal(&AdminLinkedEvent{HomeQ1: &seven, AwayQ1: &zero, HomeOT: &seven})
+	g.Expect(err).Should(gomega.Succeed())
+
+	var decoded map[string]interface{}
+	g.Expect(json.Unmarshal(data, &decoded)).Should(gomega.Succeed())
+
+	g.Expect(decoded).Should(gomega.HaveKeyWithValue("homeQ1", float64(7)))
+	// a scoreless quarter is a real score and must not be dropped
+	g.Expect(decoded).Should(gomega.HaveKeyWithValue("awayQ1", float64(0)))
+	g.Expect(decoded).Should(gomega.HaveKeyWithValue("homeOT", float64(7)))
+	// unset periods are omitted
+	g.Expect(decoded).ShouldNot(gomega.HaveKey("homeQ2"))
+	g.Expect(decoded).ShouldNot(gomega.HaveKey("awayOT"))
 }
 
 func TestGetAdminLinkedEventsSorting(t *testing.T) {
@@ -892,11 +961,13 @@ func TestGetAdminLinkedEventsSorting(t *testing.T) {
 	m := New(getDB())
 	ctx := context.Background()
 
+	day, filter := uniqueLinkedEventDay()
+
 	// Create event 1: earlier date, 1 grid
-	event1, _, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNBA, time.Now().Add(-48*time.Hour), nil, nil)
+	event1, _, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNBA, day.Add(6*time.Hour), nil, nil)
 
 	// Create event 2: later date, 2 grids (add extra grid)
-	event2, pool2, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNBA, time.Now().Add(48*time.Hour), nil, nil)
+	event2, pool2, _ := createTestEventWithGrid(t, m, ctx, SportsLeagueNBA, day.Add(18*time.Hour), nil, nil)
 
 	// Add a second grid linked to event2
 	extraGrid := pool2.NewGrid()
@@ -905,32 +976,21 @@ func TestGetAdminLinkedEventsSorting(t *testing.T) {
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Sort by eventDate ascending - event1 (earlier) should come first
-	events, err := m.GetAdminLinkedEvents(ctx, AdminLinkedEventsFilter{}, 0, 100, "eventDate", "asc")
+	events, err := m.GetAdminLinkedEvents(ctx, filter, 0, 100, "eventDate", "asc")
 	g.Expect(err).Should(gomega.Succeed())
 
-	var idx1, idx2 int
-	for i, e := range events {
-		if e.ID == event1.ID {
-			idx1 = i
-		}
-		if e.ID == event2.ID {
-			idx2 = i
-		}
-	}
+	idx1, idx2 := linkedEventIndex(events, event1.ID), linkedEventIndex(events, event2.ID)
+	g.Expect(idx1).Should(gomega.BeNumerically(">=", 0))
+	g.Expect(idx2).Should(gomega.BeNumerically(">=", 0))
 	g.Expect(idx1).Should(gomega.BeNumerically("<", idx2))
 
 	// Sort by gridCount descending - event2 (2 grids) should come first
-	events, err = m.GetAdminLinkedEvents(ctx, AdminLinkedEventsFilter{}, 0, 100, "gridCount", "desc")
+	events, err = m.GetAdminLinkedEvents(ctx, filter, 0, 100, "gridCount", "desc")
 	g.Expect(err).Should(gomega.Succeed())
 
-	for i, e := range events {
-		if e.ID == event1.ID {
-			idx1 = i
-		}
-		if e.ID == event2.ID {
-			idx2 = i
-		}
-	}
+	idx1, idx2 = linkedEventIndex(events, event1.ID), linkedEventIndex(events, event2.ID)
+	g.Expect(idx1).Should(gomega.BeNumerically(">=", 0))
+	g.Expect(idx2).Should(gomega.BeNumerically(">=", 0))
 	g.Expect(idx2).Should(gomega.BeNumerically("<", idx1))
 }
 
@@ -966,19 +1026,17 @@ func TestGetAdminLinkedEventsExcludesUnlinked(t *testing.T) {
 	event.League = SportsLeagueNFL
 	event.HomeTeamID = homeTeam.ID
 	event.AwayTeamID = awayTeam.ID
-	event.EventDate = time.Now()
+	day, filter := uniqueLinkedEventDay()
+	event.EventDate = day.Add(12 * time.Hour)
 	event.Season = 2024
 	event.Status = SportsEventStatusScheduled
 	err = m.UpsertSportsEvent(ctx, nil, event)
 	g.Expect(err).Should(gomega.Succeed())
 
 	// Verify it does NOT appear in linked events
-	events, err := m.GetAdminLinkedEvents(ctx, AdminLinkedEventsFilter{}, 0, 1000, "", "")
+	events, err := m.GetAdminLinkedEvents(ctx, filter, 0, 100, "", "")
 	g.Expect(err).Should(gomega.Succeed())
-
-	for _, e := range events {
-		g.Expect(e.ID).ShouldNot(gomega.Equal(event.ID))
-	}
+	g.Expect(linkedEventIndex(events, event.ID)).Should(gomega.Equal(-1))
 }
 
 func TestGetAdminEventGrids(t *testing.T) {
