@@ -172,50 +172,6 @@ func (m *Model) GetAdminStats(ctx context.Context, filter StatsFilter) (*AdminSt
 	return stats, nil
 }
 
-// GetAllPools returns all pools with optional search, pagination
-func (m *Model) GetAllPools(ctx context.Context, search string, offset int64, limit int) ([]*AdminPool, error) {
-	baseQuery := `
-		SELECT
-			p.token,
-			p.name,
-			p.grid_type,
-			p.number_set_config,
-			p.archived,
-			p.user_id,
-			u.email,
-			u.store,
-			(SELECT COUNT(*) FROM pools_users pu WHERE pu.pool_id = p.id) as member_count,
-			(SELECT COUNT(*) FROM grids g WHERE g.pool_id = p.id AND g.state = 'active') as grid_count,
-			(SELECT COUNT(*) FROM pool_squares ps WHERE ps.pool_id = p.id AND ps.state != 'unclaimed') as claimed_count,
-			p.created
-		FROM pools p
-		LEFT JOIN users u ON u.id = p.user_id
-		%s
-		ORDER BY p.id DESC
-		OFFSET $%d
-		LIMIT $%d`
-
-	if search != "" {
-		query := fmt.Sprintf(baseQuery, "WHERE p.name ILIKE $1", 2, 3)
-		rowsResult, queryErr := m.DB.QueryContext(ctx, query, "%"+search+"%", offset, limit)
-		if queryErr != nil {
-			return nil, fmt.Errorf("querying pools with search: %w", queryErr)
-		}
-		defer rowsResult.Close()
-
-		return scanAdminPools(rowsResult)
-	}
-
-	query := fmt.Sprintf(baseQuery, "", 1, 2)
-	rowsResult, err := m.DB.QueryContext(ctx, query, offset, limit)
-	if err != nil {
-		return nil, fmt.Errorf("querying pools: %w", err)
-	}
-	defer rowsResult.Close()
-
-	return scanAdminPools(rowsResult)
-}
-
 // scanAdminPools scans rows into AdminPool slice
 func scanAdminPools(rows interface {
 	Next() bool
@@ -243,24 +199,6 @@ func scanAdminPools(rows interface {
 		pools = append(pools, pool)
 	}
 	return pools, nil
-}
-
-// GetAllPoolsCount returns count of all pools with optional search
-func (m *Model) GetAllPoolsCount(ctx context.Context, search string) (int64, error) {
-	var count int64
-	var row interface{ Scan(...interface{}) error }
-
-	if search != "" {
-		row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM pools WHERE name ILIKE $1", "%"+search+"%")
-	} else {
-		row = m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM pools")
-	}
-
-	if err := row.Scan(&count); err != nil {
-		return 0, fmt.Errorf("counting pools: %w", err)
-	}
-
-	return count, nil
 }
 
 // AdminUserStats holds statistics for a specific user
@@ -546,6 +484,10 @@ type AdminLinkedEvent struct {
 	HomeTeam     *SportsTeamJSON   `json:"homeTeam,omitempty"`
 	AwayTeam     *SportsTeamJSON   `json:"awayTeam,omitempty"`
 	GridCount    int64             `json:"gridCount"`
+	// ManualOverride is true when a site admin has corrected the event by
+	// hand and the sync job is leaving it alone.
+	ManualOverride bool      `json:"manualOverride"`
+	LastSynced     time.Time `json:"lastSynced"`
 }
 
 // AdminEventGrid represents a grid linked to a sports event
@@ -650,6 +592,7 @@ func (m *Model) GetAdminLinkedEvents(ctx context.Context, filter AdminLinkedEven
 		SELECT
 			e.id, e.espn_id, e.league, e.name, e.home_team_id, e.away_team_id,
 			e.event_date, e.status, e.status_detail, e.home_score, e.away_score,
+			e.manual_override, e.last_synced,
 			COUNT(g.id) AS grid_count
 		FROM sports_events e
 		INNER JOIN grids g ON g.sports_event_id = e.id AND g.state = 'active'` + where + `
@@ -674,6 +617,7 @@ func (m *Model) GetAdminLinkedEvents(ctx context.Context, filter AdminLinkedEven
 		if err := rows.Scan(
 			&ale.ID, &ale.ESPNID, &ale.League, &name, &ale.HomeTeamID, &ale.AwayTeamID,
 			&ale.EventDate, &ale.Status, &statusDetail, &ale.HomeScore, &ale.AwayScore,
+			&ale.ManualOverride, &ale.LastSynced,
 			&ale.GridCount,
 		); err != nil {
 			return nil, fmt.Errorf("scanning linked event row: %w", err)

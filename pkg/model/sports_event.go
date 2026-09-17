@@ -83,6 +83,10 @@ type SportsEvent struct {
 	AwayQ4    *int
 	AwayOT    *int
 
+	// ManualOverride is set when a site admin corrected the status or
+	// scores by hand; the sync job leaves such events untouched.
+	ManualOverride bool
+
 	// Metadata
 	Created    time.Time
 	Modified   time.Time
@@ -95,36 +99,37 @@ type SportsEvent struct {
 
 // SportsEventJSON represents event data for JSON serialization
 type SportsEventJSON struct {
-	ID           int64             `json:"id"`
-	ESPNID       string            `json:"espnId,omitempty"`
-	League       SportsLeague      `json:"league"`
-	Name         string            `json:"name,omitempty"`
-	HomeTeamID   string            `json:"homeTeamId"`
-	AwayTeamID   string            `json:"awayTeamId"`
-	EventDate    time.Time         `json:"eventDate"`
-	Season       int               `json:"season"`
-	Week         *int              `json:"week,omitempty"`
-	Postseason   bool              `json:"postseason"`
-	Venue        string            `json:"venue,omitempty"`
-	Status       SportsEventStatus `json:"status"`
-	StatusDetail string            `json:"statusDetail,omitempty"`
-	Period       *int              `json:"period,omitempty"`
-	Clock        string            `json:"clock,omitempty"`
-	HomeScore    *int              `json:"homeScore,omitempty"`
-	AwayScore    *int              `json:"awayScore,omitempty"`
-	HomeQ1       *int              `json:"homeQ1,omitempty"`
-	HomeQ2       *int              `json:"homeQ2,omitempty"`
-	HomeQ3       *int              `json:"homeQ3,omitempty"`
-	HomeQ4       *int              `json:"homeQ4,omitempty"`
-	HomeOT       *int              `json:"homeOT,omitempty"`
-	AwayQ1       *int              `json:"awayQ1,omitempty"`
-	AwayQ2       *int              `json:"awayQ2,omitempty"`
-	AwayQ3       *int              `json:"awayQ3,omitempty"`
-	AwayQ4       *int              `json:"awayQ4,omitempty"`
-	AwayOT       *int              `json:"awayOT,omitempty"`
-	HomeTeam     *SportsTeamJSON   `json:"homeTeam,omitempty"`
-	AwayTeam     *SportsTeamJSON   `json:"awayTeam,omitempty"`
-	LastSynced   time.Time         `json:"lastSynced"`
+	ID             int64             `json:"id"`
+	ESPNID         string            `json:"espnId,omitempty"`
+	League         SportsLeague      `json:"league"`
+	Name           string            `json:"name,omitempty"`
+	HomeTeamID     string            `json:"homeTeamId"`
+	AwayTeamID     string            `json:"awayTeamId"`
+	EventDate      time.Time         `json:"eventDate"`
+	Season         int               `json:"season"`
+	Week           *int              `json:"week,omitempty"`
+	Postseason     bool              `json:"postseason"`
+	Venue          string            `json:"venue,omitempty"`
+	Status         SportsEventStatus `json:"status"`
+	StatusDetail   string            `json:"statusDetail,omitempty"`
+	Period         *int              `json:"period,omitempty"`
+	Clock          string            `json:"clock,omitempty"`
+	HomeScore      *int              `json:"homeScore,omitempty"`
+	AwayScore      *int              `json:"awayScore,omitempty"`
+	HomeQ1         *int              `json:"homeQ1,omitempty"`
+	HomeQ2         *int              `json:"homeQ2,omitempty"`
+	HomeQ3         *int              `json:"homeQ3,omitempty"`
+	HomeQ4         *int              `json:"homeQ4,omitempty"`
+	HomeOT         *int              `json:"homeOT,omitempty"`
+	AwayQ1         *int              `json:"awayQ1,omitempty"`
+	AwayQ2         *int              `json:"awayQ2,omitempty"`
+	AwayQ3         *int              `json:"awayQ3,omitempty"`
+	AwayQ4         *int              `json:"awayQ4,omitempty"`
+	AwayOT         *int              `json:"awayOT,omitempty"`
+	HomeTeam       *SportsTeamJSON   `json:"homeTeam,omitempty"`
+	AwayTeam       *SportsTeamJSON   `json:"awayTeam,omitempty"`
+	ManualOverride bool              `json:"manualOverride"`
+	LastSynced     time.Time         `json:"lastSynced"`
 }
 
 // JSON returns the JSON representation of the event
@@ -154,6 +159,8 @@ func (e *SportsEvent) JSON() *SportsEventJSON {
 		AwayQ4:     e.AwayQ4,
 		AwayOT:     e.AwayOT,
 		LastSynced: e.LastSynced,
+
+		ManualOverride: e.ManualOverride,
 	}
 	if e.Name != nil {
 		json.Name = *e.Name
@@ -288,7 +295,7 @@ const sportsEventColumns = `
 	status, status_detail, period, clock, home_score, away_score,
 	home_q1, home_q2, home_q3, home_q4, home_ot,
 	away_q1, away_q2, away_q3, away_q4, away_ot,
-	created, modified, last_synced`
+	created, modified, last_synced, manual_override`
 
 // sportsEventColumnsWithPrefix is for use in JOIN queries where table alias is needed
 const sportsEventColumnsWithPrefix = `
@@ -296,7 +303,7 @@ const sportsEventColumnsWithPrefix = `
 	e.status, e.status_detail, e.period, e.clock, e.home_score, e.away_score,
 	e.home_q1, e.home_q2, e.home_q3, e.home_q4, e.home_ot,
 	e.away_q1, e.away_q2, e.away_q3, e.away_q4, e.away_ot,
-	e.created, e.modified, e.last_synced`
+	e.created, e.modified, e.last_synced, e.manual_override`
 
 func (m *Model) sportsEventByRow(scan scanFunc) (*SportsEvent, error) {
 	event := &SportsEvent{model: m}
@@ -331,6 +338,7 @@ func (m *Model) sportsEventByRow(scan scanFunc) (*SportsEvent, error) {
 		&event.Created,
 		&event.Modified,
 		&event.LastSynced,
+		&event.ManualOverride,
 	); err != nil {
 		return nil, err
 	}
@@ -590,9 +598,10 @@ func (m *Model) EventsNeedingScoreUpdate(ctx context.Context) ([]*SportsEvent, e
 	const query = `
 		SELECT ` + sportsEventColumns + `
 		FROM sports_events
-		WHERE (status = 'in_progress' AND event_date >= (NOW() AT TIME ZONE 'utc') - INTERVAL '1 day')
+		WHERE NOT manual_override
+		  AND ((status = 'in_progress' AND event_date >= (NOW() AT TIME ZONE 'utc') - INTERVAL '1 day')
 		   OR (status = 'scheduled' AND event_date BETWEEN (NOW() AT TIME ZONE 'utc') AND (NOW() AT TIME ZONE 'utc') + INTERVAL '2 hours')
-		   OR (status != 'final' AND event_date >= (NOW() AT TIME ZONE 'utc') - INTERVAL '1 day' AND event_date < (NOW() AT TIME ZONE 'utc'))
+		   OR (status != 'final' AND event_date >= (NOW() AT TIME ZONE 'utc') - INTERVAL '1 day' AND event_date < (NOW() AT TIME ZONE 'utc')))
 		ORDER BY event_date ASC
 	`
 	rows, err := m.DB.QueryContext(ctx, query)
@@ -710,6 +719,7 @@ func (m *Model) FinalizeStaleEvents(ctx context.Context) (int64, error) {
 		    clock = NULL,
 		    status_detail = NULL
 		WHERE status != 'final'
+		  AND NOT manual_override
 		  AND event_date < (NOW() AT TIME ZONE 'utc') - INTERVAL '1 day'
 	`
 	result, err := m.DB.ExecContext(ctx, query)
@@ -1005,4 +1015,150 @@ func (m *Model) BDLEventCount(ctx context.Context, league BDLLeague) (int, error
 
 func (m *Model) LoadTeamsForEvents(ctx context.Context, events []*BDLEvent) error {
 	return m.LoadTeamsForSportsEvents(ctx, events)
+}
+
+// SportsEventOverride is a manual correction to an event's status and scores.
+// A nil score leaves that column NULL.
+type SportsEventOverride struct {
+	Status    SportsEventStatus
+	HomeScore *int
+	AwayScore *int
+	HomeQ1    *int
+	HomeQ2    *int
+	HomeQ3    *int
+	HomeQ4    *int
+	HomeOT    *int
+	AwayQ1    *int
+	AwayQ2    *int
+	AwayQ3    *int
+	AwayQ4    *int
+	AwayOT    *int
+}
+
+// ApplyOverride writes a manual correction to the event, flags it so the sync
+// job leaves it alone, and notifies connected clients. The event's in-memory
+// fields are updated to match.
+func (e *SportsEvent) ApplyOverride(ctx context.Context, o SportsEventOverride) error {
+	if !o.Status.IsValid() {
+		return fmt.Errorf("applying event override: invalid status %q", o.Status)
+	}
+
+	const query = `
+		UPDATE sports_events
+		SET status = $1,
+		    home_score = $2, away_score = $3,
+		    home_q1 = $4, home_q2 = $5, home_q3 = $6, home_q4 = $7, home_ot = $8,
+		    away_q1 = $9, away_q2 = $10, away_q3 = $11, away_q4 = $12, away_ot = $13,
+		    manual_override = true,
+		    status_detail = CASE WHEN $15 THEN 'Final' ELSE NULL END,
+		    period = CASE WHEN $16 THEN period ELSE NULL END,
+		    clock = CASE WHEN $16 THEN clock ELSE NULL END,
+		    modified = (NOW() AT TIME ZONE 'utc')
+		WHERE id = $14`
+
+	// ESPN's status detail describes the status it was fetched with, so it
+	// is replaced ("Final") or dropped on every override. The period and
+	// clock only make sense while a game is in progress.
+	isFinal := o.Status == SportsEventStatusFinal
+	keepClock := o.Status == SportsEventStatusInProgress
+	if _, err := e.model.DB.ExecContext(ctx, query,
+		string(o.Status),
+		o.HomeScore, o.AwayScore,
+		o.HomeQ1, o.HomeQ2, o.HomeQ3, o.HomeQ4, o.HomeOT,
+		o.AwayQ1, o.AwayQ2, o.AwayQ3, o.AwayQ4, o.AwayOT,
+		e.ID, isFinal, keepClock,
+	); err != nil {
+		return fmt.Errorf("applying event override: %w", err)
+	}
+
+	e.Status = o.Status
+	e.HomeScore, e.AwayScore = o.HomeScore, o.AwayScore
+	e.HomeQ1, e.HomeQ2, e.HomeQ3, e.HomeQ4, e.HomeOT = o.HomeQ1, o.HomeQ2, o.HomeQ3, o.HomeQ4, o.HomeOT
+	e.AwayQ1, e.AwayQ2, e.AwayQ3, e.AwayQ4, e.AwayOT = o.AwayQ1, o.AwayQ2, o.AwayQ3, o.AwayQ4, o.AwayOT
+	e.ManualOverride = true
+	e.StatusDetail = nil
+	if isFinal {
+		detail := "Final"
+		e.StatusDetail = &detail
+	}
+	if !keepClock {
+		e.Period = nil
+		e.Clock = nil
+	}
+
+	return e.model.NotifySportsEventUpdated(ctx, e.ID)
+}
+
+// ClearOverride removes the manual override flag so the sync job resumes
+// updating the event.
+func (e *SportsEvent) ClearOverride(ctx context.Context) error {
+	if _, err := e.model.DB.ExecContext(ctx,
+		"UPDATE sports_events SET manual_override = false, modified = (NOW() AT TIME ZONE 'utc') WHERE id = $1",
+		e.ID,
+	); err != nil {
+		return fmt.Errorf("clearing event override: %w", err)
+	}
+	e.ManualOverride = false
+	return nil
+}
+
+// StaleLinkedEvent is a sports event with active linked grids whose data looks
+// out of date.
+type StaleLinkedEvent struct {
+	ID         int64             `json:"id"`
+	League     SportsLeague      `json:"league"`
+	Name       *string           `json:"name"`
+	HomeTeam   *string           `json:"homeTeam"`
+	AwayTeam   *string           `json:"awayTeam"`
+	EventDate  time.Time         `json:"eventDate"`
+	Status     SportsEventStatus `json:"status"`
+	GridCount  int64             `json:"gridCount"`
+	LastSynced time.Time         `json:"lastSynced"`
+}
+
+// Thresholds for StaleLinkedEvents.
+const (
+	staleInProgressAfter = "30 minutes"
+	staleScheduledAfter  = "3 hours"
+)
+
+// StaleLinkedEvents returns events with at least one active linked grid that
+// are in progress but have not been synced recently, or that are still
+// scheduled well after their start time. Manually overridden events are
+// excluded since the admin has taken control of them.
+func (m *Model) StaleLinkedEvents(ctx context.Context) ([]*StaleLinkedEvent, error) {
+	const query = `
+		SELECT e.id, e.league, e.name, ht.full_name, at.full_name, e.event_date, e.status, COUNT(g.id), e.last_synced
+		FROM sports_events e
+		INNER JOIN grids g ON g.sports_event_id = e.id AND g.state = 'active'
+		LEFT JOIN sports_teams ht ON ht.id = e.home_team_id AND ht.league = e.league
+		LEFT JOIN sports_teams at ON at.id = e.away_team_id AND at.league = e.league
+		WHERE NOT e.manual_override
+		  AND (
+		    (e.status = 'in_progress' AND e.last_synced < (NOW() AT TIME ZONE 'utc') - INTERVAL '` + staleInProgressAfter + `')
+		    OR (e.status = 'scheduled' AND e.event_date < (NOW() AT TIME ZONE 'utc') - INTERVAL '` + staleScheduledAfter + `')
+		  )
+		GROUP BY e.id, ht.full_name, at.full_name
+		ORDER BY e.event_date DESC
+		LIMIT 100`
+
+	rows, err := m.DB.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("querying stale linked events: %w", err)
+	}
+	defer rows.Close()
+
+	events := make([]*StaleLinkedEvent, 0)
+	for rows.Next() {
+		e := &StaleLinkedEvent{}
+		if err := rows.Scan(&e.ID, &e.League, &e.Name, &e.HomeTeam, &e.AwayTeam, &e.EventDate, &e.Status, &e.GridCount, &e.LastSynced); err != nil {
+			return nil, fmt.Errorf("scanning stale linked event: %w", err)
+		}
+		events = append(events, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("reading stale linked events: %w", err)
+	}
+
+	return events, nil
 }

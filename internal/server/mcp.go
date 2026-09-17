@@ -424,7 +424,7 @@ func (in breakdownInput) dateRange() (model.DateRange, error) {
 }
 
 type listPoolsInput struct {
-	Search         string   `json:"search,omitempty" jsonschema:"Case-insensitive substring of the pool name."`
+	Search         string   `json:"search,omitempty" jsonschema:"Case-insensitive substring of the pool name, or an exact pool token."`
 	OwnerEmail     string   `json:"owner_email,omitempty" jsonschema:"Exact (case-insensitive) email address of the pool owner."`
 	Start          string   `json:"start,omitempty" jsonschema:"Inclusive start of the creation date range: YYYY-MM-DD (UTC day) or RFC3339 timestamp."`
 	End            string   `json:"end,omitempty" jsonschema:"End of the creation date range: YYYY-MM-DD (UTC day, the whole day is included) or an exclusive RFC3339 timestamp."`

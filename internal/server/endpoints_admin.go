@@ -130,45 +130,24 @@ func (s *Server) getAdminStatsEndpoint() http.HandlerFunc {
 	}
 }
 
-// getAdminPoolsEndpoint returns paginated list of all pools
+// getAdminPoolsEndpoint returns a filtered, sorted, paginated list of all pools
 func (s *Server) getAdminPoolsEndpoint() http.HandlerFunc {
-	type response struct {
-		Pools []*model.AdminPool `json:"pools"`
-		Total int64              `json:"total"`
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
-		search := r.FormValue("search")
-
-		offset, _ := strconv.ParseInt(r.FormValue("offset"), 10, 64)
-		if offset < 0 {
-			offset = 0
-		}
-
-		limit, _ := strconv.Atoi(r.FormValue("limit"))
-		if limit <= 0 {
-			limit = defaultAdminPoolsLimit
-		}
-		if limit > maxAdminPoolsLimit {
-			limit = maxAdminPoolsLimit
-		}
-
-		pools, err := s.model.GetAllPools(r.Context(), search, offset, limit)
+		filter, err := parseAdminPoolsFilter(r)
 		if err != nil {
-			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			s.writeErrorResponse(w, http.StatusBadRequest, err)
 			return
 		}
 
-		total, err := s.model.GetAllPoolsCount(r.Context(), search)
-		if err != nil {
-			s.writeErrorResponse(w, http.StatusInternalServerError, err)
-			return
-		}
-
-		s.writeJSONResponse(w, http.StatusOK, response{
-			Pools: pools,
-			Total: total,
+		list, err := queryAnalytics(s, r.Context(), func(a *model.Analytics) (*model.PoolList, error) {
+			return a.ListPools(r.Context(), filter)
 		})
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		s.writeJSONResponse(w, http.StatusOK, list)
 	}
 }
 
@@ -196,6 +175,13 @@ func (s *Server) postAdminPoolJoinEndpoint() http.HandlerFunc {
 			s.writeErrorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
+
+		s.recordAudit(r.Context(), user, model.AdminAuditRecord{
+			Action:      model.AdminAuditPoolJoin,
+			TargetType:  model.AdminAuditTargetPool,
+			TargetID:    pool.Token(),
+			TargetLabel: pool.Name(),
+		})
 
 		w.WriteHeader(http.StatusNoContent)
 	}
@@ -320,18 +306,7 @@ func (s *Server) adminUserPoolsHandler(fetch adminUserPoolsFetcher) http.Handler
 			return
 		}
 
-		offset, _ := strconv.ParseInt(r.FormValue("offset"), 10, 64)
-		if offset < 0 {
-			offset = 0
-		}
-
-		limit, _ := strconv.Atoi(r.FormValue("limit"))
-		if limit <= 0 {
-			limit = defaultAdminPoolsLimit
-		}
-		if limit > maxAdminPoolsLimit {
-			limit = maxAdminPoolsLimit
-		}
+		offset, limit := parsePagination(r, defaultAdminPoolsLimit, maxAdminPoolsLimit)
 
 		includeArchived := r.FormValue("includeArchived") == "true"
 
@@ -358,18 +333,7 @@ func (s *Server) getAdminUsersEndpoint() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		search := r.FormValue("search")
 
-		offset, _ := strconv.ParseInt(r.FormValue("offset"), 10, 64)
-		if offset < 0 {
-			offset = 0
-		}
-
-		limit, _ := strconv.Atoi(r.FormValue("limit"))
-		if limit <= 0 {
-			limit = defaultAdminUsersLimit
-		}
-		if limit > maxAdminUsersLimit {
-			limit = maxAdminUsersLimit
-		}
+		offset, limit := parsePagination(r, defaultAdminUsersLimit, maxAdminUsersLimit)
 
 		sortBy := r.FormValue("sortBy")
 		sortDir := r.FormValue("sortDir")
@@ -449,18 +413,7 @@ func (s *Server) getAdminEventsEndpoint() http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		offset, _ := strconv.ParseInt(r.FormValue("offset"), 10, 64)
-		if offset < 0 {
-			offset = 0
-		}
-
-		limit, _ := strconv.Atoi(r.FormValue("limit"))
-		if limit <= 0 {
-			limit = defaultAdminEventsLimit
-		}
-		if limit > maxAdminEventsLimit {
-			limit = maxAdminEventsLimit
-		}
+		offset, limit := parsePagination(r, defaultAdminEventsLimit, maxAdminEventsLimit)
 
 		sortBy := r.FormValue("sortBy")
 		sortDir := r.FormValue("sortDir")
@@ -505,18 +458,7 @@ func (s *Server) getAdminEventGridsEndpoint() http.HandlerFunc {
 			return
 		}
 
-		offset, _ := strconv.ParseInt(r.FormValue("offset"), 10, 64)
-		if offset < 0 {
-			offset = 0
-		}
-
-		limit, _ := strconv.Atoi(r.FormValue("limit"))
-		if limit <= 0 {
-			limit = defaultAdminEventsLimit
-		}
-		if limit > maxAdminEventsLimit {
-			limit = maxAdminEventsLimit
-		}
+		offset, limit := parsePagination(r, defaultAdminEventsLimit, maxAdminEventsLimit)
 
 		grids, err := s.model.GetAdminEventGrids(r.Context(), id, offset, limit)
 		if err != nil {

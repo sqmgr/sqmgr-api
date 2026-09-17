@@ -903,3 +903,54 @@ pools.modified,
 pools.check_id,
 pools.archived
 `
+
+// TransferOwnership makes newOwnerID the pool's owner. The previous owner is
+// kept on as a regular member so they do not lose access to their squares.
+func (p *Pool) TransferOwnership(ctx context.Context, newOwnerID int64) error {
+	if newOwnerID == p.userID {
+		return nil
+	}
+
+	tx, err := p.model.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning transfer transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx,
+		"UPDATE pools SET user_id = $1, modified = (NOW() AT TIME ZONE 'utc') WHERE id = $2",
+		newOwnerID, p.id,
+	); err != nil {
+		return fmt.Errorf("updating pool owner: %w", err)
+	}
+
+	// The previous owner becomes a regular member; the new owner's membership
+	// row, if any, is left alone since ownership already grants full access.
+	if _, err := tx.ExecContext(ctx,
+		"INSERT INTO pools_users (pool_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+		p.id, p.userID,
+	); err != nil {
+		return fmt.Errorf("keeping previous owner as member: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing transfer: %w", err)
+	}
+
+	p.userID = newOwnerID
+	return nil
+}
+
+// RevokeInvites expires every outstanding invite link for the pool and
+// returns how many were still active.
+func (p *Pool) RevokeInvites(ctx context.Context) (int64, error) {
+	result, err := p.model.DB.ExecContext(ctx, `
+		UPDATE pool_invites
+		SET expires_at = (NOW() AT TIME ZONE 'utc')
+		WHERE pool_id = $1 AND expires_at > (NOW() AT TIME ZONE 'utc')`, p.id)
+	if err != nil {
+		return 0, fmt.Errorf("revoking pool invites: %w", err)
+	}
+
+	return result.RowsAffected()
+}

@@ -984,13 +984,13 @@ func sportsEventMockRows(now time.Time) *sqlmock.Rows {
 		"status", "status_detail", "period", "clock", "home_score", "away_score",
 		"home_q1", "home_q2", "home_q3", "home_q4", "home_ot",
 		"away_q1", "away_q2", "away_q3", "away_q4", "away_ot",
-		"created", "modified", "last_synced",
+		"created", "modified", "last_synced", "manual_override",
 	}).AddRow(
 		int64(1), "espn-1", "nba", nil, "home-1", "away-1", now, 2024, nil, false, nil,
 		"scheduled", nil, nil, nil, nil, nil,
 		nil, nil, nil, nil, nil,
 		nil, nil, nil, nil, nil,
-		now, now, now,
+		now, now, now, false,
 	)
 }
 
@@ -1024,7 +1024,7 @@ func TestEventsNeedingScoreUpdateComparesEventDateInUTC(t *testing.T) {
 	m := New(db)
 
 	mock.ExpectQuery(`SELECT .+ FROM sports_events ` +
-		`WHERE \(status = 'in_progress' AND event_date >= \(NOW\(\) AT TIME ZONE 'utc'\) - INTERVAL '1 day'\) ` +
+		`WHERE NOT manual_override AND \(\(status = 'in_progress' AND event_date >= \(NOW\(\) AT TIME ZONE 'utc'\) - INTERVAL '1 day'\) ` +
 		`OR \(status = 'scheduled' AND event_date BETWEEN \(NOW\(\) AT TIME ZONE 'utc'\) AND \(NOW\(\) AT TIME ZONE 'utc'\) \+ INTERVAL '2 hours'\) ` +
 		`OR \(status != 'final' AND event_date >= \(NOW\(\) AT TIME ZONE 'utc'\) - INTERVAL '1 day' AND event_date < \(NOW\(\) AT TIME ZONE 'utc'\)\)`).
 		WillReturnRows(sportsEventMockRows(time.Now()))
@@ -1045,7 +1045,7 @@ func TestFinalizeStaleEventsComparesEventDateInUTC(t *testing.T) {
 
 	m := New(db)
 
-	mock.ExpectExec(`UPDATE sports_events SET status = 'final', .+ WHERE status != 'final' AND event_date < \(NOW\(\) AT TIME ZONE 'utc'\) - INTERVAL '1 day'`).
+	mock.ExpectExec(`UPDATE sports_events SET status = 'final', .+ WHERE status != 'final' AND NOT manual_override AND event_date < \(NOW\(\) AT TIME ZONE 'utc'\) - INTERVAL '1 day'`).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	count, err := m.FinalizeStaleEvents(context.Background())

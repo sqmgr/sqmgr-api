@@ -29,6 +29,8 @@ import (
 	"github.com/sqmgr/sqmgr-api/pkg/auth0"
 	"github.com/sqmgr/sqmgr-api/pkg/model"
 	"github.com/sqmgr/sqmgr-api/pkg/smjwt"
+	"github.com/sqmgr/sqmgr-api/pkg/sports"
+	"github.com/sqmgr/sqmgr-api/pkg/sportsync"
 )
 
 // Server represents the SqMGR server
@@ -44,6 +46,8 @@ type Server struct {
 	broker          *PoolBroker
 	pgListener      *PGListener
 	mcpServer       *mcp.Server
+	syncer          *sportsync.Syncer
+	syncRuns        *syncRunner
 }
 
 // New returns a new server object
@@ -79,8 +83,14 @@ func New(version string, db *sql.DB) *Server {
 		authRateLimiter: authRL,
 		auth0Client:     auth0Client,
 		broker:          NewPoolBroker(),
+		syncRuns:        &syncRunner{},
 	}
 	s.mcpServer = s.newMCPServer()
+
+	// Manual sports syncs started from the admin API share the model and use
+	// the same ESPN client as the sync command.
+	syncLog := logrus.NewEntry(logrus.StandardLogger()).WithField("component", "sportsync")
+	s.syncer = sportsync.New(s.model, sports.NewClient(sports.Config{Logger: syncLog}), sportsync.Options{Logger: syncLog})
 
 	s.setupRoutes()
 

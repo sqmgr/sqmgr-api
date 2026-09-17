@@ -29,7 +29,7 @@ sqmgr-api/
 │   ├── sqmgr-api/                 # Main API server
 │   ├── sqmgr-email-backfill/      # One-time Auth0 email backfill
 │   ├── sqmgr-guest-user-cleanup/  # Guest user cleanup utility
-│   └── sqmgr-sports-sync/         # ESPN teams/schedule/scores sync
+│   └── sqmgr-sports-sync/         # ESPN teams/schedule/scores sync (thin wrapper over pkg/sportsync)
 ├── internal/
 │   ├── config/                    # Configuration management
 │   ├── database/                  # Database operations & migrations
@@ -41,6 +41,7 @@ sqmgr-api/
 │   ├── model/                     # Data models & business logic
 │   ├── smjwt/                     # JWT utilities
 │   ├── sports/                    # Sports data providers
+│   ├── sportsync/                 # ESPN → database sync used by the sync command and admin API
 │   └── tokengen/                  # Token generation
 ├── sql/                           # Database migrations
 ├── k8s/                           # Kubernetes manifests
@@ -189,10 +190,32 @@ Method | Path | Description
 `GET` | `/admin/users` | List users
 `GET` | `/admin/user/{id}` | Get a user
 `GET` | `/admin/user/{id}/pools` | List a user's pools
+`GET` | `/admin/user/{id}/joined-pools` | List pools a user has joined
+`GET` | `/admin/pool/{token}` | Pool details: settings, square states, invites, grids
+`GET` | `/admin/pool/{token}/members` | Everyone with access to a pool
+`GET` | `/admin/pool/{token}/activity` | The pool's square change log
+`GET` | `/admin/pool/{token}/squares` | The pool's squares and who claimed them
+`POST` | `/admin/pool/{token}/action` | Archive, lock, reset password, transfer ownership, or revoke invites
 `POST` | `/admin/pool/{token}/join` | Join a pool as an admin
+`GET` | `/admin/analytics/timeseries` | A metric counted per day, week, month, or year
+`GET` | `/admin/analytics/fill-rates` | How full pools get
+`GET` | `/admin/analytics/breakdown` | Pools, grids, or squares grouped by one dimension
+`GET` | `/admin/analytics/engagement` | Engagement summary for a date range
+`GET` | `/admin/analytics/top-creators` | Users ranked by pools created
 `GET` | `/admin/events` | List sporting events
 `GET` | `/admin/events/{id}/grids` | List grids tied to an event
+`POST` | `/admin/events/{id}/refresh` | Fetch an event from ESPN right now
+`POST` | `/admin/events/{id}/override` | Manually correct an event's status and scores
+`DELETE` | `/admin/events/{id}/override` | Let the sync job update the event again
+`GET` | `/admin/sports/status` | Last sync run per type, in-progress manual sync, stale events
+`GET` | `/admin/sports/sync-runs` | Recent sports sync runs
+`POST` | `/admin/sports/sync` | Start a teams, schedule, or scores sync in the background
+`GET` | `/admin/audit` | Every write action a site admin has performed
 `POST` | `/admin/mcp` | Read-only analytics [MCP](https://modelcontextprotocol.io) server (see below)
+
+Every admin write action is recorded in the `admin_audit_log` table with the admin, target, an
+optional reason, and before/after details. Manually overridden events carry a `manual_override`
+flag that the sync job respects until the override is cleared.
 
 ### Admin Analytics MCP Server
 

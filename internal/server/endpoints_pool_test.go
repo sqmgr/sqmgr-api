@@ -1030,7 +1030,7 @@ func sportsEventColumns() []string {
 		"status", "status_detail", "period", "clock", "home_score", "away_score",
 		"home_q1", "home_q2", "home_q3", "home_q4", "home_ot",
 		"away_q1", "away_q2", "away_q3", "away_q4", "away_ot",
-		"created", "modified", "last_synced",
+		"created", "modified", "last_synced", "manual_override",
 	}
 }
 
@@ -1231,7 +1231,7 @@ func TestSaveGrid_BlocksChangingFinalLinkedEvent(t *testing.T) {
 			"final", "Final", 4, "0:00", 28, 21,
 			7, 7, 7, 7, nil,
 			7, 7, 7, 0, nil,
-			now, now, now)
+			now, now, now, false)
 
 	mock.ExpectQuery("SELECT .+ FROM sports_events WHERE id = \\$1").
 		WithArgs(bdlEventID).
@@ -1327,7 +1327,7 @@ func TestSaveGrid_BlocksChangingToAnotherEventWhenFinal(t *testing.T) {
 			"final", "Final", 4, "0:00", 28, 21,
 			7, 7, 7, 7, nil,
 			7, 7, 7, 0, nil,
-			now, now, now)
+			now, now, now, false)
 
 	mock.ExpectQuery("SELECT .+ FROM sports_events WHERE id = \\$1").
 		WithArgs(bdlEventID).
@@ -2171,7 +2171,7 @@ func TestSaveGrid_AllowsKeepingSameEventWhenFinal(t *testing.T) {
 			"final", "Final", 4, "0:00", 28, 21,
 			7, 7, 7, 7, nil,
 			7, 7, 7, 0, nil,
-			now, now, now)
+			now, now, now, false)
 
 	mock.ExpectQuery("SELECT .+ FROM sports_events WHERE id = \\$1").
 		WithArgs(bdlEventID).
@@ -3336,12 +3336,12 @@ func seasonEventRows(league model.SportsLeague) *sqlmock.Rows {
 			"scheduled", nil, nil, nil, nil, nil,
 			nil, nil, nil, nil, nil,
 			nil, nil, nil, nil, nil,
-			now, now, now).
+			now, now, now, false).
 		AddRow(int64(5002), "401002", string(league), "Chiefs at Broncos", "3", "1", future.Add(7*24*time.Hour), 2025, 2, false, "Mile High",
 			"scheduled", nil, nil, nil, nil, nil,
 			nil, nil, nil, nil, nil,
 			nil, nil, nil, nil, nil,
-			now, now, now)
+			now, now, now, false)
 }
 
 // seasonSingleEventRows is seasonEventRows with only the first game, for the
@@ -3355,7 +3355,7 @@ func seasonSingleEventRows(league model.SportsLeague) *sqlmock.Rows {
 			"scheduled", nil, nil, nil, nil, nil,
 			nil, nil, nil, nil, nil,
 			nil, nil, nil, nil, nil,
-			now, now, now)
+			now, now, now, false)
 }
 
 // seasonPostseasonEventRows builds sports_events rows for the league-wide
@@ -3371,12 +3371,12 @@ func seasonPostseasonEventRows(league model.SportsLeague) *sqlmock.Rows {
 			"scheduled", nil, nil, nil, nil, nil,
 			nil, nil, nil, nil, nil,
 			nil, nil, nil, nil, nil,
-			now, now, now).
+			now, now, now, false).
 		AddRow(int64(6002), "401102", string(league), "AFC Championship", "tbd-4", "tbd-5", future.Add(7*24*time.Hour), 2025, 2, true, "TBD",
 			"scheduled", nil, nil, nil, nil, nil,
 			nil, nil, nil, nil, nil,
 			nil, nil, nil, nil, nil,
-			now, now, now)
+			now, now, now, false)
 }
 
 // expectSeasonGridSave mocks a full grid.Save() for a brand new grid. The

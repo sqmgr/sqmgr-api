@@ -46,7 +46,7 @@ func (m *Model) NewPoolInvite(ctx context.Context, poolID int64, checkID int, tt
 			return nil, fmt.Errorf("generating invite token: %w", err)
 		}
 
-		expiresAt := time.Now().Add(ttl)
+		expiresAt := time.Now().UTC().Add(ttl)
 
 		invite := &PoolInvite{}
 		err = m.DB.QueryRowContext(ctx,

@@ -669,6 +669,7 @@ type AnalyticsPool struct {
 
 // PoolListFilter restricts and orders the pools returned by ListPools.
 type PoolListFilter struct {
+	// Search matches a substring of the pool name or the exact pool token.
 	Search         string
 	OwnerEmail     string
 	Created        DateRange
@@ -755,7 +756,7 @@ func (a *Analytics) ListPools(ctx context.Context, f PoolListFilter) (*PoolList,
 	var args queryArgs
 	conds := f.Created.conditions("p.created", &args)
 	if f.Search != "" {
-		conds = append(conds, "p.name ILIKE "+args.add("%"+f.Search+"%"))
+		conds = append(conds, "(p.name ILIKE "+args.add("%"+f.Search+"%")+" OR p.token = "+args.add(f.Search)+")")
 	}
 	if f.OwnerEmail != "" {
 		conds = append(conds, "u.email ILIKE "+args.add(f.OwnerEmail))
@@ -1081,6 +1082,25 @@ func (a *Analytics) PoolActivity(ctx context.Context, token string, offset int64
 	}
 
 	return entries, nil
+}
+
+// PoolActivityCount returns the number of square log entries for a pool.
+func (a *Analytics) PoolActivityCount(ctx context.Context, token string) (int64, error) {
+	poolID, _, err := a.poolIDByToken(ctx, token)
+	if err != nil {
+		return 0, err
+	}
+
+	var count int64
+	if err := a.q.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM pool_squares_logs l
+		INNER JOIN pool_squares ps ON ps.id = l.pool_square_id
+		WHERE ps.pool_id = $1`, poolID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("counting pool activity: %w", err)
+	}
+
+	return count, nil
 }
 
 // AnalyticsUser is a user row enriched with activity counts.
@@ -1411,18 +1431,59 @@ type SportsSyncRun struct {
 
 // SportsSyncRuns returns the most recent sports sync runs.
 func (a *Analytics) SportsSyncRuns(ctx context.Context, limit int) ([]*SportsSyncRun, error) {
+	return a.SportsSyncRunsByType(ctx, "", limit)
+}
+
+// SportsSyncRunsByType returns the most recent sports sync runs of the given
+// type, newest first. An empty syncType returns every type.
+func (a *Analytics) SportsSyncRunsByType(ctx context.Context, syncType string, limit int) ([]*SportsSyncRun, error) {
 	limit = clampLimit(limit, DefaultAnalyticsLimit, MaxAnalyticsLimit)
 
-	rows, err := a.q.QueryContext(ctx, `
+	var args queryArgs
+	var conds []string
+	if syncType != "" {
+		conds = append(conds, "sync_type = "+args.add(syncType))
+	}
+
+	query := `
 		SELECT id, sync_type, league::text, started_at, completed_at, records_processed, error_message, success
-		FROM sports_sync_log
+		FROM sports_sync_log` + whereClause(conds) + `
 		ORDER BY id DESC
-		LIMIT $1`, limit)
+		LIMIT ` + args.add(limit)
+
+	rows, err := a.q.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("querying sports sync runs: %w", err)
 	}
 	defer rows.Close()
 
+	return scanSportsSyncRuns(rows)
+}
+
+// LatestSportsSyncRuns returns the most recent run for every (sync type,
+// league) pair, newest first.
+func (a *Analytics) LatestSportsSyncRuns(ctx context.Context) ([]*SportsSyncRun, error) {
+	rows, err := a.q.QueryContext(ctx, `
+		SELECT DISTINCT ON (sync_type, league)
+			id, sync_type, league::text, started_at, completed_at, records_processed, error_message, success
+		FROM sports_sync_log
+		ORDER BY sync_type, league, id DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("querying latest sports sync runs: %w", err)
+	}
+	defer rows.Close()
+
+	runs, err := scanSportsSyncRuns(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(runs, func(i, j int) bool { return runs[i].ID > runs[j].ID })
+	return runs, nil
+}
+
+// scanSportsSyncRuns reads rows of sync log columns into SportsSyncRun values.
+func scanSportsSyncRuns(rows *sql.Rows) ([]*SportsSyncRun, error) {
 	runs := make([]*SportsSyncRun, 0)
 	for rows.Next() {
 		run := &SportsSyncRun{}
