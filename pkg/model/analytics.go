@@ -759,7 +759,7 @@ func (a *Analytics) ListPools(ctx context.Context, f PoolListFilter) (*PoolList,
 		conds = append(conds, "(p.name ILIKE "+args.add("%"+f.Search+"%")+" OR p.token = "+args.add(f.Search)+")")
 	}
 	if f.OwnerEmail != "" {
-		conds = append(conds, "u.email ILIKE "+args.add(f.OwnerEmail))
+		conds = append(conds, "u.email ILIKE "+args.add("%"+f.OwnerEmail+"%"))
 	}
 	if f.GridType != "" {
 		conds = append(conds, "p.grid_type = "+args.add(string(f.GridType)))

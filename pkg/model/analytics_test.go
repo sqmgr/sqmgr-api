@@ -22,6 +22,7 @@ import (
 	"errors"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -483,6 +484,21 @@ func TestAnalyticsIntegration(t *testing.T) {
 			list, err = a.ListPools(ctx, PoolListFilter{OwnerEmail: *owner.Email, Offset: 5})
 			g.Expect(err).Should(gomega.Succeed())
 			g.Expect(list.Pools).Should(gomega.BeEmpty())
+
+			// The owner filter is a case-insensitive substring match, so a
+			// fragment of the address (without the domain) still finds the
+			// owner's pools.
+			fragment := strings.ToUpper(strings.TrimSuffix(*owner.Email, "@example.com"))
+			list, err = a.ListPools(ctx, PoolListFilter{OwnerEmail: fragment})
+			g.Expect(err).Should(gomega.Succeed())
+			g.Expect(list.Total).Should(gomega.Equal(int64(2)))
+			for _, p := range list.Pools {
+				g.Expect(p.OwnerID).Should(gomega.Equal(owner.ID))
+			}
+
+			list, err = a.ListPools(ctx, PoolListFilter{OwnerEmail: "nobody-" + randString()})
+			g.Expect(err).Should(gomega.Succeed())
+			g.Expect(list.Total).Should(gomega.BeZero())
 		})
 	})
 
